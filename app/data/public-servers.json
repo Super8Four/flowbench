@@ -1,0 +1,6912 @@
+{
+  "schema_version": 1,
+  "source": "https://iperf3serverlist.net/",
+  "source_url": "https://export.iperf3serverlist.net/listed_iperf3_servers.json",
+  "source_checked_at": "2026-10-11T03:12:26.810554+00:00",
+  "presets": [
+    {
+      "name": "US · Ashburn · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "ash.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Ashburn",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c950c3230d4ba48637bcdea74e9650bd"
+    },
+    {
+      "name": "US · Ashburn · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "37.19.206.20",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Ashburn",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "aa49bfa625ee6bd85b1a01ef0c693b4d"
+    },
+    {
+      "name": "US · Ashburn · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "66.35.22.79",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Ashburn",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "91b032a565837e3a34c1f4aa89d6ea03"
+    },
+    {
+      "name": "US · Atlanta · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "atl.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Atlanta",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "b8dc4b9273b17ee1a21b4143b351f214"
+    },
+    {
+      "name": "US · Boston · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "109.61.86.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Boston",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "15b802761191444350f4cdc8599616f8"
+    },
+    {
+      "name": "US · Chicago · Clouvider",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "chi.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Chicago",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "68c707ca17166e50b0dafafcc457e8b8"
+    },
+    {
+      "name": "US · Chicago · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.93.1.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Chicago",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "cbfd17e7d14e858059a844a37a52297f"
+    },
+    {
+      "name": "US · Chicago · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.chi11.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Chicago",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "862c5f59629f66f4870f3e983180e47a"
+    },
+    {
+      "name": "US · Dallas · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "dal.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Dallas",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "47bb3651da3e581f4b6c0f07e08c6517"
+    },
+    {
+      "name": "US · Dallas · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "89.187.164.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Dallas",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4df77443e0033e5bfc66cd3ce9c9259d"
+    },
+    {
+      "name": "US · Dallas · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "66.35.27.207",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Dallas",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "2542a412eaaca6a30d33ee6ecdca6589"
+    },
+    {
+      "name": "US · Dallas · InterServer.net",
+      "kind": "public",
+      "ports": "5203-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5203,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "dfw.speedtest.is.cc",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Dallas",
+      "provider": "InterServer.net",
+      "continent": "North America",
+      "capacity": "100",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "474fc231b601d40a92e98230fefb4f4f"
+    },
+    {
+      "name": "US · Dallas · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.dal13.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Dallas",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "bc24b5ac869ffa312d90f5cc17536dde"
+    },
+    {
+      "name": "US · Houston · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "37.19.216.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Houston",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "823d0cd69c425d8b9d9ca8f840e1894e"
+    },
+    {
+      "name": "US · Kansas City · NOCIX",
+      "kind": "public",
+      "ports": "5201-5205",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.nocix.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Kansas City",
+      "provider": "NOCIX",
+      "continent": "North America",
+      "capacity": "200",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e5ddbbc7df41f501c0530488ac2ef3de"
+    },
+    {
+      "name": "US · Los Angeles · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "la.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Los Angeles",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "66912bc73d273c9f4be8efa4cf50e8e1"
+    },
+    {
+      "name": "US · Los Angeles · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.152.67.2",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Los Angeles",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "bc0ad50c7ef6473db1387c8c2db1b1bd"
+    },
+    {
+      "name": "US · Los Angeles · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.lax12.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Los Angeles",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "d4b1d516ab68f4cd54f55cd1a79bfea5"
+    },
+    {
+      "name": "US · Miami · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "195.181.162.195",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Miami",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "8c67dea02af36d631bdcc1433f48ae46"
+    },
+    {
+      "name": "US · Miami · FortiSASE",
+      "kind": "public",
+      "ports": "30002-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30002,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "23.249.54.234",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Miami",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "06830495142e6d1ff463d78a25584a8f"
+    },
+    {
+      "name": "US · Miami · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.mia11.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Miami",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5bbb0b4904b04035a4c914e47ca3b5a4"
+    },
+    {
+      "name": "US · New York · HOSTKEY",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "spd-uswb.hostkey.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "New York",
+      "provider": "HOSTKEY",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "170f09c1ae82a9fe483eab4e6e80e4f7"
+    },
+    {
+      "name": "US · New York City · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.nyc1.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "New York City",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "25018792dea973dd0a4c22ba355ebd55"
+    },
+    {
+      "name": "US · Phoenix · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "phx.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Phoenix",
+      "provider": "Clouvider",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "b9b52eb67733844d69ef72a34de00ba2"
+    },
+    {
+      "name": "US · Phoenix · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.phx1.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Phoenix",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "85c45f8fb7987fe43aaf89eb0dc85e4b"
+    },
+    {
+      "name": "US · Plano · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "209.40.123.215",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Plano",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "731a87be0ae307754b0105d11f4f313a"
+    },
+    {
+      "name": "US · Salt Lake · XMISSION",
+      "kind": "public",
+      "ports": "5202-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5202,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.xmission.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Salt Lake",
+      "provider": "XMISSION",
+      "continent": "North America",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "74147ba68eccc69c9213c88f74c659b2"
+    },
+    {
+      "name": "US · San Francisco · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.sfo12.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "San Francisco",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "1a0b17bc51f26d5d7dc9f5d4a102d3da"
+    },
+    {
+      "name": "US · San Jose · FortiSASE",
+      "kind": "public",
+      "ports": "30002-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30002,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "148.230.59.38",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "San Jose",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "93b918b0d86fc69507b93e9a02f151a0"
+    },
+    {
+      "name": "US · Seattle · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "84.17.41.11",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Seattle",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "7401796296a278117bd8e701745ed5a8"
+    },
+    {
+      "name": "US · Seattle · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.sea11.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Seattle",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f17e8f2873cf670c71bbb46d78c05460"
+    },
+    {
+      "name": "US · Washington · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.wdc2.us.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "US",
+      "city": "Washington",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "cd8d8ebb6907da85343d602ad76bc4da"
+    },
+    {
+      "name": "AE · Dubai · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "69.48.238.200",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AE",
+      "city": "Dubai",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "d380856ecd0b5103860e3ea231f55c10"
+    },
+    {
+      "name": "AE · Dubai · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "189.25.101.151",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AE",
+      "city": "Dubai",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "7dd02f4e5f1c2bd68f36a667d604dcc1"
+    },
+    {
+      "name": "AE · Dubai · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "189.25.97.217",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AE",
+      "city": "Dubai",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e25e62febd1813a474b05b49336cba16"
+    },
+    {
+      "name": "AO · Luanda · Paratus",
+      "kind": "public",
+      "ports": "9210-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9210,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "160.242.19.254",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AO",
+      "city": "Luanda",
+      "provider": "Paratus",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4547e26e43eeaf0970e87b0f4dea1384"
+    },
+    {
+      "name": "AO · Luanda · Paratus",
+      "kind": "public",
+      "ports": "9210-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9210,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "102.130.68.171",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AO",
+      "city": "Luanda",
+      "provider": "Paratus",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c8da9edd60982cb262d43345f2ea9ce8"
+    },
+    {
+      "name": "AT · Vienna · Alwyzon",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf3-vie-at.alwyzon.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AT",
+      "city": "Vienna",
+      "provider": "Alwyzon",
+      "continent": "Europe",
+      "capacity": "2x100",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "da3e4e7e19ba177379bead947f1825ce"
+    },
+    {
+      "name": "AT · Vienna · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.180.12.40",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AT",
+      "city": "Vienna",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "bdbb28ec63b34df6370637a43bc95ab2"
+    },
+    {
+      "name": "AU · Sydney · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "143.244.63.144",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AU",
+      "city": "Sydney",
+      "provider": "DATAPACKET",
+      "continent": "Oceania",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "640f3d0ed5934068e9847c091e751f4d"
+    },
+    {
+      "name": "AU · Sydney · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.44.87",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AU",
+      "city": "Sydney",
+      "provider": "FortiSASE",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "0df8a5e34fa1dc814a9a531a15f3c4f6"
+    },
+    {
+      "name": "AU · Sydney · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.syd12.au.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AU",
+      "city": "Sydney",
+      "provider": "LeaseWeb",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "3833c9168398215ed9ac0197046d8a71"
+    },
+    {
+      "name": "AU · Sydney · OVH",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "syd.proof.ovh.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "AU",
+      "city": "Sydney",
+      "provider": "OVH",
+      "continent": "Oceania",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "85176415be16c1794bcf4daabbe51739"
+    },
+    {
+      "name": "BE · Brussels · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "207.211.214.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "BE",
+      "city": "Brussels",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f273ff92829846cd1439fd1c8b18f00b"
+    },
+    {
+      "name": "BE · Liège · VOO",
+      "kind": "public",
+      "ports": "5201-5240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.3.160.57",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "BE",
+      "city": "Liège",
+      "provider": "VOO",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "09f430670f8d96d9647a22a2fdefb759"
+    },
+    {
+      "name": "BG · Sofia · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "37.19.203.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "BG",
+      "city": "Sofia",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "d8e6ae1afaf3c9b92e3627f03f589487"
+    },
+    {
+      "name": "BR · Sao Paulo · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "148.230.60.200",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "BR",
+      "city": "Sao Paulo",
+      "provider": "FortiSASE",
+      "continent": "Latin America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6d62df6c8e04903614150573608f622a"
+    },
+    {
+      "name": "BR · São Paulo · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "138.199.4.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "BR",
+      "city": "São Paulo",
+      "provider": "DATAPACKET",
+      "continent": "Latin America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "2dff4bf4c562c5ed2d2c98eda143154c"
+    },
+    {
+      "name": "CA · Montreal · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.mtl2.ca.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Montreal",
+      "provider": "LeaseWeb",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "28cec5aef5a2c8fa71ff42e0b980356a"
+    },
+    {
+      "name": "CA · Montreal · TELUS",
+      "kind": "public",
+      "ports": "9205-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9205,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.goco.ca",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Montreal",
+      "provider": "TELUS",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "d58081aa6b3a5efbd40b2fdb5caf7454"
+    },
+    {
+      "name": "CA · Ottawa · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "173.243.131.29",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Ottawa",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c24f761e5a5beb6cfe9d5ad7e5fbcd20"
+    },
+    {
+      "name": "CA · Toronto · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "138.199.57.129",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Toronto",
+      "provider": "DATAPACKET",
+      "continent": "North America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5cc541fca5894a84f2986ed435fe3b1c"
+    },
+    {
+      "name": "CA · Toronto · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.43.6",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Toronto",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "eada2e5079c39433977373b455f0bc5e"
+    },
+    {
+      "name": "CA · Toronto · FortiSASE",
+      "kind": "public",
+      "ports": "30002-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30002,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "204.155.243.172",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Toronto",
+      "provider": "FortiSASE",
+      "continent": "North America",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e797db444744c743fbd6d4efee0ab0e9"
+    },
+    {
+      "name": "CA · Victoria · couch.ca",
+      "kind": "public",
+      "ports": "15201-15210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 15201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed.couch.ca",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Victoria",
+      "provider": "couch.ca",
+      "continent": "North America",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a4eeff63b340e9959871db6510372f09"
+    },
+    {
+      "name": "CA · Woodstock · Xplore",
+      "kind": "public",
+      "ports": "8070-8099",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 8070,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "yyc-speedtest.xplore.ca",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CA",
+      "city": "Woodstock",
+      "provider": "Xplore",
+      "continent": "North America",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "7bacc7d78dba8bdd0301ade5e809dda2"
+    },
+    {
+      "name": "CH · Schaffhausen · Sasag",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.shinternet.ch",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CH",
+      "city": "Schaffhausen",
+      "provider": "Sasag",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "84ab5275081015cff08d3ee18a5080de"
+    },
+    {
+      "name": "CH · Winterthur · Init7",
+      "kind": "public",
+      "ports": "5201-5204",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.init7.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CH",
+      "city": "Winterthur",
+      "provider": "Init7",
+      "continent": "Europe",
+      "capacity": "20",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "194db686cae4b9b6ad79ed85e3028c53"
+    },
+    {
+      "name": "CH · Zürich · CSCS",
+      "kind": "public",
+      "ports": "5201-5203",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "t5.cscs.ch",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CH",
+      "city": "Zürich",
+      "provider": "CSCS",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "de846a421acee3d00e509e6d94247b5b"
+    },
+    {
+      "name": "CH · Zürich · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "89.187.165.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CH",
+      "city": "Zürich",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "41dc1fae3d6b9279e6f3dcce13fc41f6"
+    },
+    {
+      "name": "CH · Zürich · iWay",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.iway.ch",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CH",
+      "city": "Zürich",
+      "provider": "iWay",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "138323271fe398baa2d57b3882a1afe9"
+    },
+    {
+      "name": "CL · Santiago · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "79.127.209.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CL",
+      "city": "Santiago",
+      "provider": "DATAPACKET",
+      "continent": "Latin America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9a121b4731c78ae1f75be7459a5740e2"
+    },
+    {
+      "name": "CN · Chengdu · China Telecom",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "116.169.118.91",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CN",
+      "city": "Chengdu",
+      "provider": "China Telecom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a3450c7bb6099ef61d0c5509297c0711"
+    },
+    {
+      "name": "CN · Fuzhou · China Telecom",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "59.56.22.40",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CN",
+      "city": "Fuzhou",
+      "provider": "China Telecom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "972ed50d1493e0b71ba7d043b2e8795d"
+    },
+    {
+      "name": "CN · Nanjing · China Telecom",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "114.230.93.99",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CN",
+      "city": "Nanjing",
+      "provider": "China Telecom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "b428e9397f43768e16c1acdebe0dfe02"
+    },
+    {
+      "name": "CN · Ningbo · China Telecom",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "122.228.230.122",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CN",
+      "city": "Ningbo",
+      "provider": "China Telecom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "b5b3c9c395f540e2c900f2a96a0378a0"
+    },
+    {
+      "name": "CN · Zhengzhou · China Telecom",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "123.53.44.221",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CN",
+      "city": "Zhengzhou",
+      "provider": "China Telecom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9c18bb13054242aace3e033dd8d325f8"
+    },
+    {
+      "name": "CR · San Jose · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "156.146.53.53",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CR",
+      "city": "San Jose",
+      "provider": "DATAPACKET",
+      "continent": "Latin America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4d558f7e09bfa9956cb9f14517556c3f"
+    },
+    {
+      "name": "CZ · Prague · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.152.65.113",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "CZ",
+      "city": "Prague",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "98e3533d58c9a08dc61ed4461a8786ed"
+    },
+    {
+      "name": "DE · Berlin · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a209.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Berlin",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "226e35b4089c41375b288aedde7f8584"
+    },
+    {
+      "name": "DE · Berlin · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a110.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Berlin",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a8bd4cb6604006a05895e80ec649f013"
+    },
+    {
+      "name": "DE · Düsseldorf · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a208.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Düsseldorf",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "58356c352a8df6510beef7d16c9db1d2"
+    },
+    {
+      "name": "DE · Frankfurt · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "fra.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "Clouvider",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9b026cf6ff60de465343dac14fc8da94"
+    },
+    {
+      "name": "DE · Frankfurt · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.102.219.93",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "594bc0ffbbc6d27cf26643860ce2ec6a"
+    },
+    {
+      "name": "DE · Frankfurt · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.39.38",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "FortiSASE",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9ec651d6fd24e20d85b20d8671ab50b1"
+    },
+    {
+      "name": "DE · Frankfurt · HOSTKEY",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "spd-desrv.hostkey.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "HOSTKEY",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6b6132aa13e654e724ae90059d79ee02"
+    },
+    {
+      "name": "DE · Frankfurt · IP Projects",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.ip-projects.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "IP Projects",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "235e868e174d160a5a013c57571e48e7"
+    },
+    {
+      "name": "DE · Frankfurt · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.fra1.de.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "LeaseWeb",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ca17680bdaf3b024e9b361d43afbcde2"
+    },
+    {
+      "name": "DE · Frankfurt · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a210.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9d7d57ebb89b4f74a6a6305043f13ba6"
+    },
+    {
+      "name": "DE · Frankfurt · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a205.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "85a53072efc29db111a40639ebecfa6e"
+    },
+    {
+      "name": "DE · Frankfurt · level66.network",
+      "kind": "public",
+      "ports": "5201-5205",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.level66.services",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Frankfurt",
+      "provider": "level66.network",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "956d821857f8aa50ddb6af5d653a6cee"
+    },
+    {
+      "name": "DE · Norderstedt · wilhelm.tel",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.wtnet.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Norderstedt",
+      "provider": "wilhelm.tel",
+      "continent": "Europe",
+      "capacity": "40",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9381267de0558f781a9f295751e9b7cf"
+    },
+    {
+      "name": "DE · Wolfsburg · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Wolfsburg",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "044f7cd756c8825e5c044b73b76d3e58"
+    },
+    {
+      "name": "DE · Wolfsburg · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a400.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DE",
+      "city": "Wolfsburg",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "07b9e2ab5f6e54a8518904de9001fa66"
+    },
+    {
+      "name": "DK · Copenhagen · Fiberby",
+      "kind": "public",
+      "ports": "9201-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed1.fiberby.dk",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DK",
+      "city": "Copenhagen",
+      "provider": "Fiberby",
+      "continent": "Europe",
+      "capacity": "25",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5fc136eb18fbaf6844b777556ef8d99e"
+    },
+    {
+      "name": "DK · Copenhagen · Fiberby",
+      "kind": "public",
+      "ports": "9201-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed2.fiberby.dk",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DK",
+      "city": "Copenhagen",
+      "provider": "Fiberby",
+      "continent": "Europe",
+      "capacity": "25",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5411ff566742e294306b4ece856a009d"
+    },
+    {
+      "name": "DK · Copenhagen · Hiper",
+      "kind": "public",
+      "ports": "5201-5205",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.hiper.dk",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DK",
+      "city": "Copenhagen",
+      "provider": "Hiper",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5b6666a0fec6d804e4cc5ca0460b7697"
+    },
+    {
+      "name": "DZ · Algiers · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "41.110.39.130",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "DZ",
+      "city": "Algiers",
+      "provider": "DATAPACKET",
+      "continent": "Africa",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f326ee06615ec24bfa307a9967f1849a"
+    },
+    {
+      "name": "EC · Santa Ana · MásNet",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.masnet.ec",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "EC",
+      "city": "Santa Ana",
+      "provider": "MásNet",
+      "continent": "Latin America",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "46ffeba931dcb86676271cbdcaa57f25"
+    },
+    {
+      "name": "EE · Tallinn · CITIC",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "bwtest.linxtelecom.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "EE",
+      "city": "Tallinn",
+      "provider": "CITIC",
+      "continent": "Europe",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5c6021495b3aff3a3879edcd21d84348"
+    },
+    {
+      "name": "EG · Cairo · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "213.158.175.240",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "EG",
+      "city": "Cairo",
+      "provider": "DATAPACKET",
+      "continent": "Africa",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e66082a5845e49b98d0e2890d9cb9b45"
+    },
+    {
+      "name": "ES · Madrid · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.93.3.50",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "ES",
+      "city": "Madrid",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a27c60deb6443a6ed125b7381950c832"
+    },
+    {
+      "name": "ES · Madrid · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "148.230.45.213",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "ES",
+      "city": "Madrid",
+      "provider": "FortiSASE",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "39a54595256e27057db95f98c318c288"
+    },
+    {
+      "name": "FI · Helsinki · HOSTKEY",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "spd-fisrv.hostkey.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FI",
+      "city": "Helsinki",
+      "provider": "HOSTKEY",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "27fd8e96063eb494c7ca16723c44eecd"
+    },
+    {
+      "name": "FR · Marseille · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "138.199.14.66",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Marseille",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f892b7e32cfa65dd86fd0c456da9e536"
+    },
+    {
+      "name": "FR · Paris · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.93.2.193",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Paris",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "271613bb5fff77deee32285b7f5391e8"
+    },
+    {
+      "name": "FR · Paris · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.42.156",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Paris",
+      "provider": "FortiSASE",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "50a1ee25d5c427dacfea2a7661839d5e"
+    },
+    {
+      "name": "FR · Paris · Scaleway",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "ping-90ms.online.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Paris",
+      "provider": "Scaleway",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "cd28b71906fdbcff45f034d3d9b9e3fc"
+    },
+    {
+      "name": "FR · Paris · Scaleway",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf.online.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Paris",
+      "provider": "Scaleway",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "463441b52c963c86c7c741fca749fb96"
+    },
+    {
+      "name": "FR · Paris · moji",
+      "kind": "public",
+      "ports": "5200-5240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf3.moji.fr",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Paris",
+      "provider": "moji",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "27447ac3cb8baf3c5f78ef2632fa2d91"
+    },
+    {
+      "name": "FR · Valbonne · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.41.167",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Valbonne",
+      "provider": "FortiSASE",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "35ee2436d14587ae3803eaab7f699d11"
+    },
+    {
+      "name": "FR · Vitry-sur-Seine · Scaleway",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "ping.online.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "FR",
+      "city": "Vitry-sur-Seine",
+      "provider": "Scaleway",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e34eee014effc1a4a642b72ad5c3f391"
+    },
+    {
+      "name": "GB · London · Cloudvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "lon.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "Cloudvider",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "fe52de1e1b11b25a349083dda63f3b9e"
+    },
+    {
+      "name": "GB · London · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.59.221.51",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a128d10025f600151680db80b13205a8"
+    },
+    {
+      "name": "GB · London · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.40.45",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "FortiSASE",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "cd5cc4ae0e5cf4a66ecc07fdf18fc8e0"
+    },
+    {
+      "name": "GB · London · LeaseWeb",
+      "kind": "public",
+      "ports": "5202-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5202,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.lon1.uk.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "LeaseWeb",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ec497cd0175d57766b4659fe21670d4e"
+    },
+    {
+      "name": "GB · London · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.lon12.uk.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "LeaseWeb",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5a30265fa195613c7ff8870fb3237edd"
+    },
+    {
+      "name": "GB · London · Lightning Fibre",
+      "kind": "public",
+      "ports": "4000-4007",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 4000,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest2.lightningfibre.net.uk",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "Lightning Fibre",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6e2ee66c4d7c5fa13fb78b968a208cee"
+    },
+    {
+      "name": "GB · London · UK Servers",
+      "kind": "public",
+      "ports": "5300-5400",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5300,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf.as42831.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "London",
+      "provider": "UK Servers",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "429a38c7f858a8ff123da8e610adadfd"
+    },
+    {
+      "name": "GB · Maidenhead · RapidSwitch",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.rapidswitch.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "Maidenhead",
+      "provider": "RapidSwitch",
+      "continent": "Europe",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4eb364e10f349716aefb821790896856"
+    },
+    {
+      "name": "GB · Manchester · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "man.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GB",
+      "city": "Manchester",
+      "provider": "Clouvider",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e996c6e5d1a4369212ec405e3f563756"
+    },
+    {
+      "name": "GH · Accra · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "102.214.66.39",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GH",
+      "city": "Accra",
+      "provider": "DATAPACKET",
+      "continent": "Africa",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "b6ac47bf27671443d76a114d61742b4a"
+    },
+    {
+      "name": "GH · Accra · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "102.214.66.19",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GH",
+      "city": "Accra",
+      "provider": "DATAPACKET",
+      "continent": "Africa",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c85f8d0a84d9fb8c0edcac8f3f957e56"
+    },
+    {
+      "name": "GM · Banjul · Pura",
+      "kind": "public",
+      "ports": "60001-60003",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 60001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "212.60.92.134",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GM",
+      "city": "Banjul",
+      "provider": "Pura",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f2fad7fb31c0a1681651506fa9266c02"
+    },
+    {
+      "name": "GQ · Bata · Guine@net",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "gw1.malabo.guineanet.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GQ",
+      "city": "Bata",
+      "provider": "Guine@net",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "475f15b4ed8f39e929e46a56c8f72d24"
+    },
+    {
+      "name": "GQ · Bata · Guineanet",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "105.235.237.2",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GQ",
+      "city": "Bata",
+      "provider": "Guineanet",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "77cc579bb0e1a4065a9952a2ee030db7"
+    },
+    {
+      "name": "GR · Athens · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "169.150.252.2",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "GR",
+      "city": "Athens",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ce1552bb23867d34d999f442458399ca"
+    },
+    {
+      "name": "HK · Hong Kong · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "84.17.57.129",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "HK",
+      "city": "Hong Kong",
+      "provider": "DATAPACKET",
+      "continent": "Asia",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "aea7b3277c4b21c4d8fad0634339f303"
+    },
+    {
+      "name": "HK · Hong Kong · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.hkg12.hk.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "HK",
+      "city": "Hong Kong",
+      "provider": "LeaseWeb",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4682a12a937a1eb462b77cab3eb65f36"
+    },
+    {
+      "name": "HR · Zagreb · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "169.150.242.129",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "HR",
+      "city": "Zagreb",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "311e8746678c81e63497ad4e241e5639"
+    },
+    {
+      "name": "ID · Kediri · MyRepublic",
+      "kind": "public",
+      "ports": "9205-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9205,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.tangerang2.myrepublic.net.id",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "ID",
+      "city": "Kediri",
+      "provider": "MyRepublic",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5f278a6486777ee87f91714c13ae63c9"
+    },
+    {
+      "name": "IE · Dublin · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "87.249.137.8",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IE",
+      "city": "Dublin",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "eff638edd1ab4b1e37367ae69ce09ce6"
+    },
+    {
+      "name": "IL · Jerusalem · Netfiber",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed.netfiber.net.il",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IL",
+      "city": "Jerusalem",
+      "provider": "Netfiber",
+      "continent": "Asia",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c492b2c6a22c540aac463b44ac9147d0"
+    },
+    {
+      "name": "IL · Jerusalem · Rimon",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed.rimon.net.il",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IL",
+      "city": "Jerusalem",
+      "provider": "Rimon",
+      "continent": "Asia",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "edaf4514c27314a7911fc94934b547c7"
+    },
+    {
+      "name": "IL · Tel Aviv · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "169.150.202.193",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IL",
+      "city": "Tel Aviv",
+      "provider": "DATAPACKET",
+      "continent": "Asia",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "889343ae82d1635b3134d7450da57558"
+    },
+    {
+      "name": "IN · Bengaluru · ACT Fibernet",
+      "kind": "public",
+      "ports": "5008-5020",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5008,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "49.205.75.2",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IN",
+      "city": "Bengaluru",
+      "provider": "ACT Fibernet",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "cf1126634d2dab6423c03729224386cb"
+    },
+    {
+      "name": "IN · Pune · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "69.48.236.198",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IN",
+      "city": "Pune",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ac5109fd6f1a387259085d3c112516a7"
+    },
+    {
+      "name": "IS · Reykjavik · HOSTKEY",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "spd-icsrv.hostkey.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IS",
+      "city": "Reykjavik",
+      "provider": "HOSTKEY",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "77297a03c66a47fd377eee2d2cdf2c5b"
+    },
+    {
+      "name": "IT · Arezzo · Aruba.it",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "it1.speedtest.aruba.it",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IT",
+      "city": "Arezzo",
+      "provider": "Aruba.it",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "455d5ca42df2642486ed3a501333f251"
+    },
+    {
+      "name": "IT · Milan · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "84.17.59.129",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IT",
+      "city": "Milan",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "baa69bd23ebc85b67e5d2188a8172a06"
+    },
+    {
+      "name": "IT · Ponte San Pietro · Aruba.it",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "217.61.40.96",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IT",
+      "city": "Ponte San Pietro",
+      "provider": "Aruba.it",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "906a1dc8c79f6c4f47485ac0d08381d8"
+    },
+    {
+      "name": "IT · Rome · Dimensione",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed-cb.dimensione.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "IT",
+      "city": "Rome",
+      "provider": "Dimensione",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6bc3a00321a302bbd08c80d83cc2eb6e"
+    },
+    {
+      "name": "JM · Portmore · Flow",
+      "kind": "public",
+      "ports": "5506-5520",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5506,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest1.flowjamaica.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "JM",
+      "city": "Portmore",
+      "provider": "Flow",
+      "continent": "Latin America",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "84294d5cb3bb59ac0f690ef2e9b1e816"
+    },
+    {
+      "name": "JP · Tokyo · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "89.187.160.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "JP",
+      "city": "Tokyo",
+      "provider": "DATAPACKET",
+      "continent": "Asia",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "4da1d107ae5d3a8e219babb153735cf0"
+    },
+    {
+      "name": "JP · Tokyo · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "66.35.31.81",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "JP",
+      "city": "Tokyo",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "5018011313e929e218721db1caafbc09"
+    },
+    {
+      "name": "JP · Tokyo · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.tyo11.jp.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "JP",
+      "city": "Tokyo",
+      "provider": "LeaseWeb",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "1f0e7cbfd2f253a246e45929783bb622"
+    },
+    {
+      "name": "KE · Nairobi · Mymanga",
+      "kind": "public",
+      "ports": "9202-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9202,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed.mymanga.pro",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "KE",
+      "city": "Nairobi",
+      "provider": "Mymanga",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "63561e0bd05c5df3910945a680339f76"
+    },
+    {
+      "name": "MN · Ulaanbaatar · Mobicom",
+      "kind": "public",
+      "ports": "5201-5202",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "coverage1.mobicom.mn",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "MN",
+      "city": "Ulaanbaatar",
+      "provider": "Mobicom",
+      "continent": "Asia",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "767294d1841cf7b1a8b52a7cef42f6b3"
+    },
+    {
+      "name": "MU · Floreal · Mauritius Telecom",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtestfl.telecom.mu",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "MU",
+      "city": "Floreal",
+      "provider": "Mauritius Telecom",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "805f4c65c7b51d98d7847f9c657a45cb"
+    },
+    {
+      "name": "MU · Floreal · Mauritius Telecom",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "197.227.12.18",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "MU",
+      "city": "Floreal",
+      "provider": "Mauritius Telecom",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "bb9059246ca3ba9fdd75c9fcb7282e25"
+    },
+    {
+      "name": "MU · London · Mauritius Telecom",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtestlondon.telecom.mu",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "MU",
+      "city": "London",
+      "provider": "Mauritius Telecom",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "103e6fee7047497327ca2bf401779833"
+    },
+    {
+      "name": "MX · Querétaro · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "121.127.43.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "MX",
+      "city": "Querétaro",
+      "provider": "DATAPACKET",
+      "continent": "Latin America",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "fcef9f91875e1eedca6b222f0256ba08"
+    },
+    {
+      "name": "NC · Noumea · Lagoon",
+      "kind": "public",
+      "ports": "5202-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5202,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.lagoon.nc",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NC",
+      "city": "Noumea",
+      "provider": "Lagoon",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "0106ac359413e28ceeb169feb1c1bb96"
+    },
+    {
+      "name": "NL · Amsterdam · Clouvider",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "ams.speedtest.clouvider.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "Clouvider",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6ad5f8ef19412c910293ad08ed6f52dd"
+    },
+    {
+      "name": "NL · Amsterdam · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.102.218.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "71b31057c63310b371504315d2e9f34d"
+    },
+    {
+      "name": "NL · Amsterdam · Eranium",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf-ams-nl.eranium.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "Eranium",
+      "continent": "Europe",
+      "capacity": "100",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "76e3ba7eab2ab61801a8779025882c4f"
+    },
+    {
+      "name": "NL · Amsterdam · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.ams1.nl.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "LeaseWeb",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "730c01a2d0986999e70931a3b50bfc3c"
+    },
+    {
+      "name": "NL · Amsterdam · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.ams2.nl.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "LeaseWeb",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6c27f5c518611c5e8bfeafe7231844bd"
+    },
+    {
+      "name": "NL · Amsterdam · NetOne",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.netone.nl",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "NetOne",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9cc220e99ae0e705a1c9833f0af25079"
+    },
+    {
+      "name": "NL · Amsterdam · Scaleway",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "ping-ams1.online.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "Scaleway",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c1f90419b84738a0d589f65835ce23e2"
+    },
+    {
+      "name": "NL · Amsterdam · WOBCOM",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "a204.speedtest.wobcom.de",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Amsterdam",
+      "provider": "WOBCOM",
+      "continent": "Europe",
+      "capacity": "2x25",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "84fa292e5245e9cfa80f4e138d157b52"
+    },
+    {
+      "name": "NL · Dronten · vps1",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "nl.speed.vps1.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Dronten",
+      "provider": "vps1",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ab5df81a37da393ae8dd332a61a23097"
+    },
+    {
+      "name": "NL · Lelystad · SURFnet",
+      "kind": "public",
+      "ports": "5201-5220",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf1.surfwireless.nl",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Lelystad",
+      "provider": "SURFnet",
+      "continent": "Europe",
+      "capacity": "",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ded3cfd7550e6a4e691d1f4097aca72a"
+    },
+    {
+      "name": "NL · Naaldwijk · Worldstream",
+      "kind": "public",
+      "ports": "5201-5205",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf.worldstream.nl",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NL",
+      "city": "Naaldwijk",
+      "provider": "Worldstream",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "111c15e25ce3997df1ba9b432d2ecb1f"
+    },
+    {
+      "name": "NZ · Auckland · 2Degrees",
+      "kind": "public",
+      "ports": "5301-5309",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5301,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "akl.linetest.nz",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NZ",
+      "city": "Auckland",
+      "provider": "2Degrees",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "2c5a1942f090c3c3d03e4bec1f34f47e"
+    },
+    {
+      "name": "NZ · Auckland · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "72.1.86.46",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NZ",
+      "city": "Auckland",
+      "provider": "FortiSASE",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "18678a65c8bc3b90d10c7c6523c36f4c"
+    },
+    {
+      "name": "NZ · Christchurch · 2Degrees",
+      "kind": "public",
+      "ports": "5301-5309",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5301,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "chch.linetest.nz",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "NZ",
+      "city": "Christchurch",
+      "provider": "2Degrees",
+      "continent": "Oceania",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "76944311a61ad913887b1f337e0fc6a3"
+    },
+    {
+      "name": "PA · Colón · CW Panama",
+      "kind": "public",
+      "ports": "5505-5509",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5505,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest1.cwpanama.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PA",
+      "city": "Colón",
+      "provider": "CW Panama",
+      "continent": "Latin America",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "6e9668af50f0fb2b198f07a42995837a"
+    },
+    {
+      "name": "PA · Panamá · CW Panama",
+      "kind": "public",
+      "ports": "5505-5509",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5505,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest6.cwpanama.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PA",
+      "city": "Panamá",
+      "provider": "CW Panama",
+      "continent": "Latin America",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "c70f3af6d51f335524d20daaa847d523"
+    },
+    {
+      "name": "PG · Port Moresby · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "154.81.51.4",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PG",
+      "city": "Port Moresby",
+      "provider": "DATAPACKET",
+      "continent": "Oceania",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "628536fc1600c20d0eb3ac1303a02edf"
+    },
+    {
+      "name": "PG · Port Moresby · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "103.146.200.98",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PG",
+      "city": "Port Moresby",
+      "provider": "DATAPACKET",
+      "continent": "Oceania",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "52b3e40e7277581130c361817ec45f00"
+    },
+    {
+      "name": "PL · Debica · Multinet24",
+      "kind": "public",
+      "ports": "5301-5310",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5301,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedsrv.multinet24.pl",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PL",
+      "city": "Debica",
+      "provider": "Multinet24",
+      "continent": "Europe",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "2e39962aa445307bd9da28a1957e5869"
+    },
+    {
+      "name": "PL · Warsaw · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.246.208.67",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PL",
+      "city": "Warsaw",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "917a45ff2cb6a8f813dddbde286132d8"
+    },
+    {
+      "name": "PT · Lisbon · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "109.61.94.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "PT",
+      "city": "Lisbon",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "14fc14334faf98d73efbba1821472755"
+    },
+    {
+      "name": "RO · Bucharest · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.102.217.170",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "RO",
+      "city": "Bucharest",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "230ec3f9a0ceccb7ac1d769366bbb375"
+    },
+    {
+      "name": "RS · Belgrade · SOX",
+      "kind": "public",
+      "ports": "9206-9240",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 9206,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest1.sox.rs",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "RS",
+      "city": "Belgrade",
+      "provider": "SOX",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "410c8a029c360ece944884dbd356146a"
+    },
+    {
+      "name": "SA · Cape Town · Vanilla",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "verb.vanilla.co.za",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SA",
+      "city": "Cape Town",
+      "provider": "Vanilla",
+      "continent": "Africa",
+      "capacity": "",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e9cb9257186bfb126b1ecab39445c83e"
+    },
+    {
+      "name": "SE · Alvsjo · Hostup",
+      "kind": "public",
+      "ports": "5201-5207",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf.fegis.nu",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SE",
+      "city": "Alvsjo",
+      "provider": "Hostup",
+      "continent": "Europe",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "8299ca30675eb6accba4739a57bac48a"
+    },
+    {
+      "name": "SE · Kista · Kamel Networks",
+      "kind": "public",
+      "ports": "5201-5205",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.kamel.network",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SE",
+      "city": "Kista",
+      "provider": "Kamel Networks",
+      "continent": "Europe",
+      "capacity": "1",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f31f388948950dfd2a271ef8481b44bd"
+    },
+    {
+      "name": "SE · Stockholm · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "185.76.9.135",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SE",
+      "city": "Stockholm",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e785a76c96f29989da2a3c032fb60e90"
+    },
+    {
+      "name": "SG · Singapore · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "89.187.162.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SG",
+      "city": "Singapore",
+      "provider": "DATAPACKET",
+      "continent": "Asia",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e5145aab36f5312dd6c225fafb09ca36"
+    },
+    {
+      "name": "SG · Singapore · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "96.45.38.22",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SG",
+      "city": "Singapore",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "88089e45df98e8ecf7fd2db398165fef"
+    },
+    {
+      "name": "SG · Singapore · FortiSASE",
+      "kind": "public",
+      "ports": "30002-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30002,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "176.23.128.102",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SG",
+      "city": "Singapore",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f9d33718d0dc60669cf519552b0c8475"
+    },
+    {
+      "name": "SG · Singapore · LeaseWeb",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.sin1.sg.leaseweb.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SG",
+      "city": "Singapore",
+      "provider": "LeaseWeb",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "a0d6b76ae789fcd571e3e82a0286a9f0"
+    },
+    {
+      "name": "SG · Singapore · OVH",
+      "kind": "public",
+      "ports": "5201-5210",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "sgp.proof.ovh.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SG",
+      "city": "Singapore",
+      "provider": "OVH",
+      "continent": "Asia",
+      "capacity": "1",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "caa50f95b29d1a363cd0ea00040c65e0"
+    },
+    {
+      "name": "SK · Bratislava · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "156.146.40.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "SK",
+      "city": "Bratislava",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "261f42f6e99f178a5aed4115c22f986b"
+    },
+    {
+      "name": "TR · Bursa · PENDC",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "iperf.pendc.com",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "TR",
+      "city": "Bursa",
+      "provider": "PENDC",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "ab78807d27a7749ae46d42170d9cd0cd"
+    },
+    {
+      "name": "TR · Istanbul · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "156.146.52.1",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "TR",
+      "city": "Istanbul",
+      "provider": "DATAPACKET",
+      "continent": "Asia",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "927e64655119a5375631239b18a42439"
+    },
+    {
+      "name": "TR · Istanbul · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "69.48.237.66",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "TR",
+      "city": "Istanbul",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "f0f2d742773b4f24432a876415ef1192"
+    },
+    {
+      "name": "TW · Taipei · FortiSASE",
+      "kind": "public",
+      "ports": "30001-30009",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 30001,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "189.25.98.63",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "TW",
+      "city": "Taipei",
+      "provider": "FortiSASE",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "e83d61c328f6c2e5fd802359921e579f"
+    },
+    {
+      "name": "UA · Kyiv · Cosmonova",
+      "kind": "public",
+      "ports": "5201-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speed.cosmonova.net",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "UA",
+      "city": "Kyiv",
+      "provider": "Cosmonova",
+      "continent": "Europe",
+      "capacity": "40",
+      "protocols": [
+        "tcp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "95370bf518edd4894395f5fceab42f4f"
+    },
+    {
+      "name": "UA · Kyiv · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "37.19.218.65",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "UA",
+      "city": "Kyiv",
+      "provider": "DATAPACKET",
+      "continent": "Europe",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "65d7ca8c312c6a62f54345cd5ee397d2"
+    },
+    {
+      "name": "UG · Kampala · DATAPACKET",
+      "kind": "public",
+      "ports": "5201",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5201,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "41.210.185.162",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "UG",
+      "city": "Kampala",
+      "provider": "DATAPACKET",
+      "continent": "Africa",
+      "capacity": "2x10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": false,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "d30a673e35727e98016bad3c44a015cb"
+    },
+    {
+      "name": "UZ · Tashkent · UZ Telecom",
+      "kind": "public",
+      "ports": "5200-5209",
+      "settings": {
+        "role": "client",
+        "protocol": "tcp",
+        "mode": "upload",
+        "ip_version": "auto",
+        "port": 5200,
+        "duration": 10,
+        "streams": 1,
+        "idle_timeout": 300,
+        "bandwidth": "10M",
+        "target": "speedtest.uztelecom.uz",
+        "bind": "",
+        "label": "",
+        "notes": "",
+        "debug": false
+      },
+      "country": "UZ",
+      "city": "Tashkent",
+      "provider": "UZ Telecom",
+      "continent": "Asia",
+      "capacity": "10",
+      "protocols": [
+        "tcp",
+        "udp"
+      ],
+      "modes": [
+        "upload",
+        "download"
+      ],
+      "ipv6": true,
+      "source": "https://iperf3serverlist.net/",
+      "notes": "",
+      "id": "9284141c8bf9d50031d7753bce9a74f0"
+    }
+  ]
+}

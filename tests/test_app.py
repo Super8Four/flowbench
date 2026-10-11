@@ -178,8 +178,10 @@ class RealIperfTests(unittest.TestCase):
         return response.get_json()['id']
 
     def test_tcp_live_output_exports_annotation_and_restart(self):
-        run_id = self.run_test(streams=2)
-        deadline = time.monotonic() + 2
+        # Leave enough time for the Windows subprocess to start and flush a
+        # full interval while still proving output arrives before completion.
+        run_id = self.run_test(streams=2, duration=4)
+        deadline = time.monotonic() + 5
         live = None
         while time.monotonic() < deadline:
             candidate = self.client.get(f'/api/runs/{run_id}').get_json()
@@ -193,6 +195,9 @@ class RealIperfTests(unittest.TestCase):
         self.assertGreaterEqual(len(result['series']), 2)
         self.assertIn('start', result['native_result'])
         self.assertIn('server_output_text', result['native_result'])
+        self.assertTrue(result['peer']['available'])
+        self.assertTrue(result['peer']['series'])
+        self.assertGreater(result['peer']['metrics']['upload_mbps'], 0)
         seq = result['events'][0]['sequence']
         replay = self.client.get(f'/api/runs/{run_id}?after={seq}').get_json()['events']
         self.assertTrue(all(event['sequence'] > seq for event in replay))

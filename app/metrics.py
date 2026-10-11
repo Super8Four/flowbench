@@ -3,6 +3,7 @@
 
 def effective_settings(record):
     result = dict(record["settings"])
+    result.setdefault("ip_version", "auto")
     params = record.get("test_parameters") or {}
     if params:
         result["protocol"] = params.get("protocol", result["protocol"]).lower()
@@ -80,7 +81,7 @@ def comparison(before, after):
     if not left or not right:
         raise ValueError("Both tests must contain performance measurements.")
     settings_left, settings_right = effective_settings(before), effective_settings(after)
-    differences = [key for key in ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams")
+    differences = [key for key in ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams", "ip_version")
                    if settings_left[key] != settings_right[key]]
     if settings_left["protocol"] == "udp" and settings_left["bandwidth"] != settings_right["bandwidth"]:
         differences.append("bandwidth")

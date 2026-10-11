@@ -13,6 +13,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from .exports import xml_export
 from .runner import RunManager
 from .metrics import comparison, measurements, series, effective_settings
+from .imports import parse_document, import_runs
+from .presets import PresetStore, MAX_CATALOG_BYTES
+from .peer import peer_results
 
 db = SQLAlchemy()
 
@@ -28,11 +31,14 @@ def create_app(test_config=None):
         "connect_args": {"connect_timeout": 3},
     }
     app.config["RUNS_DIRECTORY"] = os.getenv("RUNS_DIRECTORY", str(Path(app.instance_path) / "runs"))
+    app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
     if test_config:
         app.config.update(test_config)
     db.init_app(app)
     manager = RunManager(app.config["RUNS_DIRECTORY"], app.config.get("IPERF_PATH"))
     app.extensions["iperf_runs"] = manager
+    presets = PresetStore(manager)
+    app.extensions["iperf_presets"] = presets
 
     @app.before_request
     def check_origin():
@@ -51,6 +57,70 @@ def create_app(test_config=None):
     @app.errorhandler(KeyError)
     def missing_run(error):
         return jsonify(error="Run not found."), 404
+
+    @app.errorhandler(413)
+    def too_large(error):
+        return jsonify(error="Upload request exceeds 32 MiB. Choose a file up to 20 MiB."), 413
+
+    @app.errorhandler(OSError)
+    def storage_failure(error):
+        return jsonify(error=f"Storage operation failed: {error}"), 503
+
+    def uploaded_document(limit):
+        data = request.get_json()
+        if not isinstance(data, dict) or not isinstance(data.get("content"), str):
+            raise ValueError("Send the uploaded file as content text in a JSON object.")
+        filename = data.get("filename", "import.json")
+        if not isinstance(filename, str) or len(filename) > 255:
+            raise ValueError("Invalid uploaded filename.")
+        try:
+            content = data["content"].encode("utf-8")
+        except UnicodeError:
+            raise ValueError("File must contain valid UTF-8 text.") from None
+        if len(content) > limit:
+            raise ValueError(f"File exceeds {limit // (1024 * 1024)} MiB.")
+        return parse_document(content), filename.replace("\\", "/").split("/")[-1]
+
+    @app.get("/api/presets")
+    def get_presets():
+        data = presets.read()
+        if request.args.get("download") == "1":
+            return Response(json.dumps(data, indent=2, ensure_ascii=False), mimetype="application/json",
+                            headers={"Content-Disposition": 'attachment; filename="iperf-server-presets.json"'})
+        return jsonify(data)
+
+    @app.post("/api/presets")
+    def save_preset():
+        return jsonify(presets.save_custom(request.get_json())), 201
+
+    @app.patch("/api/presets/<preset_id>")
+    def update_preset(preset_id):
+        return jsonify(presets.save_custom(request.get_json(), preset_id))
+
+    @app.delete("/api/presets/<preset_id>")
+    def remove_preset(preset_id):
+        presets.delete_custom(preset_id)
+        return jsonify(status="removed")
+
+    @app.post("/api/presets/import")
+    def import_presets():
+        data, _ = uploaded_document(MAX_CATALOG_BYTES)
+        return jsonify(presets.merge(data))
+
+    @app.post("/api/presets/refresh")
+    def refresh_presets():
+        try:
+            return jsonify(presets.refresh())
+        except (OSError, TimeoutError) as exc:
+            return jsonify(error=f"Public directory refresh failed; the saved catalog is retained. {exc}"), 502
+
+    @app.post("/api/runs/import")
+    def import_saved_tests():
+        data, filename = uploaded_document(20 * 1024 * 1024)
+        try:
+            return jsonify(import_runs(manager, data, filename))
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
 
     @app.get("/")
     def index():
@@ -83,6 +153,7 @@ def create_app(test_config=None):
         record["metrics"] = measurements(record)
         record["series"] = series(record)
         record["effective_settings"] = effective_settings(record)
+        record["peer"] = peer_results(record)
         record["events"] = manager.read_events(run_id, int(after))
         return jsonify(record)
 

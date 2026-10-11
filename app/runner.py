@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from .metrics import effective_settings, measurements, series
+from .peer import peer_results
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
@@ -52,6 +53,7 @@ def settings_from(data):
         ("role", "client", {"client", "server"}),
         ("protocol", "tcp", {"tcp", "udp"}),
         ("mode", "upload", {"upload", "download", "bidir"}),
+        ("ip_version", "auto", {"auto", "4", "6"}),
     ):
         value = data.get(key, default)
         if not isinstance(value, str) or value not in choices:
@@ -201,6 +203,7 @@ class RunManager:
                     )}
                     row["metrics"] = measurements(record)
                     row["effective_settings"] = effective_settings(record)
+                    row["imported"] = record.get("imported")
                     records.append(row)
                 except (KeyError, OSError, json.JSONDecodeError):
                     continue
@@ -249,6 +252,8 @@ class RunManager:
                     raise ValueError("This iPerf3 version does not support bidirectional tests.")
                 cmd.append("--bidir")
         cmd += ["-p", str(settings["port"]), "-i", "1", "--forceflush"]
+        if settings.get("ip_version", "auto") != "auto":
+            cmd.append("-" + settings["ip_version"])
         if settings["bind"]:
             cmd += ["-B", settings["bind"]]
         if self.capabilities["json_stream"]:
@@ -316,6 +321,10 @@ class RunManager:
             self.record["intervals"].append(data)
         elif event == "error":
             self.record["error"] = data if isinstance(data, str) else json.dumps(data)
+        elif event == "server_output_text" and isinstance(data, str):
+            self.record["server_output_text"] = data
+        elif event == "server_output_json" and isinstance(data, (str, dict)):
+            self.record["server_output_json"] = data
         elif event == "end" and isinstance(data, dict):
             self.record["native_result"] = obj
             self.record["summary"] = data.get("end", data)
@@ -472,6 +481,7 @@ class RunManager:
             record["metrics"] = measurements(record)
             record["effective_settings"] = effective_settings(record)
             record["series"] = series(record)
+            record["peer"] = peer_results(record)
             events = self.read_events(run_id)
             record["events"] = events
             record["raw_stdout"] = "\n".join(row["message"] for row in events if row["source"] == "stdout")
