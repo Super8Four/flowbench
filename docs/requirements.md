@@ -39,4 +39,4 @@ Web access defaults to host loopback on port 5000. Client tests need no inbound 
 
 For traceroute, the image includes Ubuntu's [iputils-tracepath package](https://packages.ubuntu.com/noble/iputils-tracepath), which is available for ARM64. No host package installation is performed by the application.
 
-Requirements are tracked in [GitHub issue #1](https://github.com/Super8Four/iPerfWeb/issues/1). See [Project state](project-state.md) for the verification boundary and [Ryan's guide](ryan-setup-and-testing.md) for operator workflows.
+Requirements are tracked in [GitHub issue #1](https://github.com/Super8Four/iPerfWeb/issues/1). See [Project state](project-state.md) for the verification boundary and [setup and testing guide](setup-and-testing.md) for operator workflows.

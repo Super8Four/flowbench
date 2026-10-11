@@ -18,4 +18,4 @@ An earlier authorized read-only SSH inventory verified the target Pi's `aarch64`
 
 Docker documents a [loopback-publication limitation before version 28](https://docs.docker.com/engine/network/port-publishing/), so the target's access boundary needs review before deployment. No host, network, firewall, or authentication settings were changed. Future Pi deployment remains a separately authorized action.
 
-See [requirements](requirements.md), [issue #1](https://github.com/Super8Four/iPerfWeb/issues/1), and [Ryan's guide](ryan-setup-and-testing.md).
+See [requirements](requirements.md), [issue #1](https://github.com/Super8Four/iPerfWeb/issues/1), and [setup and testing guide](setup-and-testing.md).

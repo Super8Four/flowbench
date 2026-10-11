@@ -2,10 +2,10 @@
   "schema_version": 1,
   "presets": [
     {
-      "name": "Ryan's server - TCP upload",
+      "name": "Example server - TCP upload",
       "kind": "custom",
       "ports": "5201",
-      "notes": "Example only: replace 192.168.1.100 with Ryan's reachable host address. Start a server session before testing.",
+      "notes": "Example only: replace 192.168.1.100 with the reachable Docker host address. Start a server session before testing.",
       "settings": {
         "target": "192.168.1.100",
         "port": 5201,

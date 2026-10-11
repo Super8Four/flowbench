@@ -1,14 +1,14 @@
-# Ryan's setup and testing guide
+# Setup and testing guide
 
 This guide covers running the iPerf workspace on an Ubuntu Docker host, testing both ends of a connection, and keeping evidence to compare a network fix. The app records the iPerf3 process it starts, including stdout, stderr, timestamps, settings, measurements, and returned server output. Tests run from the Docker host's container; the browser controls and displays them.
 
-Use your own addresses and SSH account in the examples. `192.168.1.100` represents Ryan's Docker host; `192.168.1.200` represents another iPerf server. These are example addresses, not discovered machines.
+Use your own addresses and SSH account in the examples. `192.168.1.100` represents the Docker host; `192.168.1.200` represents another iPerf server. These are example addresses, not discovered machines.
 
 ## Install and start
 
 Use native Docker Engine on Ubuntu with the Compose plugin. Follow the [official Ubuntu installation instructions](https://docs.docker.com/engine/install/ubuntu/) if Docker is missing. Git, Python 3, and curl are needed for checkout and testing. The account running these commands needs Docker access.
 
-On Ryan's Ubuntu host:
+On the Ubuntu host:
 
 ```bash
 uname -m
@@ -23,17 +23,17 @@ docker compose ps
 curl --fail http://127.0.0.1:5000/api/ready
 ```
 
-For an existing checkout, enter its directory and use `git pull --ff-only` instead of cloning again. Build on the host to match its architecture. The downloadable GitHub image is amd64; an ARM host needs its own build.
+For an existing checkout, enter its directory and use `git pull --ff-only` instead of cloning again. Build on the host to match its architecture. GitHub CI provides separate AMD64 and ARM64 image archives. Use the archive matching the host architecture, or build natively on that host.
 
 Expect a healthy container and a readiness response containing `"ready": true`. Compose's [`--wait` option](https://docs.docker.com/reference/cli/docker/compose/up/) waits for service startup and health. The app requires no separate PostgreSQL container.
 
 Open http://127.0.0.1:5000 if the browser is on the Docker host. From another computer, run this tunnel in a terminal and leave it open:
 
 ```sh
-ssh -N -L 127.0.0.1:8080:127.0.0.1:5000 ryan@192.168.1.100
+ssh -N -L 127.0.0.1:8080:127.0.0.1:5000 user@192.168.1.100
 ```
 
-Open http://127.0.0.1:8080 on that computer. Replace `ryan` with the host's actual SSH account. The app's web API has no login. Compose requests loopback publication, and the tunnel provides remote access. Docker [releases before 28.0.0 can expose loopback-published ports to the same network segment](https://docs.docker.com/engine/network/port-publishing/); review the existing access boundary before deployment on the verified Docker 26.1.5 Pi. The current work changes documentation only.
+Open http://127.0.0.1:8080 on that computer. Replace `user` with the host's actual SSH account. The app's web API has no login. Compose requests loopback publication, and the tunnel provides remote access. Docker [releases before 28.0.0 can expose loopback-published ports to the same network segment](https://docs.docker.com/engine/network/port-publishing/); review the host's access boundary before deployment.
 
 ## Verify the container
 
@@ -47,11 +47,11 @@ docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,targe
 python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle.log
 ```
 
-Expect `Ran 39 tests`, `OK`, and `Container checks passed`. The lifecycle check uses a separate disposable archive, verifies real TCP bidirectional measurements, remote output, JSON/XML exports, saved presets, container replacement, and shutdown during a test. It cleans up only its own test containers and volume. The persistent app can stay running while these checks run, but wait until they finish before measuring network performance.
+Expect `Ran 48 tests`, `OK`, and `Container checks passed`. The lifecycle check uses a separate disposable archive, verifies real TCP bidirectional measurements, remote output, JSON/XML exports, saved presets, container replacement, and shutdown during a test. It cleans up only its own test containers and volume. The persistent app can stay running while these checks run, but wait until they finish before measuring network performance.
 
-These checks establish application behavior using loopback traffic. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging and the recorded GitHub verification results. A completed read-only Pi inventory verified `J-RPI5`, `aarch64`, Docker daemon `26.1.5+dfsg1` on `linux/arm64`, and Compose `2.26.1-4`. Application transfer, native image build, smoke testing, and deployment did not start. The current user instruction is documentation only, and the function-change list is pending. See [Project state](project-state.md) for the desktop source and verification boundaries; passing GitHub checks do not establish a Pi deployment.
+These checks establish application behavior using loopback traffic. The [native Ubuntu CI run for commit `57c64ca`](https://github.com/Super8Four/iPerfWeb/actions/runs/38115446084) passed 48 tests on each of AMD64 and ARM64, plus the container lifecycle checks. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging. See [Project state](project-state.md) for target-host verification boundaries; successful CI checks do not establish deployment on another host.
 
-## Run a client test from Ryan's app
+## Run a client test
 
 Start iPerf3 on the other machine. For example, with iPerf3 already installed:
 
@@ -61,7 +61,7 @@ iperf3 -s -p 5201
 
 Leave it running during testing, then stop it with Ctrl+C. That machine must accept the connection on port 5201. UDP tests also need UDP traffic to that port; their control connection uses TCP.
 
-In Ryan's web interface:
+In the web interface:
 
 1. Choose **Client · test a remote server** and enter the other machine's address, such as `192.168.1.200`, with port `5201`.
 2. Start with TCP, 10 seconds, and one stream. Leave **Local bind address** blank.
@@ -71,11 +71,11 @@ In Ryan's web interface:
 
 Only one session runs at a time in an app instance. For UDP, choose a deliberate bandwidth target such as `10M`; it is applied per stream. Preserve that target and stream count when comparing runs. Windows builds disable UDP bidirectional; the Ubuntu container supports it when the peer supports it.
 
-## Accept a test on Ryan's end
+## Accept an incoming test
 
-Use this when another machine should connect to Ryan's app as the iPerf server. Publishing port 5201 alone does not start a server; Ryan must start a server session in the interface.
+Use this when another machine should connect to the app as the iPerf server. Publishing port 5201 alone does not start a server; start a server session in the interface.
 
-In the repository's `.env` file, set the following values, replacing the example address with an IPv4 address assigned to Ryan's Docker host. Merge these settings into an existing file:
+In the repository's `.env` file, set the following values, replacing the example address with an IPv4 address assigned to the Docker host. Merge these settings into an existing file:
 
 ```dotenv
 IPERF_BIND_ADDRESS=192.168.1.100
@@ -93,19 +93,19 @@ Compose publishes TCP and UDP on that host address. Keep the web port on loopbac
 
 In the web interface, choose **Server · accept one test**, set port `5201`, leave **Local bind address** blank, label the session, and select **Start session**. The server accepts one test and then exits. Start another server session before each subsequent test. Waiting for a client defaults to 300 seconds and produces no throughput result if it times out.
 
-From the other machine, run one of these commands while Ryan's server session is waiting:
+From the other machine, run one of these commands while the app's server session is waiting:
 
 ```sh
-# Upload from this client to Ryan; save a native JSON result.
+# Upload from this client to the app server; save a native JSON result.
 iperf3 -c 192.168.1.100 -p 5201 -t 10 -J --get-server-output > client-upload.json
 
-# Start another server session in Ryan's app before this download test.
+# Start another server session in the app before this download test.
 iperf3 -c 192.168.1.100 -p 5201 -t 10 -R -J --get-server-output > client-download.json
 ```
 
-Ryan's app archives its server measurements and logs. The client files preserve the client's measurements and returned server output. Import those files using **Import saved tests** if both records are needed in the app. Native JSON contains the data supplied by iPerf; full app exports also contain the app's event history and notes.
+The app archives its server measurements and logs. The client files preserve the client's measurements and returned server output. Import those files using **Import saved tests** if both records are needed in the app. Native JSON contains the data supplied by iPerf; full app exports also contain the app's event history and notes.
 
-If host port 5201 is occupied, set `IPERF_PORT=5202` and recreate the app. The other machine connects to **5202**, while the port inside Ryan's app stays **5201**. Do not run a separate host `iperf3 -s` on the same published host address and port.
+If host port 5201 is occupied, set `IPERF_PORT=5202` and recreate the app. The other machine connects to **5202**, while the port inside the app stays **5201**. Do not run a separate host `iperf3 -s` on the same published host address and port.
 
 ## Inspect remote results and compare a fix
 
@@ -123,11 +123,11 @@ Upload is blue and download is green. Missing measurements are blank; a blank is
 
 ## Share results and server presets
 
-Send Ryan the full session or comparison JSON/XML exports through your usual file-sharing method. He can open **Previous tests → Import saved tests** and select the files. Imported records get new local IDs and retain supplied settings, results, notes, dates, logs, and provenance. Importing equivalent JSON/XML objects again skips duplicates of earlier imports. Files are limited to 20 MiB each. A bare `run.json` metadata file lacks the separate log file; use full exports when sharing evidence.
+Share full session or comparison JSON/XML exports through the usual file-sharing method. In the receiving app, open **History & import** and select **Import saved tests**. Imported records get new local IDs and retain supplied settings, results, notes, dates, logs, and provenance. Importing equivalent JSON/XML objects again skips duplicates of earlier imports. Files are limited to 20 MiB each. A bare `run.json` metadata file lacks the separate log file; use full exports when sharing evidence.
 
 Server presets are separate from test evidence. In **Server presets**, use **Export presets JSON** and **Import server JSON** to share them. Public listings can be loaded and edited; loading does not start a test. Use **Save the current test settings as a custom preset** for a private endpoint.
 
-The [example Ryan server preset](examples/ryan-server-presets.json) contains TCP upload defaults for `192.168.1.100:5201`. Replace the address and any port mapping before importing it. Its endpoint must have a waiting server session or a running standalone iPerf server. Imported preset files merge into the catalog and do not delete saved tests.
+The [example server preset](examples/server-presets.json) contains TCP upload defaults for `192.168.1.100:5201`. Replace the address and any port mapping before importing it. Its endpoint must have a waiting server session or a running standalone iPerf server. Imported preset files merge into the catalog and do not delete saved tests.
 
 ## Keep and back up the archive
 
