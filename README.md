@@ -6,6 +6,8 @@ The entire workspace uses AdminLTE's dark mode, with a shared charcoal palette f
 
 For installation and use on another machine, start with [Ryan's setup and testing guide](docs/ryan-setup-and-testing.md). It covers Ubuntu Docker deployment, client/server testing at either end, sharing JSON/XML evidence, custom presets, backups, and troubleshooting. An [importable example server preset](docs/examples/ryan-server-presets.json) is included; replace its example address before use.
 
+The [requirements and container goal](docs/requirements.md) describe the focused pages, two/three-test overlays, route capture, and Ubuntu AMD64/ARM64 operation. [Project state](docs/project-state.md) separates current implementation from completed verification.
+
 ## Start locally on Windows
 
 If the virtual environment is already set up, run:
@@ -34,7 +36,7 @@ The installer pins the community Windows iPerf3 3.22 build and verifies its rele
 3. Label the test and record conditions or the fix in Notes. Every session is saved immediately; export is optional.
 4. Watch throughput and all captured stdout, stderr, and app events. Filter by source or search the log. Stop a session when needed.
 5. Open any saved run to replay its logs, edit its label/notes, load its settings for another test, or export JSON/XML.
-6. Choose a baseline and a follow-up under Before & after. The comparison calculates changes in throughput, retransmits, jitter, and loss when iPerf reports them. Differences in settings are flagged. Exporting a comparison includes both original runs, their logs, and the calculated changes.
+6. Open **Compare tests** and choose a baseline, a follow-up, and optionally a third test. The comparison calculates changes in throughput, retransmits, jitter, and loss when iPerf reports them. Differences in settings are flagged. Exporting a comparison includes all selected original runs, their logs, route evidence, and changes from baseline.
 
 The Windows build was verified for TCP upload, download, bidirectional, parallel streams, UDP upload/download, and one-test server sessions. UDP bidirectional is disabled on Windows because the tested Cygwin build stalls in that mode. Platforms that do not report TCP retransmissions display no value for that metric; absent metrics are not turned into zeroes. Older builds without JSON streaming use live verbose text output; their export still retains all raw output and parsed throughput.
 
@@ -87,7 +89,7 @@ The catalog is saved beside test data as `RUNS_DIRECTORY/server-presets.json` af
 
 In **Saved test history**, choose **Import saved tests** and select one or more files. Supported formats are this app's complete session JSON/XML exports, comparison JSON/XML exports (both source tests), a `run.json` metadata backup, and native `iperf3 -J` JSON. Imports preserve original results, logs supplied in the file, settings, notes, and recorded test dates; metrics and charts are recalculated from the saved measurements. Native files must contain `start.test_start`, `start.timestamp.timesecs`, and `end`. Their finish date is estimated from the original start date and configured duration; their full native result is retained. A metadata-only `run.json` does not include the separate `events.jsonl` logs: use full session exports to move all evidence.
 
-Imported tests get new local IDs and an **Imported** badge with source filename, original ID, import date, and SHA-256 provenance. They never overwrite an existing test or launch a process. Re-uploading identical test objects (including equivalent JSON/XML exports) skips duplicates. Completed imported tests with measurements are available for Before & after comparisons. Unfinished snapshots become interrupted history records. No missing measurements are fabricated. Each file is limited to 20 MiB; malformed files are rejected. XML accepts this app's typed format and rejects DTD/entity declarations.
+Imported tests get new local IDs and an **Imported** badge with source filename, original ID, import date, and SHA-256 provenance. They never overwrite an existing test or launch a process. Re-uploading identical test objects (including equivalent JSON/XML exports) skips duplicates. Completed imported tests with measurements are available on the Comparison page. Unfinished snapshots become interrupted history records. No missing measurements are fabricated. Each file is limited to 20 MiB; malformed files are rejected. XML accepts this app's typed format and rejects DTD/entity declarations.
 
 ## Persistent storage and exports
 
@@ -133,15 +135,15 @@ docker compose start app
 
 Use this copy procedure only for a fresh container archive; avoid overwriting existing evidence. After migration, confirm history, notes, logs, and custom presets before retiring the old copy. For a complete volume backup, stop the app and copy `/data/runs` out with `docker cp`. Keep the resulting backup outside the container.
 
-The default web and iPerf ports are published only on host loopback. Server sessions use container port **5201**, published for both TCP and UDP; changing the port in the UI also requires a matching Docker port mapping. To receive tests from your LAN, set `IPERF_BIND_ADDRESS` to the Docker host's LAN address when starting Compose, and keep port 5201 in the UI. `IPERF_PORT` changes the host-side port only. Binding in the test form refers to an address **inside the container**; leave it automatic unless needed. Client tests originate from the container; `127.0.0.1` as a target addresses the container itself. Use a server's reachable LAN/public address. Docker's bridge network can affect measurements, so keep container/network settings consistent between baseline and follow-up tests.
+Compose requests loopback publication for the default web and iPerf ports. Docker releases before 28.0.0 have a [documented limitation](https://docs.docker.com/engine/network/port-publishing/): machines on the same network segment can reach loopback-published ports. On the verified Docker 26.1.5 Pi host, review the existing access boundary before deployment; no network or security change is part of the current documentation-only work. Server sessions use container port **5201**, published for both TCP and UDP; changing the port in the UI also requires a matching Docker port mapping. To receive tests from your LAN, set `IPERF_BIND_ADDRESS` to the Docker host's LAN address when starting Compose, and keep port 5201 in the UI. `IPERF_PORT` changes the host-side port only. Binding in the test form refers to an address **inside the container**; leave it automatic unless needed. Client tests originate from the container; `127.0.0.1` as a target addresses the container itself. Use a server's reachable LAN/public address. Docker's bridge network can affect measurements, so keep container/network settings consistent between baseline and follow-up tests.
 
 The web control API has no authentication. Use localhost or an SSH tunnel for web access; add authentication before exposing it to other machines.
 
 ### Build verification and downloadable image
 
-The **Ubuntu container** GitHub Actions workflow builds on an Ubuntu runner, runs the complete test suite against the image's Linux iPerf3, and verifies non-root/read-only startup, health checks, real TCP bidirectional results and remote output, JSON/XML exports, custom presets, archive persistence after container replacement, and stopping an active test. Its summary records the actual image size and idle memory. Each successful `main` build provides a Linux amd64 image archive under the workflow's **iperf-workspace-linux-amd64** artifact (retained for 14 days). Download and unzip it, then load the included `.tar.gz` with `docker load -i iperf-workspace-linux-amd64.tar.gz`; `docker compose up -d --no-build` uses that image.
+The **Ubuntu container** GitHub Actions workflow builds and runs the complete suite and disposable lifecycle checks on native Ubuntu AMD64 and ARM64 runners. It verifies image architecture, route-tool availability, non-root/read-only startup, health checks, real loopback throughput and remote output, JSON/XML exports, custom presets, persistence, and stopping an active test. Successful jobs package separate **iperf-workspace-linux-amd64** and **iperf-workspace-linux-arm64** archives, retained for 14 days. Load the archive matching the host architecture, then use `docker compose up -d --no-build`. See [requirements](docs/requirements.md) for commands and the distinction between CI execution and Pi validation.
 
-The [verified container build for commit `60ca3c9`](https://github.com/Super8Four/iPerfWeb/actions/runs/38111657080) passed all **39 tests** and the lifecycle checks on an Ubuntu runner. Its amd64 image was **173.0 MiB**, with **53.93 MiB** idle container memory during that check. These are measurements from that runner; server architecture, dependency updates, and workloads can change them. Testing on the requested server, `172.31.20.100`, is still pending because SSH authentication for `gjensen` was rejected.
+The [verified container build for commit `60ca3c9`](https://github.com/Super8Four/iPerfWeb/actions/runs/38111657080) passed all **39 tests** and the lifecycle checks on an Ubuntu runner. Its amd64 image was **173.0 MiB**, with **53.93 MiB** idle container memory during that check. These are measurements from that runner; server architecture, dependency updates, and workloads can change them. A later authorized read-only SSH inventory verified the Pi hostname `J-RPI5`, `aarch64` architecture, Docker daemon `26.1.5+dfsg1` on `linux/arm64`, and Compose `2.26.1-4`. No application transfer, ARM64 image build, smoke test, or deployment started. The user has paused that work and requested documentation only while the function-change list is pending. The GitHub results above are separate runner evidence, not Pi application verification.
 
 ### Test on the Ubuntu server
 
@@ -182,7 +184,7 @@ docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,targe
 python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle.log
 ```
 
-Expect `Ran 39 tests` and `OK`, followed by `Container checks passed` with the image size and idle memory. A failed command stops this sequence. Logs stay under the ignored `test-artifacts/` directory and are not committed to GitHub.
+Expect `Ran 48 tests` and `OK`, followed by `Container checks passed` with the image size and idle memory. A failed command stops this sequence. Logs stay under the ignored `test-artifacts/` directory and are not committed to GitHub.
 
 The lifecycle check uses uniquely named disposable containers and volumes. It verifies real loopback throughput and remote output, exports, persistence across replacement, and saving an active test on shutdown. It removes only its own test containers and volume; it never opens or removes your Compose archive. Loopback checks verify application behavior; use a separate reachable iPerf server for network performance measurements.
 
@@ -213,6 +215,15 @@ Open http://127.0.0.1:8080 on your computer. This example leaves the server's we
 
 Keep the server architecture, tested commit, container/network configuration, and test conditions with your evidence. Container bridge networking and unrelated traffic can affect throughput; compare results under consistent conditions. Successful automated loopback tests alone do not establish that a network issue is fixed.
 
+
+## Focused pages and route evidence
+
+Use the AdminLTE sidebar submenus for **Test & export**, **Accept incoming test**, **History & import**, and **Compare tests**; **Server presets** has its own page. History Open links to the saved session on Test & export. Save custom presets alongside the test configuration. A preset catalog Load action returns to the test page with its settings.
+
+Finished sessions display colored result cards. The Comparison page overlays two or three tests with individual colors, solid upload curves, dashed download curves, a shared elapsed-time axis, and local/remote report selection. The metric grid and change details preserve missing measurements and settings mismatch warnings.
+
+**Capture route after the test** is selected initially on the client form and can be cleared. Saved presets retain their own selection; existing presets default to off. Route capture runs after successful throughput measurement, is bounded to 16 hops / 20 seconds, and saves raw output, responding addresses, and probe RTTs. An unavailable tool, timeout, or missing response does not change a successful throughput result or establish packet loss. Windows uses `tracert`; the Ubuntu image contains unprivileged `tracepath`. Server sessions skip route capture. API clients opt in with `traceroute: true`.
+
 ## Checks and API
 
 ```powershell
@@ -239,6 +250,8 @@ Tests use a temporary archive and real iPerf3 loopback processes. They cover liv
 | `POST /api/runs/<id>/stop` | Stop the active session; send `{}` as JSON |
 | `PATCH /api/runs/<id>` | Update `label` and/or `notes` |
 | `GET /api/runs/<id>/export?format=json\|xml` | Download a complete run |
+| `GET /api/comparison?id=<id>&id=<id>[&id=<id>]` | Two/three-test chart and metric report |
+| `GET /api/comparison?id=<id>&id=<id>[&id=<id>]&format=json\|xml` | Export all selected source runs and comparison evidence |
 | `GET /api/comparison?before=<id>&after=<id>` | Compare two completed tests |
 | `GET /api/comparison?before=<id>&after=<id>&format=json\|xml` | Export comparison and both source runs |
 

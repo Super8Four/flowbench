@@ -33,7 +33,7 @@ Open http://127.0.0.1:5000 if the browser is on the Docker host. From another co
 ssh -N -L 127.0.0.1:8080:127.0.0.1:5000 ryan@192.168.1.100
 ```
 
-Open http://127.0.0.1:8080 on that computer. Replace `ryan` with the host's actual SSH account. The app's web API has no login, so keep the default loopback web binding and use the tunnel for remote access.
+Open http://127.0.0.1:8080 on that computer. Replace `ryan` with the host's actual SSH account. The app's web API has no login. Compose requests loopback publication, and the tunnel provides remote access. Docker [releases before 28.0.0 can expose loopback-published ports to the same network segment](https://docs.docker.com/engine/network/port-publishing/); review the existing access boundary before deployment on the verified Docker 26.1.5 Pi. The current work changes documentation only.
 
 ## Verify the container
 
@@ -49,7 +49,7 @@ python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle
 
 Expect `Ran 39 tests`, `OK`, and `Container checks passed`. The lifecycle check uses a separate disposable archive, verifies real TCP bidirectional measurements, remote output, JSON/XML exports, saved presets, container replacement, and shutdown during a test. It cleans up only its own test containers and volume. The persistent app can stay running while these checks run, but wait until they finish before measuring network performance.
 
-These checks establish application behavior using loopback traffic. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging and the recorded GitHub verification results. Testing on the requested `172.31.20.100` server remains pending SSH authentication; the passing GitHub checks do not establish that this server has been deployed.
+These checks establish application behavior using loopback traffic. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging and the recorded GitHub verification results. A completed read-only Pi inventory verified `J-RPI5`, `aarch64`, Docker daemon `26.1.5+dfsg1` on `linux/arm64`, and Compose `2.26.1-4`. Application transfer, native image build, smoke testing, and deployment did not start. The current user instruction is documentation only, and the function-change list is pending. See [Project state](project-state.md) for the desktop source and verification boundaries; passing GitHub checks do not establish a Pi deployment.
 
 ## Run a client test from Ryan's app
 
@@ -116,7 +116,7 @@ To document a fix:
 1. Run a baseline before making the change. Record the client and server locations, wired/Wi-Fi connection, protocol, direction, duration, streams, UDP target if used, and relevant background traffic in Notes.
 2. Export the session using **JSON** or **XML**, then **Export session**. Both formats retain the same available measurements and complete captured app logs.
 3. Apply the change and repeat with the same configuration. Use **Load settings** on the baseline to fill the form, then change the label and notes before starting.
-4. Under **Before & after**, select the baseline and follow-up. Review throughput, retransmissions, jitter, and packet loss where reported, plus any warnings about different settings.
+4. Under **Compare tests**, select the baseline and follow-up. Review throughput, retransmissions, jitter, and packet loss where reported, plus any warnings about different settings.
 5. Choose the export format and select **Export comparison**. It includes both source runs and their calculated differences.
 
 Upload is blue and download is green. Missing measurements are blank; a blank is not zero. A row's maximum is a recorded interval peak, while its average is a final reported rate. Sparkline scales vary by run, so compare the numbers and full graph rather than sparkline height alone. Keep container networking and test conditions consistent; one higher peak does not establish a sustained improvement.
@@ -165,7 +165,7 @@ Confirm that an older run still opens with its notes and logs after the update.
 | --- | --- |
 | SSH reports permission denied | Use the correct host account and authorized SSH key. The app does not create SSH access. |
 | Docker reports permission denied | Confirm that the host account has Docker access; follow Docker's installation/post-install instructions. |
-| Web page is unreachable | Check `docker compose ps`, readiness, and the SSH tunnel. The default server web port is loopback only. |
+| Web page is unreachable | Check `docker compose ps`, readiness, and the SSH tunnel. The default mapping requests loopback; see the pre-28 Docker limitation above. |
 | Container is unhealthy | Read `docker compose logs --tail=200 app`; check `/api/ready`, free disk space, and archive permissions. `/api/health` checks the unused starter database and is not the container readiness probe. |
 | Server test cannot connect | Check the address, published host port, TCP/UDP reachability, and that the one-test server session is waiting. |
 | Port is already allocated | Check for another listener. Set `WEB_PORT` for the host web port or `IPERF_PORT` for the host iPerf port, then recreate the container and use the new port. |
@@ -174,3 +174,11 @@ Confirm that an older run still opens with its notes and logs after the update.
 | History appears empty after an update | Check the Compose project name and volume before running new tests or restoring data. |
 
 For help, share the tested Git commit, host architecture, `docker compose ps`, relevant app/test logs, and a full export of the affected run. Review logs and notes for private addresses or other sensitive details before sharing them outside the team.
+
+## Updated workspace navigation
+
+Tests, final result cards, logs, exports, saved-session notes, and custom preset editing live on **Test & export**. Use **History & import** to load saved JSON/XML evidence, then Open a row for its detail. **Compare tests** overlays two or three completed runs, with one color per test and solid upload / dashed download lines; it also offers the remote-report view when available. Exporting retains every selected run and its logs.
+
+The optional route checkbox captures at most 16 hops / 20 seconds after successful client throughput measurement. Raw route output and RTTs are retained in session exports. Clear it for throughput-only tests. Incoming server sessions skip it. Missing replies do not establish packet loss.
+
+The Ubuntu image is intended for native AMD64 and ARM64 operation. The workflow builds/tests each architecture independently and packages the matching archive. An ARM64 artifact from CI still needs target-host verification before treating jRPI-5 deployment as complete. See [requirements](requirements.md) and [project state](project-state.md).

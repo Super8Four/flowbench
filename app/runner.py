@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from .metrics import effective_settings, measurements, series, overview
 from .peer import peer_results
+from .route import capture_route
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
@@ -84,6 +85,9 @@ def settings_from(data):
     result["debug"] = data.get("debug", False)
     if not isinstance(result["debug"], bool):
         raise ValueError("debug must be true or false.")
+    result["traceroute"] = data.get("traceroute", False)
+    if not isinstance(result["traceroute"], bool):
+        raise ValueError("traceroute must be true or false.")
     return result
 
 
@@ -419,10 +423,30 @@ class RunManager:
                 if self.capture_errors:
                     self.record["error"] = "Output capture failed: " + "; ".join(self.capture_errors)
                 if self.cancel_requested:
-                    self.record["status"] = "cancelled"
+                    outcome = "cancelled"
                 else:
-                    self.record["status"] = "completed" if code == 0 and not self.record["error"] else "failed"
-                self.log("system", f"iPerf3 exited with code {code}; session {self.record['status']}.")
+                    outcome = "completed" if code == 0 and not self.record["error"] else "failed"
+                trace = settings["role"] == "client" and settings["traceroute"] and outcome == "completed"
+                self.record["status"] = "running" if trace else outcome
+                self.log("system", f"iPerf3 exited with code {code}; throughput {outcome}.")
+                self.record["route"] = {"status": "pending" if trace else "skipped", "hops": [],
+                                        "note": "Route capture follows a successful client test when selected."}
+                if trace:
+                    self.record["status"] = "running"
+                    self.log("system", "Throughput finished; capturing route (maximum 20 seconds, 16 hops).")
+            if trace:
+                def begin_route(command):
+                    with self.lock:
+                        if self.cancel_requested:
+                            return None
+                        self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                                        text=True, errors="replace", creationflags=CREATE_FLAGS)
+                        return self.process
+                result = capture_route(settings, begin_route, lambda: self.cancel_requested)
+                with self.lock:
+                    self.record["route"] = result
+                    self.record["status"] = "cancelled" if self.cancel_requested else outcome
+                    self.log("system", "Route capture: " + result["status"] + ".")
         except Exception as exc:
             with self.lock:
                 self.record.update(status="failed", error=str(exc))

@@ -229,6 +229,20 @@ def prepare_run(data, filename):
     if code is not None and (isinstance(code, bool) or not isinstance(code, int)):
         raise ValueError("Saved exit code must be a number or null.")
     validate_measurement_structure(record)
+    route = record.get("route")
+    if route is not None:
+        if not isinstance(route, dict) or not isinstance(route.get("hops"), list):
+            raise ValueError("Saved route must contain a hop array.")
+        for key in ("status", "note", "raw_output"):
+            if key in route and not isinstance(route[key], str):
+                raise ValueError("Route status, note, and output must be text.")
+        for hop in route["hops"]:
+            if (not isinstance(hop, dict) or isinstance(hop.get("hop"), bool)
+                    or not isinstance(hop.get("hop"), int) or not 1 <= hop["hop"] <= 16
+                    or (hop.get("address") is not None and not isinstance(hop["address"], str))
+                    or not isinstance(hop.get("rtt_ms"), list)
+                    or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in hop["rtt_ms"])):
+                raise ValueError("Invalid saved route hop.")
     record.update(id=uuid4().hex, event_count=len(events),
                   imported={"at": now(), "filename": filename[:255], "source_id": source_id,
                             "sha256": digest, "format": "app" if "settings" in data else "native-iperf"})
@@ -237,7 +251,11 @@ def prepare_run(data, filename):
 
 def import_runs(manager, data, filename):
     sources = [data]
-    if isinstance(data, dict) and "before" in data and "after" in data:
+    if isinstance(data, dict) and data.get("kind") == "multi-comparison":
+        sources = data.get("runs")
+        if not isinstance(sources, list) or not 2 <= len(sources) <= 3:
+            raise ValueError("A comparison export must contain two or three runs.")
+    elif isinstance(data, dict) and "before" in data and "after" in data:
         sources = [data["before"], data["after"]]
     try:
         prepared = [prepare_run(source, filename) for source in sources]

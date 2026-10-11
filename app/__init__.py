@@ -123,8 +123,13 @@ def create_app(test_config=None):
             return jsonify(error=str(exc)), 503
 
     @app.get("/")
+    @app.get("/history")
+    @app.get("/comparison")
+    @app.get("/servers")
+    @app.get("/server")
     def index():
-        return render_template("index.html")
+        page = request.path.strip("/") or "test"
+        return render_template("index.html", page=page)
 
     @app.get("/api/status")
     def status():
@@ -187,6 +192,31 @@ def create_app(test_config=None):
 
     @app.get("/api/comparison")
     def compare_runs():
+        ids = request.args.getlist("id")
+        if ids:
+            if not 2 <= len(ids) <= 3 or len(set(ids)) != len(ids):
+                raise ValueError("Choose two or three different completed tests.")
+            records = [manager.read(run_id) for run_id in ids]
+            reports = [comparison(records[0], record) for record in records[1:]]
+            format_name = request.args.get("format")
+            selected_runs = []
+            for record in records:
+                if format_name:
+                    selected_runs.append(manager.export(record["id"]))
+                else:
+                    selected_runs.append({"id": record["id"], "status": record["status"],
+                                          "created_at": record["created_at"], "settings": record["settings"],
+                                          "metrics": measurements(record), "series": series(record),
+                                          "effective_settings": effective_settings(record), "peer": peer_results(record)})
+            report = {"schema_version": 1, "kind": "multi-comparison", "comparisons": reports,
+                      "runs": selected_runs}
+            if not format_name:
+                return jsonify(report)
+            if format_name not in {"json", "xml"}:
+                raise ValueError("Choose json or xml.")
+            payload = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) if format_name == "json" else xml_export(report)
+            return Response(payload, mimetype="application/" + format_name,
+                            headers={"Content-Disposition": f'attachment; filename="iperf-comparison.{format_name}"', "Cache-Control": "no-store"})
         before = manager.read(request.args.get("before", ""))
         after = manager.read(request.args.get("after", ""))
         report = comparison(before, after)

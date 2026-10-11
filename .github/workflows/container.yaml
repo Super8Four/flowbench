@@ -11,7 +11,16 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-24.04
+    name: Ubuntu container (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +28,8 @@ jobs:
         run: |
           docker compose config --quiet
           docker build --tag iperf-workspace:local .
+          test "$(docker image inspect iperf-workspace:local --format '{{.Architecture}}')" = "${{ matrix.arch }}"
+          docker run --rm --entrypoint tracepath iperf-workspace:local -V
       - name: Run all tests with Linux iPerf3
         run: >-
           docker run --rm --entrypoint python
@@ -28,11 +39,11 @@ jobs:
         run: python3 scripts/check-container.py
       - name: Package verified image
         if: github.event_name != 'pull_request'
-        run: docker save iperf-workspace:local | gzip > iperf-workspace-linux-amd64.tar.gz
+        run: docker save iperf-workspace:local | gzip > iperf-workspace-linux-${{ matrix.arch }}.tar.gz
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
-          name: iperf-workspace-linux-amd64
-          path: iperf-workspace-linux-amd64.tar.gz
+          name: iperf-workspace-linux-${{ matrix.arch }}
+          path: iperf-workspace-linux-${{ matrix.arch }}.tar.gz
           retention-days: 14
           compression-level: 0

@@ -2,7 +2,9 @@ const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
 let engineReady = false, capabilities = {}, selectionVersion = 0, lastHistory = 0, comparisonVersion = 0;
-let presets = [], presetCatalog = {}, editingPreset = null;
+let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null;
+const testPage = Boolean($('test-form'));
+const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
 const date = (value) => value ? new Date(value).toLocaleString() : '—';
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -23,6 +25,7 @@ function safe(action) {
   return async (event) => { try { await action(event); } catch (error) { message(error.message); } };
 }
 function controls() {
+  if (!testPage) return;
   $('run-button').disabled = !engineReady || Boolean(activeId);
   $('run-button').textContent = activeId ? 'Session running…' : '▶ Start session';
   $('stop-button').disabled = !activeId;
@@ -37,6 +40,9 @@ function fields() {
   $('server-fields').classList.toggle('d-none', !server);
   $('client-fields').querySelectorAll('input, select').forEach((element) => { element.disabled = server; });
   $('idle_timeout').disabled = !server;
+  $('traceroute').disabled = server;
+  $('traceroute').closest('.form-check').classList.toggle('d-none', server);
+  $('custom-editor').closest('.card').classList.toggle('d-none', server);
   $('bandwidth').disabled = server || $('protocol').value !== 'udp';
   $('bandwidth-field').classList.toggle('d-none', $('protocol').value !== 'udp');
   const bidir = $('mode').querySelector('[value="bidir"]');
@@ -48,6 +54,7 @@ function fields() {
 function settingsData() {
   const data = Object.fromEntries(new FormData($('test-form')));
   data.debug = $('debug').checked;
+  data.traceroute = !($('role').value === 'server') && $('traceroute').checked;
   // Disabled UDP fields still belong to a reusable configuration.
   data.bandwidth = $('bandwidth').value;
   return data;
@@ -80,6 +87,7 @@ function presetDetail() {
   $('preset-detail').classList.toggle('text-warning-emphasis', Boolean(notices.length));
 }
 function renderPresetPicker() {
+  if (!testPage) return;
   const current = $('server-preset').value;
   const query = $('preset-search').value.toLowerCase();
   $('server-preset').replaceChildren(new Option('Custom settings · enter a server below', ''));
@@ -94,6 +102,7 @@ function renderPresetPicker() {
   presetDetail();
 }
 function renderCatalog() {
+  if (!$('preset-body')) return;
   const query = $('catalog-search').value.toLowerCase(), kind = $('catalog-kind').value;
   const visible = presets.filter((p) => (kind === 'all' || p.kind === kind) && presetMatches(p, query));
   $('preset-count').textContent = `${presets.filter((p) => p.kind === 'public').length} public · ${presets.filter((p) => p.kind === 'custom').length} custom`;
@@ -103,7 +112,7 @@ function renderCatalog() {
 async function loadPresets() {
   presetCatalog = await api('/api/presets'); presets = presetCatalog.presets;
   if (!presets.some((p) => p.id === editingPreset)) editingPreset = null;
-  $('update-preset').disabled = !editingPreset;
+  if ($('update-preset')) $('update-preset').disabled = !editingPreset;
   renderPresetPicker(); renderCatalog();
 }
 function applyPreset(id) {
@@ -227,6 +236,7 @@ function renderSelected() {
   $('rerun-button').disabled = false;
   renderPeer();
   renderLogs();
+  renderResults();
 }
 async function loadSelected(reset = false) {
   if (!selectedId) return;
@@ -241,6 +251,7 @@ async function loadSelected(reset = false) {
   renderSelected();
 }
 async function selectRun(id) {
+  if (!testPage) { location.href = `/?run=${encodeURIComponent(id)}`; return; }
   selectionVersion++;
   selectedId = id; selected = null; events = [];
   await loadSelected(true);
@@ -266,6 +277,7 @@ function historyTrend(overview) {
   return `<svg class="history-sparkline" viewBox="0 0 140 36" role="img" aria-label="Upload and download throughput trend, scaled to this test"><title>Upload (blue), download (green). Peak ${number(maxRate)} Mbps; ${number(maxSeconds)} seconds. Scale varies by test.</title>${lines}</svg>`;
 }
 function renderHistory() {
+  if (!$('history-body')) return;
   const search = $('history-search').value.toLowerCase();
   const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes}`.toLowerCase().includes(search));
   $('history-body').innerHTML = visible.map((run) => {
@@ -284,8 +296,9 @@ function renderHistory() {
   $('history-count').textContent = `${visible.length} of ${runs.length} saved sessions`;
 }
 function comparisonOptions() {
+  if (!$('baseline')) return;
   const complete = runs.filter((run) => run.status === 'completed' && Object.keys(run.metrics).length);
-  for (const id of ['baseline', 'candidate']) {
+  for (const id of ['baseline', 'candidate', 'third']) {
     const chosen = $(id).value || localStorage.getItem(`iperf-${id}`) || '';
     $(id).replaceChildren(new Option('Choose a completed test', ''));
     for (const run of complete) $(id).add(new Option(`${title(run)} · ${date(run.created_at)}`, run.id));
@@ -293,35 +306,74 @@ function comparisonOptions() {
   }
 }
 async function loadHistory() {
+  if (!$('history-body') && !$('baseline')) {
+    const data = await api('/api/status'); activeId = data.active_run; lastHistory = Date.now();
+    $('saved-count').textContent = `${data.saved_runs} saved sessions`; controls(); return;
+  }
   const data = await api('/api/runs');
   runs = data.runs; activeId = data.active_run; lastHistory = Date.now();
   $('saved-count').textContent = `${runs.length} saved session${runs.length === 1 ? '' : 's'}`;
   controls(); renderHistory(); comparisonOptions();
 }
+function comparisonIds() { return ['baseline', 'candidate', 'third'].map((id) => $(id).value).filter(Boolean); }
+function comparisonPath() { return '/api/comparison?' + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
+function overlay() {
+  const colors = ['#1683ff', '#15d3a6', '#ffc857'];
+  const remote = $('comparison-perspective').value === 'remote';
+  const records = comparisonData?.runs || [];
+  const lines = [];
+  records.forEach((run, index) => {
+    for (const direction of ['upload', 'download']) {
+      const input = (remote ? run.peer?.series : run.series) || [];
+      const valid = input.filter((p) => p.direction === direction && Number.isFinite(p.seconds) && Number.isFinite(p.mbps));
+      const data = [...new Map(valid.map((p) => [p.seconds, p])).values()].sort((a,b) => a.seconds-b.seconds);
+      if (data.length) lines.push({data, direction, color: colors[index], name: title(run)});
+    }
+  });
+  $('comparison-legend').innerHTML = records.map((run,i) => `<span style="color:${colors[i]}">● ${escape(title(run))} · ${escape(date(run.created_at))}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span>`).join('');
+  const points = lines.flatMap((l) => l.data);
+  if (!points.length) { $('comparison-chart').innerHTML = '<text x="380" y="115" text-anchor="middle" fill="#aab3bb">No interval data for this selection</text>'; return; }
+  const maxTime = Math.max(1, ...points.map((p) => p.seconds)), maxRate = Math.max(1, ...points.map((p) => p.mbps)) * 1.1;
+  const x = (t) => 57 + t / maxTime * 688, y = (v) => 202 - v / maxRate * 177;
+  let svg = '';
+  for (let i=0;i<=5;i++) {
+    svg += `<line x1="57" y1="${y(i*maxRate/5)}" x2="745" y2="${y(i*maxRate/5)}" stroke="#353c41"/><text x="47" y="${y(i*maxRate/5)+3}" text-anchor="end" fill="#aab3bb" font-size="10">${number(i*maxRate/5,1)}</text><text x="${x(i*maxTime/5)}" y="222" text-anchor="middle" fill="#aab3bb" font-size="10">${number(i*maxTime/5,1)}s</text>`;
+  }
+  for (const line of lines) {
+    svg += `<path d="${smoothPath(line.data,x,y)}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.direction === 'download' ? 'stroke-dasharray="7 5"' : ''}/>`;
+    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="3" fill="${line.color}"><title>${escape(line.name)} · ${line.direction}: ${number(p.mbps)} Mbps at ${number(p.seconds)}s</title></circle>`;
+  }
+  $('comparison-chart').innerHTML = svg;
+}
+function renderComparison() {
+  overlay();
+  const remote = $('comparison-perspective').value === 'remote';
+  const records = comparisonData.runs;
+  const values = records.map((run) => remote ? run.peer?.metrics || {} : run.metrics || {});
+  const keys = [...new Set(values.flatMap((v) => Object.keys(v)))].sort();
+  $('comparison-result').innerHTML = `<div class="table-responsive"><table class="table"><thead><tr><th>Metric</th>${records.map((r) => `<th>${escape(title(r))}</th>`).join('')}</tr></thead><tbody>${keys.map((key) => `<tr><td>${escape(key.replaceAll('_',' '))}</td>${values.map((v) => `<td>${number(v[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` + comparisonData.comparisons.map((report,i) => `<p class="comparison-note ${report.settings_differences.length ? 'text-warning-emphasis' : 'text-success-emphasis'}">Baseline → ${escape(title(records[i+1]))}: ${report.settings_differences.length ? 'Settings differ: ' + escape(report.settings_differences.join(', ')) : 'Settings match.'}</p>`).join('') + '<p class="comparison-note">Repeat under matching conditions to establish improvement. Missing metrics display —. Each curve ends at its own last interval.</p>';
+  $('comparison-result').innerHTML += records.slice(1).map((run,i) => {
+    const left = values[0], right = values[i+1];
+    const common = Object.keys(left).filter((key) => Number.isFinite(left[key]) && Number.isFinite(right[key]));
+    return `<details class="mt-2"><summary>Change from baseline → ${escape(title(run))}</summary><div class="table-responsive"><table class="table"><thead><tr><th>Metric</th><th>Change</th><th>Change %</th></tr></thead><tbody>${common.map((key) => {
+      const delta = right[key]-left[key], percent = left[key] ? delta/left[key]*100 : null;
+      return `<tr><td>${escape(key.replaceAll('_',' '))}</td><td>${delta > 0 ? '+' : ''}${number(delta)}</td><td>${percent === null ? 'Undefined from zero' : (percent > 0 ? '+' : '') + number(percent,1)+'%'}</td></tr>`;
+    }).join('')}</tbody></table></div></details>`;
+  }).join('');
+
+}
 async function compare() {
+  if (!$('baseline')) return;
   const generation = ++comparisonVersion;
-  const before = $('baseline').value, after = $('candidate').value;
   $('export-comparison').disabled = true;
-  for (const id of ['baseline', 'candidate']) localStorage.setItem(`iperf-${id}`, $(id).value);
-  if (!before || !after) {
-    $('comparison-result').textContent = 'Choose two completed tests to compare throughput, retransmits, jitter, and packet loss where available.';
-    return;
-  }
+  for (const id of ['baseline', 'candidate', 'third']) localStorage.setItem(`iperf-${id}`, $(id).value);
+  comparisonData = null; overlay();
+  if (!$('baseline').value || !$('candidate').value) { $('comparison-result').textContent = 'Choose a baseline and second test; the third is optional.'; return; }
   try {
-    const data = await api(`/api/comparison?before=${before}&after=${after}`);
+    const data = await api(comparisonPath());
     if (generation !== comparisonVersion) return;
-    const rows = data.metrics.filter((row) => !row.metric.endsWith('_packets') || row.metric.endsWith('_lost_packets'));
-    $('comparison-result').innerHTML = `<div class="table-responsive"><table class="table"><thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th></tr></thead><tbody>${rows.map((row) => {
-      const unit = row.metric.endsWith('mbps') ? ' Mbps' : row.metric.endsWith('jitter_ms') ? ' ms' : row.metric.endsWith('lost_percent') ? '%' : '';
-      const delta = `${row.delta > 0 ? '+' : ''}${number(row.delta)}${unit}`;
-      const percent = row.percent_change === null ? 'No % from zero' : `${row.percent_change > 0 ? '+' : ''}${number(row.percent_change, 1)}%`;
-      const color = row.direction === 'improved' ? 'success-emphasis' : row.direction === 'worse' ? 'danger-emphasis' : 'body-secondary';
-      return `<tr><td>${escape(row.metric.replaceAll('_', ' '))}</td><td>${number(row.before)}${unit}</td><td>${number(row.after)}${unit}</td><td class="text-${color}">${delta}<div class="small">${percent}</div></td></tr>`;
-    }).join('')}</tbody></table></div>${data.settings_differences.length ? `<p class="comparison-note text-warning-emphasis">Settings differ: ${escape(data.settings_differences.join(', '))}. Use matching conditions for a meaningful before/after comparison.</p>` : '<p class="comparison-note text-success-emphasis">Test settings match.</p>'}<p class="comparison-note">${escape(data.interpretation)}</p>`;
-    $('export-comparison').disabled = false;
-  } catch (error) {
-    if (generation === comparisonVersion) $('comparison-result').textContent = error.message;
-  }
+    comparisonData = data; renderComparison(); $('export-comparison').disabled = false;
+  } catch(error) { if (generation === comparisonVersion) $('comparison-result').textContent = error.message; }
 }
 async function download(path, fallback) {
   const link = document.createElement('a');
@@ -333,7 +385,7 @@ async function download(path, fallback) {
 }
 function exportRun(id) { return download(`/api/runs/${id}/export?format=${$('export-format').value}`, `iperf-${id}`); }
 
-$('test-form').addEventListener('submit', safe(async (event) => {
+$('test-form')?.addEventListener('submit', safe(async (event) => {
   event.preventDefault();
   $('message').classList.add('d-none');
   const data = settingsData();
@@ -343,78 +395,79 @@ $('test-form').addEventListener('submit', safe(async (event) => {
     activeId = run.id; controls(); await selectRun(run.id); await loadHistory();
   } finally { controls(); }
 }));
-$('stop-button').addEventListener('click', safe(async () => {
+$('stop-button')?.addEventListener('click', safe(async () => {
   if (activeId) await api(`/api/runs/${activeId}/stop`, {method: 'POST', body: '{}'});
   await loadHistory();
 }));
-$('role').addEventListener('change', fields); $('protocol').addEventListener('change', fields);
-$('server-preset').addEventListener('change', () => applyPreset($('server-preset').value));
-$('preset-search').addEventListener('input', renderPresetPicker);
-for (const id of ['target', 'port', 'mode', 'ip_version']) $(id).addEventListener('change', presetDetail);
-$('catalog-search').addEventListener('input', renderCatalog); $('catalog-kind').addEventListener('change', renderCatalog);
-$('save-preset').addEventListener('click', safe(() => savePreset(false)));
-$('update-preset').addEventListener('click', safe(() => savePreset(true)));
-$('preset-body').addEventListener('click', safe(async (event) => {
+$('role')?.addEventListener('change', fields); $('protocol')?.addEventListener('change', fields);
+$('server-preset')?.addEventListener('change', () => applyPreset($('server-preset').value));
+$('preset-search')?.addEventListener('input', renderPresetPicker);
+for (const id of ['target', 'port', 'mode', 'ip_version']) $(id)?.addEventListener('change', presetDetail);
+$('catalog-search')?.addEventListener('input', renderCatalog); $('catalog-kind')?.addEventListener('change', renderCatalog);
+$('save-preset')?.addEventListener('click', safe(() => savePreset(false)));
+$('update-preset')?.addEventListener('click', safe(() => savePreset(true)));
+$('preset-body')?.addEventListener('click', safe(async (event) => {
   const button = event.target.closest('button');
-  if (button?.dataset.preset) { applyPreset(button.dataset.preset); $('workspace').scrollIntoView({behavior: 'smooth'}); }
+  if (button?.dataset.preset) location.href = `/?preset=${encodeURIComponent(button.dataset.preset)}`;
   if (button?.dataset.removePreset) {
     const row = presets.find((p) => p.id === button.dataset.removePreset);
     await api(`/api/presets/${row.id}`, {method: 'DELETE', body: '{}'});
     await loadPresets(); message(`Custom preset “${row.name}” removed.`, 'success');
   }
 }));
-$('refresh-presets').addEventListener('click', safe(async () => {
+$('refresh-presets')?.addEventListener('click', safe(async () => {
   $('refresh-presets').disabled = true;
   try { const result = await api('/api/presets/refresh', {method: 'POST', body: '{}'}); await loadPresets(); message(`Public list refreshed: ${result.public} servers. Your ${result.custom} custom presets are saved.`, 'success'); }
   finally { $('refresh-presets').disabled = false; }
 }));
-$('import-presets').addEventListener('click', () => $('preset-file').click());
-$('preset-file').addEventListener('change', safe(async () => {
+$('import-presets')?.addEventListener('click', () => $('preset-file').click());
+$('preset-file')?.addEventListener('change', safe(async () => {
   try { const result = await uploadFile($('preset-file').files[0], '/api/presets/import', 8 * 1024 * 1024); await loadPresets(); message(`Server list imported: ${result.added} added, ${result.updated} updated.`, 'success'); }
   finally { $('preset-file').value = ''; }
 }));
-$('import-runs').addEventListener('click', () => $('run-files').click());
-$('run-files').addEventListener('change', safe(async () => {
+$('import-runs')?.addEventListener('click', () => $('run-files').click());
+$('run-files')?.addEventListener('change', safe(async () => {
   $('import-runs').disabled = true;
-  let count = 0, skipped = 0, lastId = null; const errors = [];
+  let count = 0, skipped = 0; const errors = [];
   try {
     for (const file of $('run-files').files) {
-      try { const result = await uploadFile(file, '/api/runs/import', 20 * 1024 * 1024); count += result.imported.length; skipped += result.duplicates.length; lastId = result.imported.at(-1) || lastId; }
+      try { const result = await uploadFile(file, '/api/runs/import', 20 * 1024 * 1024); count += result.imported.length; skipped += result.duplicates.length; }
       catch (error) { errors.push(`${file.name}: ${error.message}`); }
     }
-    await loadHistory(); if (lastId) await selectRun(lastId); await compare();
+    await loadHistory(); await compare();
     message(`${count} tests imported; ${skipped} duplicates skipped.${errors.length ? ` ${errors.join(' ')}` : ''}`, errors.length ? 'warning' : 'success');
   } finally { $('run-files').value = ''; $('import-runs').disabled = false; }
 }));
-$('log-filter').addEventListener('change', renderLogs); $('log-search').addEventListener('input', renderLogs);
-$('chart-perspective').addEventListener('change', renderPeer);
-$('autoscroll').addEventListener('change', renderLogs); $('history-search').addEventListener('input', renderHistory);
-$('refresh-history').addEventListener('click', safe(loadHistory));
-$('history-body').addEventListener('click', safe(async (event) => {
+$('log-filter')?.addEventListener('change', renderLogs); $('log-search')?.addEventListener('input', renderLogs);
+$('chart-perspective')?.addEventListener('change', renderPeer);
+$('comparison-perspective')?.addEventListener('change', () => comparisonData ? renderComparison() : overlay());
+$('autoscroll')?.addEventListener('change', renderLogs); $('history-search')?.addEventListener('input', renderHistory);
+$('refresh-history')?.addEventListener('click', safe(loadHistory));
+$('history-body')?.addEventListener('click', safe(async (event) => {
   const button = event.target.closest('button');
-  if (button?.dataset.open) { await selectRun(button.dataset.open); $('workspace').scrollIntoView({behavior: 'smooth'}); }
+  if (button?.dataset.open) location.href = `/?run=${encodeURIComponent(button.dataset.open)}`;
   if (button?.dataset.export) await exportRun(button.dataset.export);
 }));
-$('export-button').addEventListener('click', safe(() => exportRun(selectedId)));
-$('rerun-button').addEventListener('click', () => {
+$('export-button')?.addEventListener('click', safe(() => exportRun(selectedId)));
+$('rerun-button')?.addEventListener('click', () => {
   if (!selected) return;
   $('server-preset').value = ''; editingPreset = null; $('update-preset').disabled = true;
   loadSettings(selected.settings); $('target').focus();
 });
-$('save-notes').addEventListener('click', safe(async () => {
+$('save-notes')?.addEventListener('click', safe(async () => {
   await api(`/api/runs/${selectedId}`, {method: 'PATCH', body: JSON.stringify({label: $('saved-label').value, notes: $('saved-notes').value})});
   await loadSelected(); await loadHistory(); message('Session notes saved.', 'success');
 }));
-for (const id of ['baseline', 'candidate']) $(id).addEventListener('change', safe(compare));
-$('export-comparison').addEventListener('click', safe(() => download(`/api/comparison?before=${$('baseline').value}&after=${$('candidate').value}&format=${$('export-format').value}`, 'iperf-comparison')));
-document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => link.addEventListener('click', () => {
+for (const id of ['baseline', 'candidate', 'third']) $(id)?.addEventListener('change', safe(compare));
+$('export-comparison')?.addEventListener('click', safe(() => download(`${comparisonPath()}&format=${$('export-format').value}`, 'iperf-comparison')));
+document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => link?.addEventListener('click', () => {
   document.querySelectorAll('.sidebar-menu .nav-link').forEach((other) => other.classList.toggle('active', other === link));
 }));
 
 async function tick() {
   try {
     if (Date.now() - lastHistory > 3000) await loadHistory();
-    if (selectedId && selected && !terminal.has(selected.status)) await loadSelected();
+    if (selectedId && selected && (activeId === selectedId || !terminal.has(selected.status))) await loadSelected();
   } catch (error) { message(`Connection problem: ${error.message}`); }
   finally { setTimeout(tick, 800); }
 }
@@ -425,13 +478,39 @@ async function init() {
     engineReady = status.iperf.available && !status.storage_error;
     $('engine-badge').textContent = engineReady ? '● iPerf3 connected' : 'iPerf3 unavailable';
     $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
-    $('storage-path').textContent = `Saved on disk: ${status.storage}`;
+    if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
     if (!engineReady) message(status.storage_error || status.iperf.error);
-    if (!status.iperf.bidir) $('mode').querySelector('[value="bidir"]').disabled = true;
-    await loadHistory(); await loadPresets();
-    if (activeId || runs.length) await selectRun(activeId || runs[0].id);
-    await compare(); fields();
+    if (testPage && !status.iperf.bidir) $('mode').querySelector('[value="bidir"]').disabled = true;
+    await loadHistory();
+    if (testPage || $('preset-body')) await loadPresets();
+    if (testPage) {
+      if (document.body.dataset.page === 'server') $('role').value = 'server';
+      fields();
+      if (query.get('preset')) applyPreset(query.get('preset'));
+      if (query.get('run') || activeId) await selectRun(query.get('run') || activeId);
+    }
+    await compare();
   } catch (error) { message(error.message); }
   tick();
 }
 init();
+
+function renderResults() {
+  $('result-cards').classList.toggle('d-none', !terminal.has(selected.status));
+  $('live-metrics').classList.toggle('d-none', terminal.has(selected.status));
+  const metrics = selected.metrics || {};
+  for (const direction of ['upload','download']) {
+    $('result-' + direction).textContent = number(metrics[direction+'_mbps']);
+    $('result-' + direction + '-foot').textContent = Number.isFinite(metrics[direction+'_mbps']) ? 'Final receiver report' : 'No final measurement reported';
+  }
+  $('result-runtime').textContent = number(selected.overview?.runtime_seconds);
+  $('result-outcome').textContent = selected.status;
+  $('result-outcome-box').className = `small-box text-bg-${selected.status === 'completed' ? 'success' : selected.status === 'failed' ? 'danger' : 'warning'}`;
+  const losses = ['upload','download'].filter((d) => Number.isFinite(metrics[d+'_lost_percent'])).map((d) => `${d} loss ${number(metrics[d+'_lost_percent'])}%`);
+  $('result-quality').textContent = losses.join(' · ') || 'No packet-loss measurement reported';
+  const route = selected.route;
+  $('route-note').textContent = route ? `${route.status}: ${route.note || ''}` : 'No route evidence in this saved run.';
+  $('route-output').textContent = route?.raw_output || '';
+  const hops = route?.hops || [];
+  $('route-hops').innerHTML = hops.length ? `<table class="table"><thead><tr><th>Hop</th><th>Address</th><th>Probe RTT · ms</th></tr></thead><tbody>${hops.map((h) => `<tr><td>${escape(h.hop)}</td><td>${escape(h.address || 'No reply')}</td><td>${(h.rtt_ms || []).map((v) => number(v)).join(' / ') || '—'}</td></tr>`).join('')}</tbody></table>` : '';
+}
