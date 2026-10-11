@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iPerf</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main>
+    <p class="eyebrow">IPERF / WORKSPACE</p>
+    <h1>Your app starts here.</h1>
+    <p class="intro">A Python application with a PostgreSQL database and a web interface.</p>
+    <section aria-label="Application status">
+      <div><span>Python backend</span><strong>Running</strong></div>
+      <div><span>PostgreSQL</span><strong id="database" role="status">Checking…</strong></div>
+    </section>
+    <button id="refresh" type="button">Check connection</button>
+    <p class="hint">This is the starter screen. Add your application features here.</p>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
