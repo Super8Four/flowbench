@@ -1,23 +1,80 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>iPerf</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iPerf · Network test workspace</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/adminlte.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-  <main>
-    <p class="eyebrow">IPERF / WORKSPACE</p>
-    <h1>Your app starts here.</h1>
-    <p class="intro">A Python application with a PostgreSQL database and a web interface.</p>
-    <section aria-label="Application status">
-      <div><span>Python backend</span><strong>Running</strong></div>
-      <div><span>PostgreSQL</span><strong id="database" role="status">Checking…</strong></div>
-    </section>
-    <button id="refresh" type="button">Check connection</button>
-    <p class="hint">This is the starter screen. Add your application features here.</p>
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+<div class="app-wrapper">
+  <nav class="app-header navbar navbar-expand bg-body" aria-label="Workspace navigation"><div class="container-fluid">
+    <button class="btn btn-light me-3" data-lte-toggle="sidebar" aria-label="Toggle navigation">☰</button>
+    <span class="navbar-text">Network operations <span class="text-body-secondary mx-2">/</span> Performance testing</span>
+    <span class="ms-auto badge rounded-pill text-bg-light border" id="engine-badge">Checking iPerf3…</span>
+  </div></nav>
+  <aside class="app-sidebar bg-dark" data-bs-theme="dark">
+    <div class="sidebar-brand"><a href="#workspace" class="brand-link"><span class="brand-mark">iP</span><span class="brand-text fw-semibold">iPerf workspace</span></a></div>
+    <div class="sidebar-wrapper"><div class="sidebar-caption">MEASURE &amp; VERIFY</div>
+      <nav aria-label="Sections"><ul class="nav sidebar-menu flex-column">
+        <li class="nav-item"><a href="#workspace" class="nav-link active"><span class="nav-icon">◈</span><p>Test workspace</p></a></li>
+        <li class="nav-item"><a href="#history" class="nav-link"><span class="nav-icon">◷</span><p>Saved history</p></a></li>
+        <li class="nav-item"><a href="#comparison" class="nav-link"><span class="nav-icon">⇄</span><p>Before &amp; after</p></a></li>
+      </ul></nav>
+      <div class="sidebar-note"><span class="save-dot"></span> Every session is saved<p>Logs, settings, and outcomes stay available after a restart.</p></div>
+    </div>
+  </aside>
+  <main class="app-main" id="workspace">
+    <div class="app-content-header"><div class="container-fluid d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div><p class="eyebrow">NETWORK PERFORMANCE</p><h1 class="fs-3 fw-semibold mb-1">Measure. Fix. Verify.</h1><p class="text-body-secondary mb-0">Live iPerf3 tests with a permanent record of what changed.</p></div>
+      <div class="text-end"><span class="badge text-bg-success">Persistent history</span><p class="small text-body-secondary mt-2 mb-0" id="saved-count">0 saved sessions</p></div>
+    </div></div>
+    <div class="app-content"><div class="container-fluid">
+      <div id="message" class="alert d-none" role="status"></div>
+      <div class="row g-3 mb-4" aria-label="Selected session metrics">
+        <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">SESSION STATUS</div><strong id="session-status">Ready</strong><div class="metric-foot" id="session-date">Start a test or open a saved run</div></div></div>
+        <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">UPLOAD / SEND</div><strong id="upload-rate">—</strong><div class="metric-foot">Mbps · client perspective</div></div></div>
+        <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">DOWNLOAD / RECEIVE</div><strong id="download-rate">—</strong><div class="metric-foot">Mbps · client perspective</div></div></div>
+        <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">CAPTURED OUTPUT</div><strong id="event-count">0</strong><div class="metric-foot">Timestamped log entries</div></div></div>
+      </div>
+      <div class="row g-4"><div class="col-xl-4">
+        <section class="card card-outline card-primary"><div class="card-header"><h2 class="card-title">Test configuration</h2><span class="card-tools small text-body-secondary">iPerf3</span></div>
+          <form id="test-form"><div class="card-body">
+            <label for="role" class="form-label">Session type</label><select id="role" name="role" class="form-select mb-3"><option value="client">Client · test a remote server</option><option value="server">Server · accept one test</option></select>
+            <div class="row g-3 mb-3"><div class="col-8" id="target-field"><label for="target" class="form-label">Server IP or hostname</label><input id="target" name="target" class="form-control" placeholder="192.168.1.100" required></div><div class="col-4"><label for="port" class="form-label">Port</label><input id="port" name="port" class="form-control" type="number" min="1" max="65535" value="5201" required></div></div>
+            <div id="client-fields"><div class="row g-3 mb-3"><div class="col-6"><label for="protocol" class="form-label">Protocol</label><select id="protocol" name="protocol" class="form-select"><option value="tcp">TCP</option><option value="udp">UDP</option></select></div><div class="col-6"><label for="mode" class="form-label">Direction</label><select id="mode" name="mode" class="form-select"><option value="upload">Upload</option><option value="download">Download</option><option value="bidir">Bidirectional</option></select></div></div>
+              <div class="row g-3 mb-3"><div class="col-6"><label for="duration" class="form-label">Duration (seconds)</label><input id="duration" name="duration" class="form-control" type="number" min="1" max="3600" value="10" required></div><div class="col-6"><label for="streams" class="form-label">Parallel streams</label><input id="streams" name="streams" class="form-control" type="number" min="1" max="32" value="1" required></div></div>
+              <div class="mb-3 d-none" id="bandwidth-field"><label for="bandwidth" class="form-label">UDP bandwidth per stream</label><input id="bandwidth" name="bandwidth" class="form-control" value="10M"><div class="form-text">For example 10M, 1G, or 0 for unlimited.</div></div>
+            </div>
+            <div id="server-fields" class="d-none mb-3"><label for="idle_timeout" class="form-label">Wait for a client (seconds)</label><input id="idle_timeout" name="idle_timeout" class="form-control" type="number" min="1" max="3600" value="300"><div class="form-text">The server exits after one test. An idle timeout has no performance results.</div></div>
+            <div class="mb-3"><label for="label" class="form-label">Test label</label><input id="label" name="label" class="form-control" maxlength="200" placeholder="Office uplink · before switch replacement"></div>
+            <div class="mb-3"><label for="notes" class="form-label">Notes / change being tested</label><textarea id="notes" name="notes" class="form-control" rows="2" maxlength="4000" placeholder="Record the issue, the fix, or the conditions."></textarea></div>
+            <details><summary class="small text-body-secondary">Advanced logging &amp; network settings</summary><div class="mt-3"><label for="bind" class="form-label">Local bind address (optional)</label><input id="bind" name="bind" class="form-control" placeholder="Leave blank for automatic"><div class="form-check mt-3"><input id="debug" name="debug" type="checkbox" class="form-check-input"><label for="debug" class="form-check-label">Include iPerf3 debug output</label></div></div></details>
+          </div><div class="card-footer d-flex gap-2"><button type="submit" id="run-button" class="btn btn-primary flex-grow-1">▶ Start session</button><button id="stop-button" type="button" class="btn btn-outline-danger" disabled>Stop</button></div></form>
+        </section>
+        <div class="small text-body-secondary px-1"><p>Tests run from this machine. A client test needs an iPerf3 server on the target (<code>iperf3 -s</code>).</p><p id="storage-path" class="storage-path"></p></div>
+      </div><div class="col-xl-8">
+        <section class="card" aria-label="Session activity"><div class="card-header d-flex align-items-center flex-wrap gap-2"><h2 class="card-title">Session activity</h2><span id="selected-label" class="small text-body-secondary ms-auto">No session selected</span></div>
+          <div class="card-body pb-2"><div class="d-flex align-items-center justify-content-between"><span class="small text-body-secondary">THROUGHPUT OVER TIME</span><span class="small"><span class="legend upload"></span> Upload <span class="legend download ms-2"></span> Download</span></div><svg id="throughput-chart" viewBox="0 0 760 160" role="img" aria-label="Throughput over time in megabits per second"><text x="380" y="85" text-anchor="middle" fill="#8793a5" font-size="14">Interval measurements will appear here</text></svg></div>
+          <div class="log-toolbar"><span class="terminal-title">● LIVE OUTPUT</span><label class="small ms-auto" for="log-filter">Show</label><select id="log-filter" class="form-select form-select-sm"><option value="all">All output</option><option value="stdout">iPerf stdout</option><option value="stderr">iPerf stderr</option><option value="system">App events</option></select><input id="log-search" class="form-control form-control-sm" placeholder="Search output" aria-label="Search output"><label class="small text-nowrap"><input id="autoscroll" type="checkbox" checked> Follow</label></div>
+          <pre id="log-output" class="log-output" tabindex="0" aria-label="Captured process log">No output yet. Each line will be saved with its timestamp and source.</pre>
+          <div class="card-footer d-flex align-items-center flex-wrap gap-2"><span class="small text-body-secondary" id="exit-code">Raw stdout, stderr, and app events are retained.</span><select id="export-format" class="form-select form-select-sm ms-auto export-select" aria-label="Export format"><option value="json">JSON</option><option value="xml">XML</option></select><button id="export-button" class="btn btn-sm btn-outline-primary" disabled>Export session</button><button id="rerun-button" class="btn btn-sm btn-outline-secondary" disabled>Load settings</button></div>
+        </section>
+        <section class="card" id="comparison"><div class="card-header"><h2 class="card-title">Before &amp; after</h2><span class="card-tools small text-body-secondary">Evidence of improvement</span></div><div class="card-body">
+          <div class="row g-3"><div class="col-md-6"><label for="baseline" class="form-label">Baseline (before)</label><select id="baseline" class="form-select"><option value="">Choose a completed test</option></select></div><div class="col-md-6"><label for="candidate" class="form-label">Follow-up (after)</label><select id="candidate" class="form-select"><option value="">Choose a completed test</option></select></div></div>
+          <div id="comparison-result" class="comparison-result mt-3">Choose two completed tests to compare throughput, retransmits, jitter, and packet loss where available.</div><button id="export-comparison" class="btn btn-sm btn-outline-primary mt-3" disabled>Export comparison</button>
+        </div></section>
+      </div></div>
+      <section class="card mt-4" id="history"><div class="card-header d-flex flex-wrap align-items-center gap-2"><h2 class="card-title">Saved test history</h2><input id="history-search" class="form-control form-control-sm ms-auto" placeholder="Search labels, hosts, and notes" aria-label="Search history"><button id="refresh-history" class="btn btn-sm btn-outline-secondary">Refresh</button></div>
+        <div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Session / recorded at</th><th>Target</th><th>Test settings</th><th>Status</th><th>Send / receive</th><th class="text-end">Actions</th></tr></thead><tbody id="history-body"><tr><td colspan="6" class="text-center py-5 text-body-secondary">No saved tests yet. Your first session will appear here.</td></tr></tbody></table></div>
+      </section>
+      <section class="card d-none" id="annotation-card"><div class="card-header"><h2 class="card-title">Selected session notes</h2></div><div class="card-body"><div class="row g-3"><div class="col-md-4"><label for="saved-label" class="form-label">Label</label><input id="saved-label" class="form-control" maxlength="200"></div><div class="col-md-8"><label for="saved-notes" class="form-label">Notes</label><textarea id="saved-notes" class="form-control" maxlength="4000" rows="2"></textarea></div></div><button id="save-notes" class="btn btn-sm btn-primary mt-3">Save notes</button></div></section>
+    </div></div>
   </main>
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <footer class="app-footer"><div class="float-end d-none d-sm-inline small" id="engine-version">iPerf3</div><span class="small">Built with <a href="https://github.com/ColorlibHQ/AdminLTE" target="_blank" rel="noopener">AdminLTE 4</a> · Your network, your test history.</span></footer>
+</div>
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/adminlte/adminlte.min.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
