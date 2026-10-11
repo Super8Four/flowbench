@@ -1,0 +1,11 @@
+# Allow only application source and build inputs into the context.
+# Never include .env, test evidence, Windows binaries, or .venv.
+**
+!Dockerfile
+!requirements.txt
+!wsgi.py
+!THIRD_PARTY_NOTICES.md
+!app/
+!app/**
+**/__pycache__/
+**/*.py[cod]

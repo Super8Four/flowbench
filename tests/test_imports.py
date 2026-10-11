@@ -38,6 +38,16 @@ class ImportTests(unittest.TestCase):
         self.manager.shutdown()
         self.temp.cleanup()
 
+    def test_readiness_requires_engine_and_working_archive_without_database(self):
+        self.assertEqual(self.client.get('/api/ready').status_code, 503)
+        self.manager.capabilities['available'] = True
+        self.assertEqual(self.client.get('/api/ready').get_json(), {'ready': True})
+        self.manager.storage_error = 'Disk full'
+        self.assertEqual(self.client.get('/api/ready').status_code, 503)
+        self.manager.storage_error = None
+        self.manager.shutdown()
+        self.assertEqual(self.client.get('/api/ready').status_code, 503)
+
     def upload(self, endpoint, data, xml=False):
         content = xml_export(data).decode() if xml else json.dumps(data)
         return self.client.post(endpoint, json={"filename": "old-test.xml" if xml else "old-test.json", "content": content})

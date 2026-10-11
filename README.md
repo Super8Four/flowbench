@@ -100,13 +100,53 @@ Set `RUNS_DIRECTORY` to change the archive location. Relative paths resolve from
 
 JSON and XML exports include the same settings, metadata, metrics, intervals, native results, raw stdout/stderr, and complete event history. Exporting a running session produces a snapshot of the data captured so far. XML uses typed `field` and `item` elements to preserve nested objects, arrays, numbers, booleans, and nulls. Strings with characters XML cannot represent use base64 with an explicit encoding attribute.
 
-The existing PostgreSQL configuration, `Measurement` starter model, `init-db` command, and database-only Compose service are retained for future database integration. Test history currently uses the disk archive; it does not require PostgreSQL or a schema migration. `/api/health` reports the starter database's connection status; `/api/status` reports the iPerf engine, archive path, and active session.
+The existing PostgreSQL configuration, `Measurement` starter model, `init-db` command, and database-only service in `compose.postgres.yaml` are retained for future database integration. Test history currently uses the disk archive; it does not require PostgreSQL or a schema migration. `/api/health` reports the starter database's connection status; `/api/status` reports the iPerf engine, archive path, and active session. `/api/ready` checks the engine and archive manager without a database connection or a full history scan.
 
-## Docker migration (next step)
+## Ubuntu container
 
-The app is currently run and verified locally. App containerization has not been added yet. For migration, install iPerf3 inside the Linux container, run one Waitress process with threads, set `RUNS_DIRECTORY=/data/runs`, and mount a persistent volume at `/data`. Copy the existing archive into that volume so baseline evidence survives the move and container replacements. Preserve the volume in backups. The existing `compose.yaml` starts only PostgreSQL.
+Install [Docker Engine and Compose on Ubuntu](https://docs.docker.com/engine/install/ubuntu/), clone this repository, and run:
 
-The local control API has no authentication. Keep the current loopback binding for this phase; access control belongs in the deployment setup if the UI is made available to other machines.
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose logs -f app
+```
+
+Open http://127.0.0.1:5000 on the Docker host. If port 5000 is occupied, use `WEB_PORT=8080 docker compose up -d --build` and open port 8080. Use `docker compose stop` to stop cleanly, or `docker compose down` to remove the container while retaining saved data. Updating the checkout and rerunning `docker compose up -d --build` recreates the app using the same archive volume.
+
+The image uses Ubuntu 24.04 LTS, Python 3.12, one Waitress process with eight threads, and upstream iPerf3 3.22. A separate build stage verifies the iPerf source checksum and compiles it; the final image contains no compiler, downloaded source archive, pip cache, or development virtual environment. Source code is owned by root; the app runs as UID/GID `10001:10001`, with a read-only root filesystem, writable `/tmp`, and writable archive volume. SIGTERM stops an active test, saves its output, and closes the archive. The health probe uses `/api/ready`; PostgreSQL is not started or required. The old database-only setup remains available separately with `docker compose -f compose.postgres.yaml up -d`.
+
+**Saved evidence is in the named `iperf_data` volume**, mounted at `/data`, with runs and custom presets under `/data/runs`. Normal stop, restart, rebuild, and container replacement preserve it. Do not use `docker compose down --volumes` unless you intend to delete that archive. The build context excludes your local `.env`, Windows executables, `.venv`, exports, and run archive. Your existing Windows results are not automatically copied or published in the image.
+
+To move evidence using the interface, export your sessions/comparisons as JSON or XML, import them into the container's Previous tests, and separately export/import your server presets JSON. Full exports retain the logs; `run.json` alone does not. To preserve the complete archive and original IDs instead, stop both apps, back up `instance/runs`, then copy its contents into a newly created app container's volume:
+
+```sh
+docker compose create app
+container_id=$(docker compose ps --all --quiet app)
+docker cp ./instance/runs/. "$container_id:/data/runs/"
+docker run --rm --user 0 --volumes-from "$container_id" --entrypoint chown iperf-workspace:local -R 10001:10001 /data
+docker compose start app
+```
+
+Use this copy procedure only for a fresh container archive; avoid overwriting existing evidence. After migration, confirm history, notes, logs, and custom presets before retiring the old copy. For a complete volume backup, stop the app and copy `/data/runs` out with `docker cp`. Keep the resulting backup outside the container.
+
+The default web and iPerf ports are published only on host loopback. Server sessions use container port **5201**, published for both TCP and UDP; changing the port in the UI also requires a matching Docker port mapping. To receive tests from your LAN, set `IPERF_BIND_ADDRESS` to the Docker host's LAN address when starting Compose, and keep port 5201 in the UI. `IPERF_PORT` changes the host-side port only. Binding in the test form refers to an address **inside the container**; leave it automatic unless needed. Client tests originate from the container; `127.0.0.1` as a target addresses the container itself. Use a server's reachable LAN/public address. Docker's bridge network can affect measurements, so keep container/network settings consistent between baseline and follow-up tests.
+
+The web control API has no authentication. Use localhost or an SSH tunnel for web access; add authentication before exposing it to other machines.
+
+### Build verification and downloadable image
+
+The **Ubuntu container** GitHub Actions workflow builds on an Ubuntu runner, runs the complete test suite against the image's Linux iPerf3, and verifies non-root/read-only startup, health checks, real TCP bidirectional results and remote output, JSON/XML exports, custom presets, archive persistence after container replacement, and stopping an active test. Its summary records the actual image size and idle memory. Each successful `main` build provides a Linux amd64 image archive under the workflow's **iperf-workspace-linux-amd64** artifact (retained for 14 days). Download and unzip it, then load the included `.tar.gz` with `docker load -i iperf-workspace-linux-amd64.tar.gz`; `docker compose up -d --no-build` uses that image.
+
+To repeat the checks on a Docker host after building:
+
+```sh
+docker build -t iperf-workspace:local .
+docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,target=/tests,readonly" iperf-workspace:local -m unittest discover -s /tests -v
+python3 scripts/check-container.py
+```
+
+The lifecycle check uses uniquely named disposable containers and volumes. It never opens or removes your Compose archive. The Dockerfile can also build for arm64 with an appropriate builder; the downloadable CI artifact is amd64.
 
 ## Checks and API
 
@@ -120,6 +160,7 @@ Tests use a temporary archive and real iPerf3 loopback processes. They cover liv
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/status` | Engine capabilities, storage location, active session |
+| `GET /api/ready` | Container readiness: engine available and archive manager healthy |
 | `GET /api/runs` | Saved history and active run ID |
 | `POST /api/runs/import` | Import saved JSON/XML; JSON envelope with `filename` and `content` text |
 | `GET /api/presets[?download=1]` | Read/export public and custom catalog |

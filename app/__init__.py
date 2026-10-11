@@ -136,6 +136,12 @@ def create_app(test_config=None):
     def list_runs():
         return jsonify(runs=manager.list_runs(), active_run=manager.active)
 
+    @app.get("/api/ready")
+    def readiness():
+        ready = bool(manager.capabilities["available"] and not manager.storage_error
+                     and not manager.storage_lock.closed)
+        return jsonify(ready=ready), 200 if ready else 503
+
     @app.post("/api/runs")
     def start_run():
         try:

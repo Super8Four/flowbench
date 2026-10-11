@@ -1,0 +1,38 @@
+name: Ubuntu container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and build Ubuntu image
+        run: |
+          docker compose config --quiet
+          docker build --tag iperf-workspace:local .
+      - name: Run all tests with Linux iPerf3
+        run: >-
+          docker run --rm --entrypoint python
+          --mount type=bind,source="${{ github.workspace }}/tests",target=/tests,readonly
+          iperf-workspace:local -m unittest discover -s /tests -v
+      - name: Test container lifecycle and persistent evidence
+        run: python3 scripts/check-container.py
+      - name: Package verified image
+        if: github.event_name != 'pull_request'
+        run: docker save iperf-workspace:local | gzip > iperf-workspace-linux-amd64.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: iperf-workspace-linux-amd64
+          path: iperf-workspace-linux-amd64.tar.gz
+          retention-days: 14
+          compression-level: 0
