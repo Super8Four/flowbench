@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from .metrics import effective_settings, measurements, series
+from .metrics import effective_settings, measurements, series, overview
 from .peer import peer_results
 
 
@@ -202,6 +202,7 @@ class RunManager:
                         "id", "created_at", "finished_at", "status", "settings", "summary", "exit_code"
                     )}
                     row["metrics"] = measurements(record)
+                    row["overview"] = overview(record)
                     row["effective_settings"] = effective_settings(record)
                     row["imported"] = record.get("imported")
                     records.append(row)
@@ -481,6 +482,7 @@ class RunManager:
             record["metrics"] = measurements(record)
             record["effective_settings"] = effective_settings(record)
             record["series"] = series(record)
+            record["overview"] = overview(record)
             record["peer"] = peer_results(record)
             events = self.read_events(run_id)
             record["events"] = events

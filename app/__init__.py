@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .exports import xml_export
 from .runner import RunManager
-from .metrics import comparison, measurements, series, effective_settings
+from .metrics import comparison, measurements, series, effective_settings, overview
 from .imports import parse_document, import_runs
 from .presets import PresetStore, MAX_CATALOG_BYTES
 from .peer import peer_results
@@ -152,6 +152,7 @@ def create_app(test_config=None):
         record = manager.read(run_id)
         record["metrics"] = measurements(record)
         record["series"] = series(record)
+        record["overview"] = overview(record)
         record["effective_settings"] = effective_settings(record)
         record["peer"] = peer_results(record)
         record["events"] = manager.read_events(run_id, int(after))

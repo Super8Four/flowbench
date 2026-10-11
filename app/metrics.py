@@ -1,5 +1,7 @@
 """Normalize iPerf results without fabricating metrics absent from a platform."""
 
+import math
+
 
 def effective_settings(record):
     result = dict(record["settings"])
@@ -70,6 +72,46 @@ def series(record):
             grouped[key] = grouped.get(key, 0) + point["mbps"]
         points = [{"seconds": key[0], "direction": key[1], "mbps": value} for key, value in grouped.items()]
     return points
+
+
+def overview(record):
+    """Interval peaks and measured runtime, with a bounded trend for history rows."""
+    def valid(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+    points = [point for point in series(record) if point["direction"] in {"upload", "download"}
+              and valid(point["seconds"]) and valid(point["mbps"])]
+    result = {"runtime_seconds": None, "trend": []}
+    ends = [point["seconds"] for point in points]
+    summary = record.get("summary") or {}
+    # A summary-only import can report runtime, but cannot establish interval peaks.
+    for key in ("sum", "sum_sent", "sum_received", "sum_bidir_reverse",
+                "sum_sent_bidir_reverse", "sum_received_bidir_reverse"):
+        value = summary.get(key) or {}
+        end = value.get("end", value.get("seconds"))
+        if valid(end):
+            ends.append(end)
+    for entries in summary.get("text_summaries", {}).values():
+        ends.extend(entry["end"] for entry in entries if valid(entry.get("end")))
+    if ends:
+        result["runtime_seconds"] = max(ends)
+    for direction in ("upload", "download"):
+        values = sorted((point for point in points if point["direction"] == direction), key=lambda point: point["seconds"])
+        if not values:
+            continue
+        result["max_" + direction + "_mbps"] = max(point["mbps"] for point in values)
+        if len(values) > 60:
+            # Keep endpoints and each bucket's extrema so short peaks remain visible.
+            middle = values[1:-1]
+            reduced = [values[0]]
+            for index in range(29):
+                bucket = middle[index * len(middle) // 29:(index + 1) * len(middle) // 29]
+                extrema = {min(range(len(bucket)), key=lambda i: bucket[i]["mbps"]),
+                           max(range(len(bucket)), key=lambda i: bucket[i]["mbps"])}
+                reduced.extend(bucket[i] for i in sorted(extrema))
+            values = reduced + [values[-1]]
+        result["trend"].extend({key: point[key] for key in ("seconds", "mbps", "direction")} for point in values)
+    return result
 
 
 def comparison(before, after):

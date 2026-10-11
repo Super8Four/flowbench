@@ -213,12 +213,14 @@ function renderSelected() {
   if (!selected) return;
   $('session-status').textContent = selected.status[0].toUpperCase() + selected.status.slice(1);
   $('session-date').textContent = date(selected.created_at);
+  if (Number.isFinite(selected.overview?.runtime_seconds)) $('session-date').textContent += ` · Run time ${number(selected.overview.runtime_seconds)}s`;
   $('selected-label').textContent = title(selected);
   $('event-count').textContent = number(selected.event_count, 0);
   const metrics = selected.metrics || {};
   for (const direction of ['upload', 'download']) {
     const latest = (selected.series || []).filter((p) => p.direction === direction).at(-1);
     $(direction + '-rate').textContent = number(metrics[direction + '_mbps'] ?? (!terminal.has(selected.status) ? latest?.mbps : undefined));
+    $(direction + '-peak').textContent = `Mbps · Peak ${number(selected.overview?.['max_' + direction + '_mbps'])} Mbps`;
   }
   $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
   $('export-button').disabled = false;
@@ -247,14 +249,39 @@ async function selectRun(id) {
   $('saved-label').value = selected.settings.label;
   $('saved-notes').value = selected.settings.notes;
 }
+function historyTrend(overview) {
+  const points = overview?.trend || [];
+  if (!points.length) return '<span class="history-muted">No interval data</span>';
+  const maxSeconds = Math.max(1, ...points.map((point) => point.seconds));
+  const maxRate = Math.max(1, ...points.map((point) => point.mbps));
+  const x = (point) => (4 + point.seconds / maxSeconds * 128).toFixed(2);
+  const y = (point) => (32 - point.mbps / maxRate * 28).toFixed(2);
+  const lines = ['upload', 'download'].map((direction) => {
+    const values = points.filter((point) => point.direction === direction);
+    if (!values.length) return '';
+    const color = direction === 'upload' ? '#1683ff' : '#15d3a6';
+    return `<polyline points="${values.map((point) => `${x(point)},${y(point)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/>` +
+      values.map((point) => `<circle cx="${x(point)}" cy="${y(point)}" r="1.3" fill="${color}"><title>${direction}: ${number(point.mbps)} Mbps at ${number(point.seconds)}s</title></circle>`).join('');
+  }).join('');
+  return `<svg class="history-sparkline" viewBox="0 0 140 36" role="img" aria-label="Upload and download throughput trend, scaled to this test"><title>Upload (blue), download (green). Peak ${number(maxRate)} Mbps; ${number(maxSeconds)} seconds. Scale varies by test.</title>${lines}</svg>`;
+}
 function renderHistory() {
   const search = $('history-search').value.toLowerCase();
   const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes}`.toLowerCase().includes(search));
   $('history-body').innerHTML = visible.map((run) => {
     const config = run.effective_settings || run.settings;
+    const stats = run.overview || {};
     const color = {completed: 'success', failed: 'danger', cancelled: 'secondary', interrupted: 'warning', running: 'primary', starting: 'primary'}[run.status] || 'secondary';
-    return `<tr><td><div class="history-label">${escape(title(run))}</div><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-light border">Imported</span>' : ''}</div></td><td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}<div class="history-date">Port ${run.settings.port} · ${escape(run.settings.role)}</div></td><td>${escape(config.protocol.toUpperCase())} · ${escape(config.mode)}<div class="history-date">${config.duration}s · ${config.streams} stream(s)</div></td><td><span class="badge text-bg-${color}">${escape(run.status)}</span></td><td>${number(run.metrics.upload_mbps)} / ${number(run.metrics.download_mbps)}<div class="history-date">Mbps</div></td><td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-open="${run.id}">Open</button> <button class="btn btn-sm btn-outline-secondary" data-export="${run.id}">Export</button></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="text-center py-5 text-body-secondary">No matching saved sessions.</td></tr>';
+    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div></td>
+      <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}</div></td>
+      <td><span class="badge text-bg-${color}">${escape(run.status)}</span></td>
+      <td class="history-speed"><strong>${number(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.upload_mbps)}</div></td>
+      <td class="history-speed"><strong>${number(stats.max_download_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.download_mbps)}</div></td>
+      <td class="text-nowrap"><strong>${number(stats.runtime_seconds)}${Number.isFinite(stats.runtime_seconds) ? 's' : ''}</strong><div class="history-date">${config.role === 'server' && !run.test_parameters ? 'Measured time' : `Set ${number(config.duration)}s`}</div></td>
+      <td>${historyTrend(stats)}</td>
+      <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-open="${run.id}">Open</button> <button class="btn btn-sm btn-outline-secondary" data-export="${run.id}">Export</button></td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="text-center py-5 history-muted">No matching saved sessions.</td></tr>';
+  $('history-count').textContent = `${visible.length} of ${runs.length} saved sessions`;
 }
 function comparisonOptions() {
   const complete = runs.filter((run) => run.status === 'completed' && Object.keys(run.metrics).length);

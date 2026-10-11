@@ -193,6 +193,10 @@ class RealIperfTests(unittest.TestCase):
         self.assertEqual(result['status'], 'completed', result.get('error'))
         self.assertGreater(result['metrics']['upload_mbps'], 0)
         self.assertGreaterEqual(len(result['series']), 2)
+        self.assertEqual(result['overview']['max_upload_mbps'], max(point['mbps'] for point in result['series']))
+        self.assertAlmostEqual(result['overview']['runtime_seconds'], 4, delta=.5)
+        history = self.client.get('/api/runs').get_json()['runs']
+        self.assertEqual(next(row for row in history if row['id'] == run_id)['overview'], result['overview'])
         self.assertIn('start', result['native_result'])
         self.assertIn('server_output_text', result['native_result'])
         self.assertTrue(result['peer']['available'])
@@ -208,6 +212,7 @@ class RealIperfTests(unittest.TestCase):
         self.assertEqual(decode_xml(ET.fromstring(xml_response.data)), json_response.get_json())
         self.assertIn('attachment', json_response.headers['Content-Disposition'])
         exported = json_response.get_json()
+        self.assertEqual(exported['overview'], result['overview'])
         self.manager.shutdown()
         self.manager = RunManager(self.temp.name, IPERF)
         self.assertEqual(self.manager.export(run_id), exported)
