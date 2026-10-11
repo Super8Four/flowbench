@@ -121,6 +121,7 @@ The image uses Ubuntu 24.04 LTS, Python 3.12, one Waitress process with eight th
 To move evidence using the interface, export your sessions/comparisons as JSON or XML, import them into the container's Previous tests, and separately export/import your server presets JSON. Full exports retain the logs; `run.json` alone does not. To preserve the complete archive and original IDs instead, stop both apps, back up `instance/runs`, then copy its contents into a newly created app container's volume:
 
 ```sh
+docker compose build app
 docker compose create app
 container_id=$(docker compose ps --all --quiet app)
 docker cp ./instance/runs/. "$container_id:/data/runs/"
@@ -138,15 +139,77 @@ The web control API has no authentication. Use localhost or an SSH tunnel for we
 
 The **Ubuntu container** GitHub Actions workflow builds on an Ubuntu runner, runs the complete test suite against the image's Linux iPerf3, and verifies non-root/read-only startup, health checks, real TCP bidirectional results and remote output, JSON/XML exports, custom presets, archive persistence after container replacement, and stopping an active test. Its summary records the actual image size and idle memory. Each successful `main` build provides a Linux amd64 image archive under the workflow's **iperf-workspace-linux-amd64** artifact (retained for 14 days). Download and unzip it, then load the included `.tar.gz` with `docker load -i iperf-workspace-linux-amd64.tar.gz`; `docker compose up -d --no-build` uses that image.
 
-To repeat the checks on a Docker host after building:
+The [verified container build for commit `60ca3c9`](https://github.com/Super8Four/iPerfWeb/actions/runs/38111657080) passed all **39 tests** and the lifecycle checks on an Ubuntu runner. Its amd64 image was **173.0 MiB**, with **53.93 MiB** idle container memory during that check. These are measurements from that runner; server architecture, dependency updates, and workloads can change them. Testing on the requested server, `172.31.20.100`, is still pending because SSH authentication for `gjensen` was rejected.
+
+### Test on the Ubuntu server
+
+From your computer, connect using an authorized SSH key or the server's configured authentication:
 
 ```sh
-docker build -t iperf-workspace:local .
-docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,target=/tests,readonly" iperf-workspace:local -m unittest discover -s /tests -v
-python3 scripts/check-container.py
+ssh gjensen@172.31.20.100
 ```
 
-The lifecycle check uses uniquely named disposable containers and volumes. It never opens or removes your Compose archive. The Dockerfile can also build for arm64 with an appropriate builder; the downloadable CI artifact is amd64.
+Run the following commands **on the server**, using native Docker Engine. Confirm Docker access and the server architecture first:
+
+```sh
+uname -m
+docker version
+docker compose version
+python3 --version
+```
+
+Docker Engine, the Compose plugin, Git, and Python 3 are required. The account running the checks must have Docker access. For a new checkout:
+
+```sh
+git clone https://github.com/Super8Four/iPerfWeb.git
+cd iPerfWeb
+```
+
+For an existing checkout, enter its directory and run `git pull --ff-only`. Build on the server so the image matches its architecture; use the downloadable amd64 artifact only on an amd64 host (`uname -m` reports `x86_64`).
+
+In a Bash shell, validate Compose, build, and run the automated checks. Keep the logs for later comparison:
+
+```bash
+set -euo pipefail
+mkdir -p test-artifacts
+git rev-parse HEAD | tee test-artifacts/tested-commit.txt
+uname -m | tee test-artifacts/server-architecture.txt
+docker compose config --quiet
+docker build --progress=plain -t iperf-workspace:local . 2>&1 | tee test-artifacts/container-build.log
+docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,target=/tests,readonly" iperf-workspace:local -m unittest discover -s /tests -v 2>&1 | tee test-artifacts/container-tests.log
+python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle.log
+```
+
+Expect `Ran 39 tests` and `OK`, followed by `Container checks passed` with the image size and idle memory. A failed command stops this sequence. Logs stay under the ignored `test-artifacts/` directory and are not committed to GitHub.
+
+The lifecycle check uses uniquely named disposable containers and volumes. It verifies real loopback throughput and remote output, exports, persistence across replacement, and saving an active test on shutdown. It removes only its own test containers and volume; it never opens or removes your Compose archive. Loopback checks verify application behavior; use a separate reachable iPerf server for network performance measurements.
+
+After those checks pass, start the persistent app:
+
+```sh
+docker compose up -d --no-build --wait
+docker compose ps
+curl --fail http://127.0.0.1:5000/api/ready
+docker compose logs --tail=100 app
+```
+
+Expect a healthy container and `{"ready":true}`. To open the interface from your computer, leave this SSH tunnel running in another terminal:
+
+```sh
+ssh -N -L 127.0.0.1:8080:127.0.0.1:5000 gjensen@172.31.20.100
+```
+
+Open http://127.0.0.1:8080 on your computer. This example leaves the server's web port bound to loopback and uses local port 8080 to avoid conflicting with an existing local app.
+
+### Verify saved evidence and a network fix
+
+1. Run a short test against a reachable second machine running `iperf3 -s`. Use its LAN address, rather than `127.0.0.1`. Label the run **Before**, record the conditions in Notes, and confirm the live graph and logs.
+2. When it completes, inspect **Remote server results** if the peer returned them. Export the full session once as JSON and once as XML; retain both files outside the container.
+3. Run `docker compose down` followed by `docker compose up -d --no-build`. Once healthy, reopen the same saved run and confirm its notes, logs, results, and custom presets remain. Avoid `--volumes`, which deletes the archive.
+4. In a separate fresh workspace, import the exported JSON through **Import saved tests** and confirm its logs and results. Import the same JSON again, then its equivalent XML export; both should be recognized as duplicates of the imported test.
+5. Apply the network fix, then run **After** with the same target, protocol, direction, duration, streams, and bandwidth setting. Select Before and After in the comparison controls. Inspect the measurements and any settings warnings, then export the comparison as JSON or XML to preserve both source runs and the calculated changes.
+
+Keep the server architecture, tested commit, container/network configuration, and test conditions with your evidence. Container bridge networking and unrelated traffic can affect throughput; compare results under consistent conditions. Successful automated loopback tests alone do not establish that a network issue is fixed.
 
 ## Checks and API
 
