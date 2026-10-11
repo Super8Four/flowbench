@@ -4,6 +4,8 @@ An AdminLTE 4 web interface for iPerf3, backed by Python and Flask. Run TCP/UDP 
 
 The entire workspace uses AdminLTE's dark mode, with a shared charcoal palette for navigation, cards, forms, tables, results, and logs, following the [Dashboard v2 example](https://adminlte.io/themes/v4/index2.html). Dark mode is applied before the page renders, including on reload; new controls inherit the same theme.
 
+For installation and use on another machine, start with [Ryan's setup and testing guide](docs/ryan-setup-and-testing.md). It covers Ubuntu Docker deployment, client/server testing at either end, sharing JSON/XML evidence, custom presets, backups, and troubleshooting. An [importable example server preset](docs/examples/ryan-server-presets.json) is included; replace its example address before use.
+
 ## Start locally on Windows
 
 If the virtual environment is already set up, run:
