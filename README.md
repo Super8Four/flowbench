@@ -2,6 +2,8 @@
 
 An AdminLTE 4 web interface for iPerf3, backed by Python and Flask. Run TCP/UDP client tests or a one-test server session, watch live output and throughput, and keep an archive for later verification. AdminLTE and Bootstrap assets are bundled locally. See `THIRD_PARTY_NOTICES.md` for versions and licenses.
 
+The entire workspace uses AdminLTE's dark mode, with a shared charcoal palette for navigation, cards, forms, tables, results, and logs, following the [Dashboard v2 example](https://adminlte.io/themes/v4/index2.html). Dark mode is applied before the page renders, including on reload; new controls inherit the same theme.
+
 ## Start locally on Windows
 
 If the virtual environment is already set up, run:
