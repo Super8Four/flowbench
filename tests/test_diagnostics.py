@@ -115,7 +115,9 @@ class DiagnosticsTests(unittest.TestCase):
     def test_baseline_loaded_and_after_checks_are_distinct_and_bounded(self):
         capture = DiagnosticsCapture(settings(mtu=True, endpoint_health=True))
         snapshot = {"status": "captured", "cpu": {"total_ticks": 100, "idle_ticks": 50}, "interfaces": []}
-        with patch.object(capture, "_probe", side_effect=lambda phase, size=None: reply(3 if phase == "baseline" else 8, phase)), patch.object(capture, "_health", return_value=snapshot), patch("app.diagnostics.MAX_LOADED_SAMPLES", 2), patch("app.diagnostics.PROBE_INTERVAL", .001):
+        # This lifecycle fixture supplies measured replies; tool discovery must
+        # also be controlled so hosts without native ping exercise the same path.
+        with patch.object(capture, "_ping_command", return_value=["fixture-ping", "127.0.0.1"]) as command, patch.object(capture, "_probe", side_effect=lambda phase, size=None: reply(3 if phase == "baseline" else 8, phase)) as probe, patch.object(capture, "_health", return_value=snapshot), patch("app.diagnostics.MAX_LOADED_SAMPLES", 2), patch("app.diagnostics.PROBE_INTERVAL", .001):
             baseline = capture.baseline()
             self.assertEqual(len(baseline["samples"]), 3)
             capture.start(); capture.worker.join(timeout=1)
@@ -123,7 +125,21 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(result["latency"]["mean_increase_ms"], 5)
         self.assertEqual(len(result["latency"]["loaded"]["samples"]), 2)
         self.assertEqual(result["path_context"]["mtu"]["largest_confirmed_packet_bytes"], 1500)
+        command.assert_called_once_with(1500)
+        self.assertEqual(probe.call_args.args, ("path", 1500))
+        self.assertEqual(result["path_context"]["mtu"]["tested_packet_sizes"][0]["status"], "reply")
         self.assertIsNotNone(result["endpoint_health"]["local"]["before"])
+        validate_diagnostics(result)
+
+    def test_missing_native_tool_cannot_confirm_mtu_even_with_reply_fixture(self):
+        capture = DiagnosticsCapture(settings(latency=False, mtu=True))
+        with patch("app.diagnostics.shutil.which", return_value=None), patch.object(capture, "_probe", return_value=reply(8)) as probe:
+            result = capture.finish()
+        probe.assert_not_called()
+        mtu = result["path_context"]["mtu"]
+        self.assertEqual(mtu["status"], "unavailable")
+        self.assertEqual(mtu["tested_packet_sizes"], [])
+        self.assertIsNone(mtu["largest_confirmed_packet_bytes"])
         validate_diagnostics(result)
 
     def test_loaded_limit_and_cancel_prevent_more_probes(self):
