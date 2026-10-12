@@ -5,8 +5,9 @@ import unittest
 from xml.etree import ElementTree as ET
 
 from app import create_app
+import app as application
 
-BRAND = Path(__file__).resolve().parents[1] / 'app' / 'static' / 'brand'
+BRAND = Path(application.__file__).resolve().parent / 'static' / 'brand'
 
 
 class Tags(HTMLParser):
