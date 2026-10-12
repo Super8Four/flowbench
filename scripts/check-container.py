@@ -116,6 +116,14 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
             assert response.status == 200
         assert docker("exec", name, "id", "-u") == "10001"
         assert b'data-bs-theme="dark"' in request("/", raw=True)
+        assert b'brand/flowbench-logo.svg' in request('/', raw=True)
+        assert b'brand/flowbench-logo.png' in request('/', raw=True)
+        svg = request('/static/brand/flowbench-logo.svg', raw=True)
+        assert b'<path ' in svg and b'<image' not in svg and b'<script' not in svg
+        assert request('/static/brand/flowbench-logo.png', raw=True).startswith(b'\x89PNG\r\n\x1a\n')
+        version = docker('exec', name, 'python', '-c', 'from app.version import __version__; print(__version__)')
+        assert status['version'] == version
+        assert docker('image', 'inspect', '--format', '{{index .Config.Labels "org.opencontainers.image.version"}}', image) == version
         assert docker("exec", name, "python", "-m", "app.healthcheck") == ""
         run_id = test_run(2)
         deadline = time.monotonic() + 20

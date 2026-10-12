@@ -41,7 +41,7 @@ function renderStatus(status) {
   capabilities = status.iperf;
   engineReady = status.iperf.available && !status.storage_error;
   $('engine-badge').textContent = engineReady ? '● iPerf3 connected' : status.storage_error ? 'Archive unavailable' : 'iPerf3 unavailable';
-  $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
+  if ($('engine-version')) $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
   if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
   if ($('configuration-engine')) $('configuration-engine').textContent = status.iperf.version || 'Unavailable';
   if ($('configuration-storage')) $('configuration-storage').textContent = status.database;

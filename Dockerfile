@@ -26,7 +26,7 @@ RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip uninstall -y pip setuptools
 
 FROM ubuntu:24.04 AS runtime
-ARG FLOWBENCH_VERSION=0.1.0-rc.1
+ARG FLOWBENCH_VERSION=0.1.0-rc.2
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="FlowBench" \
       org.opencontainers.image.version=$FLOWBENCH_VERSION \

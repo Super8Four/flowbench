@@ -1,6 +1,6 @@
 # FlowBench requirements and acceptance boundaries
 
-[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
 
 FlowBench's current scope is a portable iPerf3 measurement/evidence workspace with focused Test & export, Incoming capture, History & import, Compare tests, Server presets and Configuration pages. Ubuntu native AMD64/ARM64 containers and SQLite persistence are part of this prerelease. The GitHub repository is now `flowbench`; existing local checkout, image tag and archive paths remain compatible.
 

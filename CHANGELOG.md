@@ -2,6 +2,14 @@
 
 [![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
+## 0.1.0-rc.2 — vector logo update
+
+- Prefer the supplied self-contained SVG logo in the sidebar and favicon, retaining the original PNG fallback, palette and proportions.
+- Update README branding and screenshots; remove framework credits, repeated slogans and development-process commentary from product-facing copy.
+- Include outlined lettering without fonts, scripts, embedded raster or external resources; verify safe SVG content and asset serving.
+- Derive CI package names/OCI version labels from the application version and rebuild both native image archives for this prerelease.
+- Keep 0.1.0-rc.1 and its downloads unchanged. Database schema and operational/security scope remain unchanged.
+
 ## 0.1.0-rc.1 — first prerelease
 
 - Replace the actual JSON/JSONL archive with SQLite transactions in the existing writable data volume. Remove unused PostgreSQL starter dependencies and optional service.

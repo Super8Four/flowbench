@@ -2,7 +2,7 @@ name: Ubuntu container
 
 on:
   push:
-    branches: [main, feature/sqlite-storage]
+    branches: [main, feature/sqlite-storage, feature/svg-logo]
   pull_request:
   workflow_dispatch:
 
@@ -24,10 +24,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Read application version
+        run: |
+          version=$(python3 -c "import runpy; print(runpy.run_path('app/version.py')['__version__'])")
+          echo "FLOWBENCH_VERSION=$version" >> "$GITHUB_ENV"
       - name: Validate Compose and build Ubuntu image
         run: |
           docker compose config --quiet
-          docker build --build-arg VCS_REF="${{ github.sha }}" --tag iperf-workspace:local .
+          docker build --build-arg FLOWBENCH_VERSION="${{ env.FLOWBENCH_VERSION }}" --build-arg VCS_REF="${{ github.sha }}" --tag iperf-workspace:local .
           test "$(docker image inspect iperf-workspace:local --format '{{.Architecture}}')" = "${{ matrix.arch }}"
           docker run --rm --entrypoint tracepath iperf-workspace:local -V
       - name: Run all tests with Linux iPerf3
@@ -41,13 +45,14 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           arch="${{ matrix.arch }}"
-          docker save iperf-workspace:local | gzip > "flowbench-0.1.0-rc.1-linux-${arch}.tar.gz"
-          docker image inspect iperf-workspace:local > "flowbench-0.1.0-rc.1-linux-${arch}.image.json"
-          sha256sum flowbench-0.1.0-rc.1-linux-${arch}.* > "flowbench-0.1.0-rc.1-linux-${arch}.SHA256SUMS"
+          prefix="flowbench-${FLOWBENCH_VERSION}-linux-${arch}"
+          docker save iperf-workspace:local | gzip > "${prefix}.tar.gz"
+          docker image inspect iperf-workspace:local > "${prefix}.image.json"
+          sha256sum "${prefix}.tar.gz" "${prefix}.image.json" > "${prefix}.SHA256SUMS"
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
           name: flowbench-linux-${{ matrix.arch }}
-          path: flowbench-0.1.0-rc.1-linux-${{ matrix.arch }}.*
+          path: flowbench-${{ env.FLOWBENCH_VERSION }}-linux-${{ matrix.arch }}.*
           retention-days: 14
           compression-level: 0

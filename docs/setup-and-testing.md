@@ -1,6 +1,6 @@
 # FlowBench installation and operation
 
-[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
 
 ## Ubuntu container
 
@@ -9,8 +9,8 @@ Install Docker Engine and Compose v2 using [Docker's Ubuntu instructions](https:
 To use the prerelease image instead of building, download its architecture-specific `.tar.gz`, `.image.json` and `.SHA256SUMS` files into a clean directory. Verify the checksum list **before** loading. Example for ARM64:
 
 ```sh
-sha256sum -c flowbench-0.1.0-rc.1-linux-arm64.SHA256SUMS
-gzip -dc flowbench-0.1.0-rc.1-linux-arm64.tar.gz | docker load
+sha256sum -c flowbench-0.1.0-rc.2-linux-arm64.SHA256SUMS
+gzip -dc flowbench-0.1.0-rc.2-linux-arm64.tar.gz | docker load
 docker image inspect iperf-workspace:local --format '{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
 docker compose up -d --no-build --wait
 ```
