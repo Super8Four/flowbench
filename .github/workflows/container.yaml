@@ -40,6 +40,7 @@ jobs:
           --mount type=bind,source="${{ github.workspace }}/tests",target=/tests,readonly
           iperf-workspace:local -m unittest discover -s /tests -v
       - name: Test container lifecycle and persistent evidence
+        id: lifecycle
         run: python3 scripts/check-container.py
       - name: Test actual optional Flent RRUL with an isolated loopback peer
         run: |
@@ -49,6 +50,8 @@ jobs:
             --mount type=bind,source="${{ github.workspace }}/scripts/check-flent.py",target=/checks/check-flent.py,readonly \
             flowbench-flent-test /checks/check-flent.py
       - name: Render PDF and Word report fixtures
+        id: reports
+        if: ${{ !cancelled() && steps.lifecycle.outcome == 'success' }}
         run: |
           mkdir -p report-qa
           chmod 777 report-qa
@@ -69,6 +72,7 @@ jobs:
             pdftoppm -r 110 -png "$source" "report-qa/rendered/${folder}-${name}"
           done
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.reports.outcome == 'success' }}
         with:
           name: report-qa-${{ matrix.arch }}
           path: report-qa/

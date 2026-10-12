@@ -82,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         assert manager.process is not None, "Cancellation check never launched Flent"
         owned_group = manager.process.pid
         time.sleep(3)
-        assert client.post("/api/runs/" + cancel_id + "/stop").status_code == 200
+        assert client.post("/api/runs/" + cancel_id + "/stop", json={}).status_code == 200
         cancelled = finish(manager, cancel_id)
         assert cancelled["status"] == "cancelled", cancelled
         time.sleep(.2)

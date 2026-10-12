@@ -11,7 +11,7 @@ RUN curl --fail --location --retry 3 --max-time 120 \
     && echo "f7bca9d7faabd2bb27009013fa7df605f38a4e6a513697bad74355d2814b12cd  netperf.tar.gz" | sha256sum -c - \
     && tar -xzf netperf.tar.gz \
     && cd netperf-afc51ff9764741da4ed6702651fba9d9c23f8557 \
-    && autoreconf -fi \
+    && autoreconf -fi -I src/missing/m4 \
     && ./configure --enable-demo --enable-omni --prefix=/usr/local \
     && make -j2 \
     && install -Dm755 src/netperf /out/netperf \
