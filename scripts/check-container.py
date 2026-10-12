@@ -64,10 +64,44 @@ def main():
 
     docker("volume", "create", volume)
     try:
+        # Seed only this disposable volume with the pre-SQLite file layout.
+        legacy_id = "f" * 32
+        seed = '''
+import json
+from pathlib import Path
+from app.runner import settings_from
+from app.presets import normalize
+root = Path('/data/runs')
+path = root / ('f' * 32)
+path.mkdir(parents=True)
+record = dict(schema_version=1, id='f'*32, created_at='2026-01-01T00:00:00+00:00',
+              finished_at='2026-01-01T00:00:01+00:00', status='completed', exit_code=0,
+              settings=settings_from(dict(target='127.0.0.1', notes='Legacy volume evidence')),
+              summary={}, intervals=[], command=[], error=None, native_result=None,
+              test_parameters=None, event_count=1)
+event = dict(sequence=1, timestamp=record['created_at'], source='stdout', message='legacy raw output')
+(path / 'run.json').write_text(json.dumps(record), encoding='utf-8')
+(path / 'events.jsonl').write_text(json.dumps(event)+'\\n', encoding='utf-8')
+catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', settings=dict(target='127.0.0.1')))])
+(root / 'server-presets.json').write_text(json.dumps(catalog), encoding='utf-8')
+'''
+        docker("run", "--rm", "--mount", f"type=volume,source={volume},target=/data",
+               "--entrypoint", "python", image, "-c", seed)
         start()
         status = request("/api/status")
         assert status["iperf"]["full_json"] and status["iperf"]["udp_bidir"]
         assert status["storage"] == "/data/runs"
+        assert status["storage_backend"] == "sqlite" and status["database"] == "/data/runs/archive.sqlite3"
+        assert request("/api/health")["database"] == "connected"
+        legacy = request(f"/api/runs/{legacy_id}/export")
+        assert legacy["settings"]["notes"] == "Legacy volume evidence"
+        assert legacy["events"][0]["message"] == "legacy raw output"
+        assert any(row["name"] == "Legacy preset" for row in request("/api/presets")["presets"])
+        # Legacy sources remain intact, but must never revert newer SQLite notes.
+        payload = json.dumps({"notes": "Updated after SQLite migration"})
+        with urlopen(Request(base + f"/api/runs/{legacy_id}", data=payload.encode(), method="PATCH",
+                             headers={"Content-Type": "application/json"}), timeout=5) as response:
+            assert response.status == 200
         assert docker("exec", name, "id", "-u") == "10001"
         assert b'data-bs-theme="dark"' in request("/", raw=True)
         assert docker("exec", name, "python", "-m", "app.healthcheck") == ""
@@ -75,20 +109,32 @@ def main():
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             run = request("/api/runs/" + run_id)
-            if run["status"] in {"completed", "failed"}:
+            if run["status"] in {"completed", "failed"} and run["finished_at"]:
                 break
             time.sleep(.2)
         assert run["status"] == "completed", run
         assert run["metrics"]["upload_mbps"] > 0 and run["metrics"]["download_mbps"] > 0
         assert run["peer"]["available"] and run["events"]
         exported = request(f"/api/runs/{run_id}/export?format=json")
-        xml = ElementTree.fromstring(request(f"/api/runs/{run_id}/export?format=xml", raw=True))
+        xml_body = request(f"/api/runs/{run_id}/export?format=xml", raw=True)
+        xml = ElementTree.fromstring(xml_body)
         assert xml.find("./field[@name='id']").text == run_id
+        imported = request("/api/runs/import", {"filename": "test.json", "content": json.dumps(exported)})["imported"][0]
+        assert request("/api/runs/import", {"filename": "test.xml", "content": xml_body.decode()})["duplicates"] == [imported]
+        imported_export = request(f"/api/runs/{imported}/export")
+        assert imported_export["events"] == exported["events"] and imported_export["summary"] == exported["summary"]
         preset = request("/api/presets", {"name": "Disposable loopback preset", "settings": {"target": "127.0.0.1", "port": 5202}})
         memory = docker("stats", "--no-stream", "--format", "{{.MemUsage}}", name)
         stop_and_remove()
         start()
         assert request(f"/api/runs/{run_id}/export?format=json") == exported, "Evidence changed after replacement"
+        assert request(f"/api/runs/{imported}/export") == imported_export, "Import changed after replacement"
+        assert request(f"/api/runs/{legacy_id}")["settings"]["notes"] == "Updated after SQLite migration"
+        original = docker("exec", name, "python", "-c",
+                          f"import json; print(json.load(open('/data/runs/{legacy_id}/run.json'))['settings']['notes'])")
+        assert original == "Legacy volume evidence", "Legacy source was modified"
+        assert docker("exec", name, "python", "-c",
+                      "import sqlite3; c=sqlite3.connect('/data/runs/archive.sqlite3'); print(c.execute('PRAGMA integrity_check').fetchone()[0]); c.close()") == "ok"
         assert any(row["id"] == preset["id"] for row in request("/api/presets")["presets"]), "Preset was lost"
         active_id = test_run(30, "upload")
         deadline = time.monotonic() + 10
@@ -104,7 +150,7 @@ def main():
         assert stopped["status"] == "cancelled", stopped["status"]
         assert stopped["series"] and stopped["events"] and stopped["finished_at"]
         size = int(docker("image", "inspect", "--format", "{{.Size}}", image)) / (1024 * 1024)
-        result = f"Container checks passed: TCP bidirectional, remote output, JSON/XML exports, non-root/read-only runtime, volume persistence, preset persistence, graceful active-test stop. Image: {size:.1f} MiB; idle memory: {memory}."
+        result = f"Container checks passed: TCP bidirectional, remote output, JSON/XML import/export and deduplication, non-root/read-only runtime, SQLite integrity, legacy volume migration, volume/preset persistence, graceful active-test stop. Image: {size:.1f} MiB; idle memory: {memory}."
         print(result)
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary_path:

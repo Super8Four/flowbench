@@ -5,7 +5,6 @@ import hashlib
 import json
 import re
 import shlex
-import time
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -118,26 +117,15 @@ def catalog_from(data):
 class PresetStore:
     def __init__(self, manager):
         self.manager = manager
-        self.path = manager.directory / "server-presets.json"
         self.defaults = Path(__file__).resolve().parent / "data" / "public-servers.json"
 
     def read(self):
         with self.manager.lock:
-            path = self.path if self.path.exists() else self.defaults
-            return json.loads(path.read_text(encoding="utf-8"))
+            catalog = self.manager.storage.catalog()
+            return catalog if catalog is not None else json.loads(self.defaults.read_text(encoding="utf-8"))
 
     def write(self, catalog):
-        temp = self.path.with_suffix(".tmp")
-        temp.write_text(json.dumps(catalog, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-        deadline = time.monotonic() + 5
-        while True:
-            try:
-                temp.replace(self.path)
-                return
-            except PermissionError:
-                if time.monotonic() >= deadline:
-                    raise
-                time.sleep(.05)
+        self.manager.storage.save_catalog(catalog)
 
     def merge(self, data):
         items = catalog_from(data)  # Validate the entire file before changing storage.

@@ -1,4 +1,4 @@
-.venv/
+.venv*/
 __pycache__/
 *.py[cod]
 .env
@@ -6,4 +6,7 @@ __pycache__/
 instance/
 bin/
 test-artifacts/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 output test/

@@ -98,19 +98,14 @@ class CoreTests(unittest.TestCase):
                 self.assertEqual(reopened.export(record['id']), exported)
             finally: reopened.shutdown()
 
-    def test_metadata_retry_survives_temporary_file_lock(self):
+    def test_metadata_failure_retains_previous_commit(self):
         with tempfile.TemporaryDirectory() as directory:
             manager = RunManager(directory, executable='this-binary-does-not-exist')
-            original = Path.replace
-            calls = []
-            def locked_replace(path, target):
-                calls.append(1)
-                if len(calls) < 3: raise PermissionError('Temporary sync lock')
-                return original(path, target)
             try:
-                with patch.object(Path, 'replace', locked_replace):
-                    manager.save({'id': 'b' * 32, 'status': 'completed'})
-                self.assertEqual(len(calls), 3)
+                manager.save({'id': 'b' * 32, 'status': 'completed'})
+                with patch.object(manager.storage, 'save', side_effect=OSError('Disk full')):
+                    with self.assertRaises(OSError):
+                        manager.save({'id': 'b' * 32, 'status': 'failed'})
                 self.assertEqual(manager.read('b' * 32)['status'], 'completed')
             finally: manager.shutdown()
 
@@ -134,9 +129,7 @@ IPERF = RunManager.find_executable()
 class RealIperfTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.app = create_app({'TESTING': True, 'RUNS_DIRECTORY': self.temp.name, 'IPERF_PATH': IPERF,
-                               'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-                               'SQLALCHEMY_ENGINE_OPTIONS': {}})
+        self.app = create_app({'TESTING': True, 'RUNS_DIRECTORY': self.temp.name, 'IPERF_PATH': IPERF})
         self.client = self.app.test_client()
         self.manager = self.app.extensions['iperf_runs']
         self.peers = []
@@ -149,9 +142,18 @@ class RealIperfTests(unittest.TestCase):
         self.temp.cleanup()
 
     def port(self):
-        with socket.socket() as sock:
-            sock.bind(('127.0.0.1', 0))
-            return sock.getsockname()[1]
+        # Windows can reserve a UDP range independently of TCP. iPerf's UDP
+        # listener shares the TCP control port, so verify both before selecting it.
+        for _ in range(50):
+            with socket.socket() as tcp, socket.socket(type=socket.SOCK_DGRAM) as udp:
+                tcp.bind(('127.0.0.1', 0))
+                port = tcp.getsockname()[1]
+                try:
+                    udp.bind(('127.0.0.1', port))
+                except OSError:
+                    continue
+                return port
+        self.fail('No available loopback TCP/UDP test port found')
 
     def server(self):
         port = self.port()

@@ -47,7 +47,7 @@ docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,targe
 python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle.log
 ```
 
-Expect `Ran 48 tests`, `OK`, and `Container checks passed`. The lifecycle check uses a separate disposable archive, verifies real TCP bidirectional measurements, remote output, JSON/XML exports, saved presets, container replacement, and shutdown during a test. It cleans up only its own test containers and volume. The persistent app can stay running while these checks run, but wait until they finish before measuring network performance.
+Expect `OK` and `Container checks passed`. Tests include SQLite transactions, concurrency, errors, migration and rollback. Lifecycle checks use a disposable archive and verify real TCP bidirectional measurements, remote output, JSON/XML import/export, legacy migration, SQLite integrity, presets, container replacement and shutdown during a test. They clean up only their own test containers/volume. The persistent app can stay running, but wait until checks finish before measuring network performance.
 
 These checks establish application behavior using loopback traffic. The [native Ubuntu CI run for commit `57c64ca`](https://github.com/Super8Four/iPerfWeb/actions/runs/38115446084) passed 48 tests on each of AMD64 and ARM64, plus the container lifecycle checks. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging. See [Project state](project-state.md) for target-host verification boundaries; successful CI checks do not establish deployment on another host.
 
@@ -131,7 +131,7 @@ The [example server preset](examples/server-presets.json) contains TCP upload de
 
 ## Keep and back up the archive
 
-The app saves automatically under `/data/runs` in the Compose named volume. JSON/XML export is an additional portable copy. Stop, restart, and rebuild preserve the volume. Keep the same checkout directory and Compose project name when updating; changing the project name can select a different volume and make history appear empty. `docker compose down --volumes` deletes the archive.
+The app saves in `/data/runs/archive.sqlite3` in the Compose volume. JSON/XML export is an additional portable copy. Stop, restart and rebuild preserve the volume. Keep the same checkout directory/Compose project name; changing it can select another volume and hide history. `docker compose down --volumes` deletes the archive. Follow the [SQLite migration/rollback guide](sqlite-storage.md) when upgrading from file storage.
 
 For a complete backup, run these commands on the host while no test is active:
 
@@ -147,7 +147,7 @@ docker compose up -d --no-build --wait
 printf 'Backup saved to %s\n' "$backup_dir"
 ```
 
-This copies run metadata, event logs, and any saved preset catalog outside the container and repository. Copy the backup to another machine for recovery. Restore portable session/preset exports through the interface, or follow the [fresh archive migration procedure](../README.md#ubuntu-container) to preserve original run IDs. Do not copy a backup over an existing archive containing evidence.
+This copies SQLite evidence/presets, sidecars and retained legacy sources outside the container/repository. Keep the whole stopped backup together; copying only a running database can miss committed WAL data. Copy it to another machine for recovery. Restore portable exports through the interface, or follow the [fresh archive procedure](../README.md#ubuntu-container) to preserve IDs. Never restore over an archive containing evidence.
 
 Before updating, back up the archive, then run:
 
@@ -166,7 +166,7 @@ Confirm that an older run still opens with its notes and logs after the update.
 | SSH reports permission denied | Use the correct host account and authorized SSH key. The app does not create SSH access. |
 | Docker reports permission denied | Confirm that the host account has Docker access; follow Docker's installation/post-install instructions. |
 | Web page is unreachable | Check `docker compose ps`, readiness, and the SSH tunnel. The default mapping requests loopback; see the pre-28 Docker limitation above. |
-| Container is unhealthy | Read `docker compose logs --tail=200 app`; check `/api/ready`, free disk space, and archive permissions. `/api/health` checks the unused starter database and is not the container readiness probe. |
+| Container is unhealthy | Check logs, `/api/ready`, free disk space, archive permissions and migration errors. `/api/health` checks writable SQLite; readiness also needs iPerf and archive ownership. |
 | Server test cannot connect | Check the address, published host port, TCP/UDP reachability, and that the one-test server session is waiting. |
 | Port is already allocated | Check for another listener. Set `WEB_PORT` for the host web port or `IPERF_PORT` for the host iPerf port, then recreate the container and use the new port. |
 | Another process owns the archive | Keep one app process per archive. Do not mount the same archive into two running app instances. |

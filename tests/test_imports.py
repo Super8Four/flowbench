@@ -28,8 +28,7 @@ class ImportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.app = create_app({"TESTING": True, "RUNS_DIRECTORY": self.temp.name,
-                               "IPERF_PATH": "missing-iperf", "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-                               "SQLALCHEMY_ENGINE_OPTIONS": {}})
+                               "IPERF_PATH": "missing-iperf"})
         self.client = self.app.test_client()
         self.manager = self.app.extensions["iperf_runs"]
         self.presets = self.app.extensions["iperf_presets"]
@@ -38,7 +37,7 @@ class ImportTests(unittest.TestCase):
         self.manager.shutdown()
         self.temp.cleanup()
 
-    def test_readiness_requires_engine_and_working_archive_without_database(self):
+    def test_readiness_requires_engine_and_working_sqlite_archive(self):
         self.assertEqual(self.client.get('/api/ready').status_code, 503)
         self.manager.capabilities['available'] = True
         self.assertEqual(self.client.get('/api/ready').get_json(), {'ready': True})
@@ -157,7 +156,8 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.get_json()['settings']['duration'], 20)
         self.assertIn('-6', self.manager.command(result.get_json()['settings']))
-        self.assertTrue((Path(self.temp.name) / 'server-presets.json').is_file())
+        self.assertIsNotNone(self.manager.storage.catalog())
+        self.assertTrue((Path(self.temp.name) / 'archive.sqlite3').is_file())
         self.assertEqual(self.client.delete('/api/presets/' + item['id'], json={}).status_code, 200)
         public = self.presets.read()['presets'][0]
         self.assertEqual(self.client.delete('/api/presets/' + public['id'], json={}).status_code, 400)

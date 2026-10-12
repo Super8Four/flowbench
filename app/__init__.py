@@ -6,9 +6,6 @@ from urllib.parse import urlsplit
 import click
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, render_template, request
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 
 from .exports import xml_export
 from .runner import RunManager
@@ -17,24 +14,14 @@ from .imports import parse_document, import_runs
 from .presets import PresetStore, MAX_CATALOG_BYTES
 from .peer import peer_results
 
-db = SQLAlchemy()
-
 
 def create_app(test_config=None):
     load_dotenv()
     app = Flask(__name__)
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "DATABASE_URL", "postgresql+psycopg://iperf:change-me@localhost:5432/iperf"
-    )
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_pre_ping": True,
-        "connect_args": {"connect_timeout": 3},
-    }
     app.config["RUNS_DIRECTORY"] = os.getenv("RUNS_DIRECTORY", str(Path(app.instance_path) / "runs"))
     app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
     if test_config:
         app.config.update(test_config)
-    db.init_app(app)
     manager = RunManager(app.config["RUNS_DIRECTORY"], app.config.get("IPERF_PATH"))
     app.extensions["iperf_runs"] = manager
     presets = PresetStore(manager)
@@ -135,6 +122,7 @@ def create_app(test_config=None):
     def status():
         return jsonify(iperf=manager.capabilities, active_run=manager.active,
                        storage=str(manager.directory), storage_error=manager.storage_error,
+                       storage_backend="sqlite", database=str(manager.storage.path),
                        saved_runs=len(manager.list_runs()))
 
     @app.get("/api/runs")
@@ -143,8 +131,11 @@ def create_app(test_config=None):
 
     @app.get("/api/ready")
     def readiness():
-        ready = bool(manager.capabilities["available"] and not manager.storage_error
-                     and not manager.storage_lock.closed)
+        try:
+            ready = bool(manager.capabilities["available"] and not manager.storage_error
+                         and not manager.storage_lock.closed and manager.storage.ready())
+        except OSError:
+            ready = False
         return jsonify(ready=ready), 200 if ready else 503
 
     @app.post("/api/runs")
@@ -235,18 +226,27 @@ def create_app(test_config=None):
     @app.get("/api/health")
     def health():
         try:
-            db.session.execute(text("SELECT 1"))
+            if manager.storage_lock.closed or manager.storage_error:
+                raise OSError("Archive unavailable")
+            manager.storage.ready()
             return jsonify(app="ok", database="connected")
-        except SQLAlchemyError:
-            db.session.rollback()
+        except OSError:
             return jsonify(app="ok", database="unavailable"), 503
 
     @app.cli.command("init-db")
     def init_db():
-        """Create tables registered with SQLAlchemy."""
-        from . import models  # noqa: F401
+        """Check the SQLite archive (tables and legacy import initialize at startup)."""
+        manager.storage.ready()
+        click.echo(f"SQLite archive ready: {manager.storage.path}")
 
-        db.create_all()
-        click.echo("Database tables created.")
+    @app.cli.command("export-legacy")
+    @click.argument("destination", type=click.Path())
+    def export_legacy(destination):
+        """Export a rollback snapshot into a new, non-existing directory."""
+        with manager.lock:
+            if manager.active:
+                raise click.ClickException("Stop the active test before exporting a rollback archive.")
+            manager.storage.export_legacy(destination)
+        click.echo(f"Legacy archive exported to {destination}")
 
     return app

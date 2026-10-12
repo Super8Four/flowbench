@@ -266,29 +266,18 @@ def import_runs(manager, data, filename):
         if manager.storage_error:
             raise RuntimeError("Restore archive storage access before importing tests.")
         existing = {}
-        for path in manager.directory.glob("*/run.json"):
-            record = manager.read(path.parent.name)
+        for record in manager.storage.records():
             digest = (record.get("imported") or {}).get("sha256")
             if digest:
                 existing[digest] = record["id"]
-        for record, events in prepared:
-            digest = record["imported"]["sha256"]
-            if digest in existing:
-                duplicates.append(existing[digest])
-                continue
-            # Stage below an extra directory level; history/recovery only see
-            # a fully written run after the atomic directory rename.
-            stage = manager.directory / ".imports" / record["id"]
-            stage.mkdir(parents=True)
-            try:
-                (stage / "events.jsonl").write_text("".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events), encoding="utf-8")
-                (stage / "run.json").write_text(json.dumps(record, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-                stage.replace(manager.path(record["id"]))
-            finally:
-                if stage.exists():
-                    for name in ("events.jsonl", "run.json"):
-                        (stage / name).unlink(missing_ok=True)
-                    stage.rmdir()
-            existing[digest] = record["id"]
-            imported.append(record["id"])
+        with manager.storage.transaction() as connection:
+            for record, events in prepared:
+                digest = record["imported"]["sha256"]
+                if digest in existing:
+                    duplicates.append(existing[digest])
+                    continue
+                manager.storage.save(record, connection)
+                manager.storage.insert_events(record["id"], events, connection)
+                existing[digest] = record["id"]
+                imported.append(record["id"])
     return {"imported": imported, "duplicates": duplicates}

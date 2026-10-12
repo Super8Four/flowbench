@@ -2,7 +2,7 @@ name: Ubuntu container
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/sqlite-storage]
   pull_request:
   workflow_dispatch:
 

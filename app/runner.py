@@ -1,4 +1,4 @@
-"""Run iPerf3 without a shell and retain a replayable archive on disk."""
+"""Run iPerf3 without a shell and retain a replayable SQLite archive."""
 
 import atexit
 import copy
@@ -17,6 +17,7 @@ from uuid import uuid4
 from .metrics import effective_settings, measurements, series, overview
 from .peer import peer_results
 from .route import capture_route
+from .storage import SQLiteArchive
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
@@ -117,12 +118,17 @@ class RunManager:
         self.worker = None
         self.record = None
         self.events = []
-        self.last_checkpoint = 0
         self.capture_errors = []
         self.storage_error = None
         self.executable = executable or self.find_executable()
         self.capabilities = self.probe()
-        self.recover()
+        try:
+            self.storage = SQLiteArchive(self.directory)
+            self.storage.migrate_legacy()
+            self.recover()
+        except BaseException:
+            self.storage_lock.close()
+            raise
         atexit.register(self.shutdown)
 
     @staticmethod
@@ -173,35 +179,22 @@ class RunManager:
         with self.lock:
             if self.record and run_id == self.record["id"]:
                 return copy.deepcopy(self.record)
-            try:
-                return json.loads((self.path(run_id) / "run.json").read_text(encoding="utf-8"))
-            except FileNotFoundError:
-                raise KeyError("Run not found.") from None
+            self.path(run_id)  # Validate the public ID before querying storage.
+            return self.storage.read(run_id)
 
     def read_events(self, run_id, after=0):
         with self.lock:
             if run_id == self.active:
                 return copy.deepcopy(self.events[after:])
-            path = self.path(run_id) / "events.jsonl"
-            if not path.exists():
-                return []
-            events = []
-            for line in path.read_text(encoding="utf-8").splitlines():
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    # A partial last write after abrupt shutdown isn't a valid event.
-                    continue
-                if event["sequence"] > after:
-                    events.append(event)
-            return events
+            self.path(run_id)
+            return self.storage.events(run_id, after)
 
     def list_runs(self):
         records = []
         with self.lock:
-            for path in self.directory.glob("*/run.json"):
+            for saved in self.storage.records():
                 try:
-                    record = self.read(path.parent.name)
+                    record = self.read(saved["id"])
                     row = {key: record[key] for key in (
                         "id", "created_at", "finished_at", "status", "settings", "summary", "exit_code"
                     )}
@@ -215,26 +208,12 @@ class RunManager:
         return sorted(records, key=lambda row: row["created_at"], reverse=True)
 
     def save(self, record):
-        path = self.path(record["id"])
-        path.mkdir(exist_ok=True)
-        temp = path / "run.tmp"
-        temp.write_text(json.dumps(record, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
-        # OneDrive / antivirus scanners can briefly deny replacement on Windows.
-        deadline = time.monotonic() + 5
-        while True:
-            try:
-                temp.replace(path / "run.json")
-                break
-            except PermissionError:
-                if time.monotonic() >= deadline:
-                    raise
-                time.sleep(.05)
-        self.last_checkpoint = time.monotonic()
+        self.path(record["id"])
+        self.storage.save(record)
 
     def recover(self):
-        for path in self.directory.glob("*/run.json"):
-            record = self.read(path.parent.name)
-            if record["status"] not in TERMINAL:
+        for record in self.storage.records():
+            if record["status"] not in TERMINAL or record.get("finished_at") is None:
                 record.update(status="interrupted", finished_at=now(),
                               error="The app stopped before this session finished.")
                 self.save(record)
@@ -299,17 +278,19 @@ class RunManager:
         with self.lock:
             event = {"sequence": len(self.events) + 1, "timestamp": now(),
                      "source": source, "message": message}
-            # Persist every output line before publishing it to the browser.
-            with (self.path(self.active) / "events.jsonl").open("a", encoding="utf-8") as file:
-                file.write(json.dumps(event, ensure_ascii=False) + "\n")
+            previous = copy.deepcopy(self.record)
+            try:
+                self.record["event_count"] = event["sequence"]
+                if source == "stdout":
+                    self.parse(message)
+                # Commit the event and corresponding measured state together,
+                # before either is published to HTTP readers.
+                self.storage.append(self.record, event)
+            except OSError as exc:
+                self.record = previous
+                self.storage_error = str(exc)
+                raise
             self.events.append(event)
-            self.record["event_count"] = len(self.events)
-            if source == "stdout":
-                self.parse(message)
-            # Every log entry is durable immediately; avoid rewriting a synced
-            # metadata file hundreds of times during the final pretty JSON dump.
-            if time.monotonic() - self.last_checkpoint >= .25:
-                self.save(self.record)
 
     def parse(self, line):
         try:
@@ -449,6 +430,13 @@ class RunManager:
                     self.log("system", "Route capture: " + result["status"] + ".")
         except Exception as exc:
             with self.lock:
+                if self.process and self.process.poll() is None:
+                    self.process.kill()
+                    self.process.wait(timeout=5)
+                if self.process and not readers:
+                    # Storage may fail immediately after Popen, before readers own the pipes.
+                    self.process.stdout.close()
+                    self.process.stderr.close()
                 self.record.update(status="failed", error=str(exc))
                 try:
                     self.log("system", "Session failed: " + str(exc))
@@ -472,13 +460,18 @@ class RunManager:
                 self.read(run_id)
                 return
             self.cancel_requested = True
-            self.log("system", "Stop requested by user.")
-            if self.process and self.process.poll() is None:
-                self.process.terminate()
+            try:
+                self.log("system", "Stop requested by user.")
+            finally:
+                if self.process and self.process.poll() is None:
+                    self.process.terminate()
 
     def shutdown(self):
         if self.active:
-            self.stop(self.active)
+            try:
+                self.stop(self.active)
+            except OSError as exc:
+                self.storage_error = str(exc)
             if self.worker and self.worker is not threading.current_thread():
                 self.worker.join(timeout=5)
         if not self.storage_lock.closed:
@@ -495,9 +488,9 @@ class RunManager:
                     if not isinstance(data[key], str) or len(data[key]) > limit:
                         raise ValueError(f"{key} must be text up to {limit} characters.")
                     record["settings"][key] = data[key].strip()
+            self.save(record)
             if self.record and run_id == self.record["id"]:
                 self.record = record
-            self.save(record)
             return record
 
     def export(self, run_id):

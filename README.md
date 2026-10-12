@@ -83,7 +83,7 @@ To create a custom preset, set the client test configuration, open **Save the cu
 }
 ```
 
-The catalog is saved beside test data as `RUNS_DIRECTORY/server-presets.json` after a change; until then the bundled catalog is used. Include it when backing up or migrating the archive into Docker.
+The catalog is saved in `RUNS_DIRECTORY/archive.sqlite3` after a change; until then the bundled catalog is used. Include the whole archive directory when backing up or migrating into Docker.
 
 ## Import older test evidence
 
@@ -93,18 +93,19 @@ Imported tests get new local IDs and an **Imported** badge with source filename,
 
 ## Persistent storage and exports
 
-The authoritative archive is **`instance/runs/`**, independent of browser storage and the starter PostgreSQL connection. Each run has its own UUID directory containing:
+The authoritative archive is **`instance/runs/archive.sqlite3`**, independent of browser storage. SQLite stores:
 
-- `run.json`: settings, notes, timestamps in UTC, status, exit code, interval measurements, iPerf version, command arguments, and native results.
-- `events.jsonl`: an append-only log of timestamped stdout, stderr, and app events, with sequence numbers for replay.
+- Run JSON documents: settings, notes, UTC timestamps, status, exit code, interval measurements, iPerf version, command arguments and native results.
+- Timestamped stdout, stderr and app events, keyed by run ID/sequence for replay.
+- Saved public/custom presets and archive schema/migration metadata.
 
-Output is written before it is displayed. Metadata is replaced atomically. Completed, failed, cancelled, and interrupted sessions remain available after an app restart. If the app stops abruptly, unfinished records are marked interrupted on the next start. Closing the browser leaves the active test running. The log captures what the launched process emits, including remote output requested with `--get-server-output`; it is not packet capture or a collector for unrelated external iPerf processes. Enable debug output for additional iPerf diagnostics.
+Output and corresponding measured state commit together before display. Completed, failed, cancelled and interrupted sessions remain available after restart. Unfinished records become interrupted after an abrupt stop. Closing the browser leaves a test running. Logs capture what the launched process emits, including output requested with `--get-server-output`; they are not packet capture or a collector for unrelated processes. Enable debug output for additional diagnostics.
 
-Set `RUNS_DIRECTORY` to change the archive location. Relative paths resolve from the app's working directory. Back up the **whole archive directory**, preferably with the app stopped. No automatic deletion or retention limit is applied. Browser local storage holds only selected comparison IDs; it does not hold measurement data.
+Set `RUNS_DIRECTORY` to change the archive location. Relative paths resolve from the working directory. Use a writable local filesystem and one app process per archive. Back up the **whole archive directory with the app stopped**, including SQLite sidecars. No automatic deletion/retention limit applies. Browser local storage holds only selected comparison IDs.
 
 JSON and XML exports include the same settings, metadata, metrics, intervals, native results, raw stdout/stderr, and complete event history. Exporting a running session produces a snapshot of the data captured so far. XML uses typed `field` and `item` elements to preserve nested objects, arrays, numbers, booleans, and nulls. Strings with characters XML cannot represent use base64 with an explicit encoding attribute.
 
-The existing PostgreSQL configuration, `Measurement` starter model, `init-db` command, and database-only service in `compose.postgres.yaml` are retained for future database integration. Test history currently uses the disk archive; it does not require PostgreSQL or a schema migration. `/api/health` reports the starter database's connection status; `/api/status` reports the iPerf engine, archive path, and active session. `/api/ready` checks the engine and archive manager without a database connection or a full history scan.
+The unused PostgreSQL/SQLAlchemy starter configuration and optional database service are removed. Old file archives import transactionally on first startup without modifying sources. `/api/health` checks writable SQLite; `/api/status` reports engine, archive/database paths and active session. `/api/ready` checks engine, writer ownership and writable storage without scanning history. `init-db` checks the initialized archive. See [SQLite migration, backup and rollback](docs/sqlite-storage.md) before upgrading.
 
 ## Ubuntu container
 
@@ -118,9 +119,9 @@ docker compose logs -f app
 
 Open http://127.0.0.1:5000 on the Docker host. If port 5000 is occupied, use `WEB_PORT=8080 docker compose up -d --build` and open port 8080. Use `docker compose stop` to stop cleanly, or `docker compose down` to remove the container while retaining saved data. Updating the checkout and rerunning `docker compose up -d --build` recreates the app using the same archive volume.
 
-The image uses Ubuntu 24.04 LTS, Python 3.12, one Waitress process with eight threads, and upstream iPerf3 3.22. A separate build stage verifies the iPerf source checksum and compiles it; the final image contains no compiler, downloaded source archive, pip cache, or development virtual environment. Source code is owned by root; the app runs as UID/GID `10001:10001`, with a read-only root filesystem, writable `/tmp`, and writable archive volume. SIGTERM stops an active test, saves its output, and closes the archive. The health probe uses `/api/ready`; PostgreSQL is not started or required. The old database-only setup remains available separately with `docker compose -f compose.postgres.yaml up -d`.
+The image uses Ubuntu 24.04 LTS, Python 3.12, one Waitress process with eight threads and upstream iPerf3 3.22. A build stage verifies/compiles iPerf; the final image contains no compiler, source archive, pip cache or development environment. Source is owned by root; the app runs as UID/GID `10001:10001`, with a read-only root, writable `/tmp` and archive volume. SIGTERM stops active tests and saves output. Readiness uses `/api/ready`; SQLite is bundled with Python and needs no separate service.
 
-**Saved evidence is in the named `iperf_data` volume**, mounted at `/data`, with runs and custom presets under `/data/runs`. Normal stop, restart, rebuild, and container replacement preserve it. Do not use `docker compose down --volumes` unless you intend to delete that archive. The build context excludes your local `.env`, Windows executables, `.venv`, exports, and run archive. Your existing Windows results are not automatically copied or published in the image.
+**Saved evidence is in the named `iperf_data` volume**, mounted at `/data`, in `/data/runs/archive.sqlite3`. Stop, restart, rebuild and replacement preserve it. `docker compose down --volumes` deletes the archive. The build context excludes local `.env`, Windows binaries, virtual environments, exports and archives. Existing Windows results are not copied/published in the image.
 
 To move evidence using the interface, export your sessions/comparisons as JSON or XML, import them into the container's Previous tests, and separately export/import your server presets JSON. Full exports retain the logs; `run.json` alone does not. To preserve the complete archive and original IDs instead, stop both apps, back up `instance/runs`, then copy its contents into a newly created app container's volume:
 
