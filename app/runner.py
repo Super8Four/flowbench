@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import threading
 import time
+import tempfile
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -18,6 +19,7 @@ from .metrics import effective_settings, measurements, series, overview
 from .peer import peer_results
 from .route import capture_route
 from .storage import SQLiteArchive
+from .matrix import matrix_plan
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "partial", "skipped"}
@@ -88,9 +90,14 @@ def settings_from(data, default_mode="upload"):
     result["debug"] = data.get("debug", False)
     if not isinstance(result["debug"], bool):
         raise ValueError("debug must be true or false.")
-    result["traceroute"] = data.get("traceroute", False)
-    if not isinstance(result["traceroute"], bool):
-        raise ValueError("traceroute must be true or false.")
+    for key in ("traceroute", "latency", "endpoint_health", "mtu"):
+        # Preserve omitted legacy options during import/export normalization.
+        if key == "traceroute" or key in data:
+            result[key] = data.get(key, False)
+            if not isinstance(result[key], bool):
+                raise ValueError(f"{key} must be true or false.")
+    from .annotations import settings_metadata
+    result.update(settings_metadata(data))
     return result
 
 
@@ -120,12 +127,16 @@ class RunManager:
         self.worker = None
         self.record = None
         self.job = None
+        self.diagnostics_capture = None
         self.listener = None
         self.events = []
         self.capture_errors = []
         self.storage_error = None
+        self.shutdown_requested = False
         self.executable = executable or self.find_executable()
         self.capabilities = self.probe()
+        from .flent import capabilities as flent_capabilities
+        self.flent_capabilities = flent_capabilities()
         try:
             self.storage = SQLiteArchive(self.directory)
             self.storage.migrate_legacy()
@@ -193,7 +204,7 @@ class RunManager:
 
     def read_events(self, run_id, after=0):
         with self.lock:
-            if self.read(run_id).get("kind") == "protocol-job":
+            if self.read(run_id).get("kind") in {"protocol-job", "matrix-job"}:
                 return []
             if run_id == self.active:
                 return copy.deepcopy(self.events[after:])
@@ -217,6 +228,13 @@ class RunManager:
                     row["protocol_job"] = record.get("protocol_job")
                     row["incoming"] = record.get("incoming")
                     row["concurrency"] = record.get("concurrency")
+                    for key in ("matrix_job", "diagnostics", "annotations"):
+                        row[key] = record.get(key)
+                    row["flent"] = ({key: record["flent"].get(key) for key in
+                                     ("tool", "version", "workload", "status", "summaries", "provenance")}
+                                    if record.get("flent") else None)
+                    row["project_id"] = record["settings"].get("project_id")
+                    row["tags"] = record["settings"].get("tags", {})
                     records.append(row)
                 except (KeyError, OSError, json.JSONDecodeError):
                     continue
@@ -269,6 +287,8 @@ class RunManager:
 
     def start(self, data):
         settings = settings_from(data, default_mode="bidir")
+        from .projects import validate_project_assignment
+        validate_project_assignment(self, settings)
         if self.storage_error:
             raise RuntimeError("Archive writes failed. Restore storage access and restart the app: " + self.storage_error)
         if not self.capabilities["available"]:
@@ -276,6 +296,7 @@ class RunManager:
         protocols = ["tcp", "udp"] if settings["protocol"] == "both" else [settings["protocol"]]
         commands = [self.command(dict(settings, protocol=protocol)) for protocol in protocols]
         with self.lock:
+            self.ensure_running()
             if self.active:
                 raise RuntimeError("A session is already running. Stop it before starting another.")
             if settings["role"] == "server" and self.listener and self.listener.running and settings["port"] == self.listener.config["port"]:
@@ -312,6 +333,46 @@ class RunManager:
             self.worker.start()
             return copy.deepcopy(record)
 
+    def start_matrix(self, data):
+        settings, combinations, plan = matrix_plan(data, settings_from)
+        from .projects import validate_project_assignment
+        validate_project_assignment(self, settings)
+        if self.storage_error:
+            raise RuntimeError("Archive writes failed. Restore storage access and restart the app: " + self.storage_error)
+        if not self.capabilities["available"]:
+            raise RuntimeError(self.capabilities["error"])
+        commands = [self.command(child) for child in combinations]
+        with self.lock:
+            self.ensure_running()
+            if self.active:
+                raise RuntimeError("A session is already running. Stop it before starting another.")
+            record = {"schema_version": 1, "id": uuid4().hex, "created_at": now(),
+                      "finished_at": None, "status": "starting", "settings": settings,
+                      "command": [], "iperf_version": self.capabilities["version"],
+                      "output_format": "matrix-job", "kind": "matrix-job", "matrix": plan,
+                      "exit_code": None, "error": None, "summary": {}, "intervals": [],
+                      "native_result": None, "test_parameters": None, "event_count": 0, "children": []}
+            children = []
+            for index, (child_settings, command) in enumerate(zip(combinations, commands), 1):
+                child = copy.deepcopy(record)
+                for key in ("kind", "children", "matrix"):
+                    child.pop(key)
+                child.update(id=uuid4().hex, status="queued", settings=child_settings, command=command,
+                             output_format="json-stream" if self.capabilities["json_stream"] else "text",
+                             matrix_job={"id": record["id"], "order": index})
+                record["children"].append({"id": child["id"], "protocol": child_settings["protocol"],
+                                           "mode": child_settings["mode"], "streams": child_settings["streams"], "order": index})
+                children.append(child)
+            with self.storage.transaction() as connection:
+                for row in [record, *children]:
+                    self.storage.save(row, connection)
+            self.job = self.record = record
+            self.active = record["id"]
+            self.events, self.cancel_requested, self.capture_errors = [], False, []
+            self.worker = threading.Thread(target=self.run_job, name=f"matrix-{self.active}", daemon=True)
+            self.worker.start()
+            return copy.deepcopy(record)
+
     @property
     def active_id(self):
         return self.job["id"] if self.active and self.job else self.active
@@ -323,9 +384,13 @@ class RunManager:
                 child = self.read(reference["id"])
                 result.append({"id": child["id"], "protocol": child["settings"]["protocol"],
                                "mode": effective_settings(child)["mode"], "status": child["status"],
+                               "streams": effective_settings(child)["streams"], "settings": child["settings"],
+                               "diagnostics": child.get("diagnostics"), "annotations": child.get("annotations"),
                                "error": child.get("error"), "metrics": measurements(child),
                                "created_at": child["created_at"], "finished_at": child["finished_at"]})
             return result
+
+    job_runs = protocol_runs
 
     def run_job(self):
         try:
@@ -337,7 +402,7 @@ class RunManager:
                     child = self.storage.read(reference["id"])
                     if self.cancel_requested or self.storage_error:
                         child.update(status="skipped", finished_at=now(),
-                                     error="Job stopped before this protocol test started.")
+                                     error="Job stopped before this test started.")
                         self.save(child)
                         continue
                     # Keep archive ownership and the active job reserved between tests.
@@ -352,9 +417,9 @@ class RunManager:
                                       "completed" if all(status == "completed" for status in statuses) and not self.storage_error else
                                       "partial" if "completed" in statuses else "failed")
                 if self.job["status"] == "partial":
-                    self.job["error"] = "Only one protocol completed; inspect each protocol's retained evidence."
+                    self.job["error"] = "Some tests did not complete; inspect each test's retained evidence."
                 elif self.job["status"] == "failed":
-                    self.job["error"] = self.storage_error or "Neither protocol completed successfully."
+                    self.job["error"] = self.storage_error or "No test completed successfully."
         except Exception as exc:
             with self.lock:
                 self.job.update(status="failed", error=str(exc))
@@ -362,7 +427,7 @@ class RunManager:
                     try:
                         child = self.read(reference["id"])
                         if child["status"] == "queued":
-                            child.update(status="skipped", finished_at=now(), error="Job failed before this protocol started.")
+                            child.update(status="skipped", finished_at=now(), error="Job failed before this test started.")
                             self.save(child)
                     except OSError:
                         pass
@@ -388,7 +453,7 @@ class RunManager:
             previous = copy.deepcopy(self.record)
             try:
                 self.record["event_count"] = event["sequence"]
-                if source == "stdout":
+                if source == "stdout" and self.record.get("kind") != "flent-run":
                     self.parse(message)
                 # Commit the event and corresponding measured state together,
                 # before either is published to HTTP readers.
@@ -478,7 +543,43 @@ class RunManager:
 
     def run(self, grouped=False):
         readers = []
+        diagnostics = None
         try:
+            settings = self.record["settings"]
+            if settings["role"] == "client" and any(settings.get(key, False) for key in ("latency", "endpoint_health", "mtu")):
+                from .diagnostics import DiagnosticsCapture
+                diagnostics = DiagnosticsCapture(settings, lambda: self.cancel_requested)
+                with self.lock:
+                    self.diagnostics_capture = diagnostics
+                diagnostic_owner, diagnostic_id = diagnostics, self.record["id"]
+                def diagnostic_checkpoint(evidence):
+                    with self.lock:
+                        if self.record["id"] != diagnostic_id or self.diagnostics_capture is not diagnostic_owner:
+                            return
+                        previous = copy.deepcopy(self.record)
+                        self.record["diagnostics"] = evidence
+                        try:
+                            self.save(self.record)
+                        except OSError as exc:
+                            self.record = previous
+                            self.storage_error = str(exc)
+                            self.record["error"] = "Diagnostic checkpoint archive write failed: " + str(exc)
+                            self.capture_errors.append(self.record["error"])
+                            if self.process and self.process.poll() is None:
+                                self.process.kill()
+                            raise
+                diagnostics.on_update = diagnostic_checkpoint
+                # Baseline probes must finish (or cancel) before traffic starts.
+                try:
+                    diagnostics.baseline()
+                except Exception as diagnostic_error:
+                    with self.lock:
+                        self.record["diagnostics"] = diagnostics.failure(diagnostic_error)
+                    diagnostics = None
+                if diagnostics:
+                    # Persist the measured baseline before starting traffic. Loaded
+                    # samples checkpoint once per probe, preserving restart evidence.
+                    diagnostic_checkpoint(diagnostics.snapshot())
             self.log("system", "Starting: " + subprocess.list2cmdline(self.record["command"]))
             with self.lock:
                 if not self.cancel_requested:
@@ -492,6 +593,13 @@ class RunManager:
                 else:
                     self.record["status"] = "cancelled"
                     return
+            if diagnostics:
+                try:
+                    diagnostics.start()
+                except Exception as diagnostic_error:
+                    with self.lock:
+                        self.record["diagnostics"] = diagnostics.failure(diagnostic_error)
+                    diagnostics = None
             for stream, source in ((self.process.stdout, "stdout"), (self.process.stderr, "stderr")):
                 reader = threading.Thread(target=self.consume, args=(stream, source), daemon=True)
                 readers.append(reader)
@@ -508,6 +616,14 @@ class RunManager:
                 self.record["error"] = "Session exceeded its time limit."
             for reader in readers:
                 reader.join()
+            if diagnostics:
+                try:
+                    result = diagnostics.finish()
+                except Exception as diagnostic_error:
+                    result = diagnostics.failure(diagnostic_error)
+                with self.lock:
+                    self.record["diagnostics"] = result
+                diagnostics = None
             with self.lock:
                 self.record["exit_code"] = code
                 if self.capture_errors:
@@ -552,7 +668,16 @@ class RunManager:
                 except OSError as log_error:
                     self.storage_error = str(log_error)
         finally:
+            if diagnostics:
+                try:
+                    result = diagnostics.finish()
+                    with self.lock:
+                        self.record["diagnostics"] = result
+                except Exception as diagnostic_error:
+                    with self.lock:
+                        self.record["diagnostics"] = diagnostics.failure(diagnostic_error)
             with self.lock:
+                self.diagnostics_capture = None
                 self.record["finished_at"] = now()
                 try:
                     self.save(self.record)
@@ -573,9 +698,11 @@ class RunManager:
                 try:
                     self.job["cancel_requested"] = True
                     self.save(self.job)
-                    if self.record and self.record.get("kind") != "protocol-job" and self.record["status"] not in TERMINAL:
-                        self.log("system", "Both-protocol job stopped by user.")
+                    if self.record and self.record.get("kind") not in {"protocol-job", "matrix-job"} and self.record["status"] not in TERMINAL:
+                        self.log("system", "Grouped job stopped by user.")
                 finally:
+                    if self.diagnostics_capture:
+                        self.diagnostics_capture.cancel()
                     if self.process and self.process.poll() is None:
                         self.process.terminate()
                 return
@@ -586,10 +713,18 @@ class RunManager:
             try:
                 self.log("system", "Stop requested by user.")
             finally:
+                if self.diagnostics_capture:
+                    self.diagnostics_capture.cancel()
                 if self.process and self.process.poll() is None:
-                    self.process.terminate()
+                    if self.record.get("kind") == "flent-run":
+                        from .flent import stop_process
+                        stop_process(self.process)
+                    else:
+                        self.process.terminate()
 
     def shutdown(self):
+        with self.lock:
+            self.shutdown_requested = True
         if self.listener:
             try:
                 self.listener.stop(disable=False)
@@ -600,35 +735,144 @@ class RunManager:
                 self.stop(self.active)
             except OSError as exc:
                 self.storage_error = str(exc)
-            if self.worker and self.worker is not threading.current_thread():
-                self.worker.join(timeout=5)
+        if self.worker and self.worker is not threading.current_thread():
+            self.worker.join(timeout=15)
+        if self.worker and self.worker.is_alive():
+            # A writer still holds the archive. Preserve ownership and honest
+            # unavailable readiness instead of letting a second app race it.
+            self.storage_error = "Shutdown did not finish within 15 seconds; archive writer ownership is retained until the worker exits."
+            return
         if not self.storage_lock.closed:
             self.storage_lock.close()
         atexit.unregister(self.shutdown)
 
+    def ensure_running(self):
+        if self.shutdown_requested or self.storage_lock.closed:
+            raise RuntimeError("The app is shutting down or the archive writer is closed. Restart the app before starting traffic.")
+
     def annotate(self, run_id, data):
-        if not isinstance(data, dict):
-            raise ValueError("Send label and notes as JSON.")
+        from .annotations import annotate_run
+        return annotate_run(self, run_id, data)
+
+    def start_flent(self, data):
+        from .flent import settings as flent_settings
+        from .projects import validate_project_assignment
+        settings = flent_settings(data)
+        validate_project_assignment(self, settings)
+        if self.storage_error:
+            raise RuntimeError("Archive writes failed. Restore storage access and restart the app: " + self.storage_error)
+        if not self.flent_capabilities["available"]:
+            raise RuntimeError(self.flent_capabilities.get("error", "Optional Flent tools are unavailable."))
         with self.lock:
-            record = self.read(run_id)
-            for key, limit in (("label", 200), ("notes", 4000)):
-                if key in data:
-                    if not isinstance(data[key], str) or len(data[key]) > limit:
-                        raise ValueError(f"{key} must be text up to {limit} characters.")
-                    record["settings"][key] = data[key].strip()
+            self.ensure_running()
+            if self.active:
+                raise RuntimeError("A session is already running. Stop it before starting another.")
+            record = {"schema_version": 1, "id": uuid4().hex, "created_at": now(), "finished_at": None,
+                      "status": "starting", "settings": settings, "kind": "flent-run", "command": [],
+                      "iperf_version": None, "output_format": "flent-native", "exit_code": None, "error": None,
+                      "summary": {}, "intervals": [], "native_result": None, "test_parameters": None, "event_count": 0,
+                      "flent": {"tool": "Flent", "version": self.flent_capabilities["version"], "workload": "rrul",
+                                "status": "missing", "data": None, "series": [], "summaries": [],
+                                "provenance": "External Flent CLI; native result pending."}}
             self.save(record)
-            if self.record and run_id == self.record["id"]:
-                self.record = record
-            if self.job and run_id == self.job["id"]:
-                self.job = record
-            if self.listener and self.listener.record and run_id == self.listener.record["id"]:
-                self.listener.record = record
-            return record
+            self.active, self.record, self.job = record["id"], record, None
+            self.events, self.cancel_requested, self.capture_errors = [], False, []
+            self.worker = threading.Thread(target=self.run_flent, name=f"flent-{self.active}", daemon=True)
+            self.worker.start()
+            return copy.deepcopy(record)
+
+    def run_flent(self):
+        from .flent import command, read_result, stop_process
+        readers = []
+        process = None
+        try:
+            # Only files created in this owned temporary child directory are cleaned.
+            with tempfile.TemporaryDirectory(prefix="flent-", dir=self.directory) as directory:
+                with self.lock:
+                    if self.cancel_requested:
+                        self.record["status"] = "cancelled"
+                        self.record["flent"]["status"] = "cancelled"
+                        return
+                    self.record["command"] = command(self.flent_capabilities, self.record["settings"], directory)
+                    self.log("system", "Starting actual Flent RRUL: " + subprocess.list2cmdline(self.record["command"]))
+                    process = self.process = subprocess.Popen(self.record["command"], stdout=subprocess.PIPE,
+                                                             stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                                                             errors="replace", cwd=directory, start_new_session=True)
+                    self.record["status"] = "running"
+                    if self.listener:
+                        self.listener.mark_overlap(self.record)
+                    self.save(self.record)
+                for stream, source in ((process.stdout, "stdout"), (process.stderr, "stderr")):
+                    thread = threading.Thread(target=self.consume, args=(stream, source), daemon=True)
+                    thread.start()
+                    readers.append(thread)
+                deadline = time.monotonic() + self.record["settings"]["duration"] + 45
+                cancel_deadline = None
+                while True:
+                    try:
+                        code = process.wait(timeout=.2)
+                        break
+                    except subprocess.TimeoutExpired:
+                        if self.cancel_requested and cancel_deadline is None:
+                            stop_process(process)
+                            cancel_deadline = time.monotonic() + 2
+                        if time.monotonic() >= (cancel_deadline or deadline):
+                            stop_process(process, force=True)
+                            code = process.wait(timeout=5)
+                            if not self.cancel_requested:
+                                self.record["error"] = "Flent exceeded its bounded workload time limit."
+                            break
+                # Kill any leftover descendants in the owned new session, including
+                # after a CLI crash; never touch the independently owned Netserver.
+                stop_process(process, force=True)
+                for reader in readers:
+                    reader.join(timeout=5)
+                with self.lock:
+                    self.record["exit_code"] = code
+                    if code != 0 and not self.cancel_requested:
+                        self.record["error"] = self.record["error"] or f"Flent exited with code {code}; inspect the captured logs and partial native evidence."
+                    try:
+                        evidence = read_result(directory, self.flent_capabilities["version"])
+                        if self.cancel_requested or code != 0:
+                            evidence["status"] = "partial"
+                        self.record["flent"] = evidence
+                    except (OSError, ValueError) as exc:
+                        self.record["flent"].update(status="cancelled" if self.cancel_requested else "missing", error=str(exc))
+                        if not self.cancel_requested:
+                            self.record["error"] = self.record["error"] or str(exc)
+                    if self.capture_errors:
+                        self.record["error"] = "Output capture failed: " + "; ".join(self.capture_errors)
+                    self.record["status"] = "cancelled" if self.cancel_requested else "completed" if code == 0 and not self.record["error"] else "failed"
+                    self.log("system", "Actual Flent workload " + self.record["status"] + "; native evidence " + self.record["flent"]["status"] + ".")
+        except Exception as exc:
+            with self.lock:
+                self.record.update(status="cancelled" if self.cancel_requested else "failed", error=str(exc))
+                self.record["flent"].update(status="cancelled" if self.cancel_requested else "failed", error=str(exc))
+        finally:
+            if process:
+                stop_process(process, force=True)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+                if not readers:
+                    process.stdout.close()
+                    process.stderr.close()
+            for reader in readers:
+                reader.join(timeout=5)
+            with self.lock:
+                self.record["finished_at"] = now()
+                try:
+                    self.save(self.record)
+                except OSError as exc:
+                    self.storage_error = str(exc)
+                    self.record.update(status="failed", error="Archive write failed: " + str(exc))
+                self.process, self.active = None, None
 
     def export(self, run_id):
         with self.lock:
             record = self.read(run_id)
-            if record.get("kind") == "protocol-job":
+            if record.get("kind") in {"protocol-job", "matrix-job"}:
                 record["runs"] = [self.export(child["id"]) for child in record["children"]]
                 return record
             record["metrics"] = measurements(record)

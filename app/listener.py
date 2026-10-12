@@ -71,7 +71,7 @@ class IncomingListener:
         if not (caps["available"] and caps["json_stream"] and caps["full_json"] and caps.get("server_max_duration")):
             raise ValueError("Managed capture needs iPerf3 with streaming/full JSON and server duration limits (the bundled 3.22 engine).")
         with self.lock:
-            if self.manager.storage_lock.closed or self.manager.storage_error:
+            if self.manager.shutdown_requested or self.manager.storage_lock.closed or self.manager.storage_error:
                 raise RuntimeError("Restore archive access and restart before enabling the listener.")
             if self.running or (self.worker and self.worker.is_alive()):
                 raise ListenerConflict("The managed listener is already running. Stop it before changing settings.")

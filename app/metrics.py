@@ -17,6 +17,18 @@ def effective_settings(record):
 
 
 def measurements(record):
+    if record.get("kind") == "flent-run":
+        result = {}
+        for row in (record.get("flent") or {}).get("summaries", []):
+            mean = row.get("mean")
+            if isinstance(mean, bool) or not isinstance(mean, (int, float)) or not math.isfinite(mean):
+                continue
+            # Preserve each actual native series identity and unit. These means
+            # never stand in for an iPerf upload/download measurement.
+            suffix = "_mbps" if row.get("unit") == "Mbits/s" else "_rtt_ms" if row.get("unit") == "ms" else None
+            if suffix:
+                result["flent_" + row["name"] + suffix] = mean
+        return result
     summary = record.get("summary") or {}
     settings = effective_settings(record)
     result = {}
@@ -64,16 +76,22 @@ def series(record):
                     point["start"] = value["start"]
                 points.append(point)
         elif "bits_per_second" in interval:
-            points.append({"seconds": interval["end"], "mbps": interval["bits_per_second"] / 1_000_000,
-                           "direction": interval.get("direction") or settings["mode"], "stream": interval["stream"]})
+            point = {"seconds": interval["end"], "mbps": interval["bits_per_second"] / 1_000_000,
+                     "direction": interval.get("direction") or settings["mode"], "stream": interval["stream"]}
+            if isinstance(interval.get("start"), (int, float)) and not isinstance(interval["start"], bool):
+                point["start"] = interval["start"]
+            points.append(point)
     if record.get("output_format") == "text":
         has_sums = any(point.get("stream") == "SUM" for point in points)
         points = [point for point in points if not has_sums or point.get("stream") == "SUM"]
-        grouped = {}
+        grouped, starts = {}, {}
         for point in points:
             key = (point["seconds"], point["direction"])
             grouped[key] = grouped.get(key, 0) + point["mbps"]
-        points = [{"seconds": key[0], "direction": key[1], "mbps": value} for key, value in grouped.items()]
+            starts.setdefault(key, []).append(point.get("start"))
+        points = [{"seconds": key[0], "direction": key[1], "mbps": value,
+                   **({"start": starts[key][0]} if starts[key][0] is not None and all(start == starts[key][0] for start in starts[key]) else {})}
+                  for key, value in grouped.items()]
     return points
 
 
@@ -117,6 +135,43 @@ def overview(record):
     return result
 
 
+def settings_differences(before, after):
+    """Differences in measured or requested conditions; no causal inference."""
+    left, right = effective_settings(before), effective_settings(after)
+    differences = [key for key in ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams", "ip_version")
+                   if left[key] != right[key]]
+    if "udp" in {left["protocol"], right["protocol"]} and left["bandwidth"] != right["bandwidth"]:
+        differences.append("bandwidth")
+    if before.get("iperf_version") != after.get("iperf_version"):
+        differences.append("iperf_version")
+    if (before.get("kind") == "flent-run") != (after.get("kind") == "flent-run"):
+        differences.append("tool")
+    if left.get("flent_workload") != right.get("flent_workload"):
+        differences.append("flent_workload")
+    if (before.get("flent") or {}).get("version") != (after.get("flent") or {}).get("version"):
+        differences.append("flent_version")
+    return differences
+
+
+def live_comparison(baseline, active):
+    if baseline["id"] == active["id"]:
+        raise ValueError("Choose a saved baseline different from the displayed test.")
+    if baseline["status"] != "completed" or not measurements(baseline):
+        raise ValueError("The baseline must be a completed test with measurements.")
+    if baseline.get("kind") in {"protocol-job", "matrix-job"} or active.get("kind") in {"protocol-job", "matrix-job"}:
+        raise ValueError("Choose an individual protocol or matrix test for the live overlay.")
+    if baseline.get("kind") == "flent-run" or active.get("kind") == "flent-run":
+        raise ValueError("The live overlay uses iPerf intervals. Inspect Flent's separately labeled native series.")
+    def row(record):
+        return {"id": record["id"], "status": record["status"], "settings": record["settings"],
+                "effective_settings": effective_settings(record), "series": series(record),
+                "metrics": measurements(record), "concurrency": record.get("concurrency")}
+    return {"schema_version": 1, "kind": "live-comparison", "baseline_id": baseline["id"],
+            "active_id": active["id"], "runs": [row(baseline), row(active)],
+            "settings_differences": settings_differences(baseline, active),
+            "interpretation": "Elapsed seconds start at each test's traffic start. Only measured intervals are shown. Matching settings do not establish identical conditions; overlapping traffic may affect results. ICMP RTT is separate from throughput."}
+
+
 def comparison(before, after):
     if before["id"] == after["id"]:
         raise ValueError("Choose two different completed tests.")
@@ -125,13 +180,7 @@ def comparison(before, after):
     left, right = measurements(before), measurements(after)
     if not left or not right:
         raise ValueError("Both tests must contain performance measurements.")
-    settings_left, settings_right = effective_settings(before), effective_settings(after)
-    differences = [key for key in ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams", "ip_version")
-                   if settings_left[key] != settings_right[key]]
-    if settings_left["protocol"] == "udp" and settings_left["bandwidth"] != settings_right["bandwidth"]:
-        differences.append("bandwidth")
-    if before["iperf_version"] != after["iperf_version"]:
-        differences.append("iperf_version")
+    differences = settings_differences(before, after)
     rows = []
     for key in sorted(left.keys() & right.keys()):
         baseline, current = left[key], right[key]

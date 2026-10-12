@@ -6,4 +6,6 @@ FlowBench supports TCP/UDP/Both tests, incoming capture, saved history, notes/pr
 
 0.1.0-rc.2 adds the outlined SVG logo with PNG fallback and simplifies the product copy. The rc.1 tag and downloads remain unchanged. Test results, image metadata and screenshots are in [verification](verification.md) and the [release notes](release-0.1.0-rc.2.md).
 
-Profiles/thresholds, full reports, retention, authentication and authenticated instance coordination remain pending. Keep the API within a trusted access boundary. Target Pi deployment, hardware power-loss recovery and full requirements/WCAG/audit acceptance remain unverified. See [remaining requirements](requirements.md).
+The unmerged measurement-workflows branch adds projects/baselines, bounded sequential matrices, native ping/route/MTU and local health evidence, live comparisons, tags/timeline notes, optional actual Flent RRUL and PDF/Word report generation. See [workflows](measurement-workflows.md), [Flent prerequisites](flent.md) and [reports](reports.md). This does not change rc.1 or rc.2 downloads.
+
+Profiles/thresholds, retention, authentication and authenticated instance coordination remain pending. Keep the API within a trusted access boundary. Target Pi deployment, hardware power-loss recovery and full requirements/WCAG/audit acceptance remain unverified. See [remaining requirements](requirements.md).

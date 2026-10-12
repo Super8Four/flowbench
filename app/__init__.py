@@ -9,12 +9,14 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from .exports import xml_export
 from .runner import RunManager
-from .metrics import comparison, measurements, series, effective_settings, overview
-from .imports import parse_document, import_runs
+from .metrics import comparison, live_comparison, measurements, series, effective_settings, overview
+from .imports import parse_document, import_runs, prepare_source_documents
 from .presets import PresetStore, MAX_CATALOG_BYTES
 from .peer import peer_results
 from .listener import IncomingListener, ListenerConflict
 from .version import __version__
+from .projects import ProjectStore
+from .diagnostics import diagnostic_capabilities
 
 
 def create_app(test_config=None):
@@ -29,6 +31,8 @@ def create_app(test_config=None):
     app.extensions["iperf_runs"] = manager
     presets = PresetStore(manager)
     app.extensions["iperf_presets"] = presets
+    projects = ProjectStore(manager)
+    app.extensions["iperf_projects"] = projects
     listener = IncomingListener(manager)
     manager.listener = listener
     app.extensions["iperf_listener"] = listener
@@ -78,6 +82,47 @@ def create_app(test_config=None):
         if len(content) > limit:
             raise ValueError(f"File exceeds {limit // (1024 * 1024)} MiB.")
         return parse_document(content), filename.replace("\\", "/").split("/")[-1]
+
+    @app.get("/api/projects")
+    def list_projects():
+        return jsonify(projects=projects.list())
+
+    @app.post("/api/projects")
+    def create_project():
+        try:
+            return jsonify(projects.create(request.get_json())), 201
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
+
+    @app.patch("/api/projects/<project_id>")
+    def edit_project(project_id):
+        try:
+            return jsonify(projects.update(project_id, request.get_json()))
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
+
+    @app.get("/api/projects/<project_id>")
+    def project_report(project_id):
+        return jsonify(projects.report(project_id))
+
+    @app.get("/api/projects/<project_id>/export")
+    def export_project(project_id):
+        format_name = request.args.get("format", "json").lower()
+        if format_name not in {"json", "xml"}:
+            raise ValueError("Choose json or xml.")
+        document = projects.export(project_id)
+        payload = json.dumps(document, indent=2, ensure_ascii=False, allow_nan=False) if format_name == "json" else xml_export(document)
+        return Response(payload, mimetype="application/" + format_name,
+                        headers={"Content-Disposition": f'attachment; filename="flowbench-project-{project_id}.{format_name}"',
+                                 "Cache-Control": "no-store"})
+
+    @app.post("/api/projects/import")
+    def import_project():
+        data, filename = uploaded_document(20 * 1024 * 1024)
+        try:
+            return jsonify(projects.import_bundle(data, filename, prepare_source_documents))
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
 
     @app.get("/api/presets")
     def get_presets():
@@ -143,6 +188,7 @@ def create_app(test_config=None):
     @app.get("/servers")
     @app.get("/server")
     @app.get("/configuration")
+    @app.get("/projects")
     def index():
         page = request.path.strip("/") or "test"
         return render_template("index.html", page=page)
@@ -152,7 +198,8 @@ def create_app(test_config=None):
         return jsonify(iperf=manager.capabilities, active_run=manager.active_id,
                        storage=str(manager.directory), storage_error=manager.storage_error,
                        storage_backend="sqlite", database=str(manager.storage.path),
-                       saved_runs=len(manager.list_runs()), version=__version__, listener=listener.status())
+                       saved_runs=len(manager.list_runs()), version=__version__, listener=listener.status(),
+                       diagnostics=diagnostic_capabilities(), flent=manager.flent_capabilities)
 
     @app.get("/api/runs")
     def list_runs():
@@ -161,7 +208,7 @@ def create_app(test_config=None):
     @app.get("/api/ready")
     def readiness():
         try:
-            ready = bool(manager.capabilities["available"] and not manager.storage_error
+            ready = bool(manager.capabilities["available"] and not manager.storage_error and not manager.shutdown_requested
                          and not manager.storage_lock.closed and manager.storage.ready())
         except OSError:
             ready = False
@@ -177,6 +224,24 @@ def create_app(test_config=None):
             return jsonify(error=str(exc)), 409 if conflict else 503
         return jsonify(record), 201
 
+    @app.post("/api/matrices")
+    def start_matrix():
+        try:
+            return jsonify(manager.start_matrix(request.get_json())), 201
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 409 if manager.active else 503
+
+    @app.get("/api/flent")
+    def flent_status():
+        return jsonify(manager.flent_capabilities)
+
+    @app.post("/api/flent")
+    def start_flent():
+        try:
+            return jsonify(manager.start_flent(request.get_json())), 201
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 409 if manager.active else 503
+
     @app.get("/api/runs/<run_id>")
     def get_run(run_id):
         after = request.args.get("after", "0")
@@ -191,6 +256,8 @@ def create_app(test_config=None):
         record["events"] = manager.read_events(run_id, int(after))
         if record.get("kind") == "protocol-job":
             record["protocol_runs"] = manager.protocol_runs(record)
+        if record.get("kind") == "matrix-job":
+            record["matrix_runs"] = manager.protocol_runs(record)
         return jsonify(record)
 
     @app.post("/api/runs/<run_id>/stop")
@@ -200,7 +267,10 @@ def create_app(test_config=None):
 
     @app.patch("/api/runs/<run_id>")
     def annotate_run(run_id):
-        return jsonify(manager.annotate(run_id, request.get_json()))
+        try:
+            return jsonify(manager.annotate(run_id, request.get_json()))
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
 
     @app.get("/api/runs/<run_id>/export")
     def export_run(run_id):
@@ -212,6 +282,29 @@ def create_app(test_config=None):
                    if format_name == "json" else xml_export(data))
         return Response(payload, mimetype="application/" + format_name,
                         headers={"Content-Disposition": f'attachment; filename="iperf-{run_id}.{format_name}"',
+                                 "Cache-Control": "no-store"})
+
+    @app.get("/api/live-comparison")
+    def compare_active():
+        return jsonify(live_comparison(manager.read(request.args.get("baseline", "")),
+                                       manager.read(request.args.get("active", ""))))
+
+    @app.post("/api/reports/preview")
+    def preview_report():
+        from .reports import prepare_report
+        return jsonify(prepare_report(manager, request.get_json()))
+
+    @app.post("/api/reports/download")
+    def download_report():
+        from .reports import prepare_report, render_pdf, render_docx
+        format_name = request.args.get("format", "pdf").lower()
+        if format_name not in {"pdf", "docx"}:
+            raise ValueError("Choose pdf or docx.")
+        model = prepare_report(manager, request.get_json())
+        payload = render_pdf(model) if format_name == "pdf" else render_docx(model)
+        mimetype = "application/pdf" if format_name == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        return Response(payload, mimetype=mimetype,
+                        headers={"Content-Disposition": f'attachment; filename="flowbench-report.{format_name}"',
                                  "Cache-Control": "no-store"})
 
     @app.get("/api/comparison")

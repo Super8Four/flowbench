@@ -26,7 +26,7 @@ RUN python3 -m venv /opt/venv \
     && /opt/venv/bin/pip uninstall -y pip setuptools
 
 FROM ubuntu:24.04 AS runtime
-ARG FLOWBENCH_VERSION=0.1.0-rc.2
+ARG FLOWBENCH_VERSION=0.2.0-dev
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="FlowBench" \
       org.opencontainers.image.version=$FLOWBENCH_VERSION \
@@ -41,7 +41,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     IPERF_PATH=/usr/local/bin/iperf3
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 ca-certificates libssl3t64 iputils-tracepath \
+    && apt-get install -y --no-install-recommends python3 ca-certificates libssl3t64 iputils-tracepath iputils-ping \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 iperf \
     && useradd --uid 10001 --gid iperf --no-create-home --home-dir /data --shell /usr/sbin/nologin iperf \

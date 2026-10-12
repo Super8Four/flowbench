@@ -2,7 +2,17 @@
 
 [![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
-## 0.1.0-rc.2 — vector logo update
+## Unreleased - measurement workflows
+
+- Group runs in named projects with completed baselines, observed change summaries and comparability warnings.
+- Capture opt-in native ping, route and MTU evidence, with local CPU/interface counters and explicit missing/blocked states; save diagnostic checkpoints in SQLite.
+- Run bounded sequential TCP/UDP, direction and stream-count matrices, retaining cancellation, child failures and restart evidence.
+- Add elapsed-time live baseline overlays, endpoint tags and editable timestamped timeline notes with JSON/XML and project interchange.
+- Integrate optional actual Linux Flent RRUL through local tools, preserving native result data and stopping owned child processes.
+- Generate branded PDF/Word reports for completed tests and comparisons, with default redaction, an evidence preview and stale-preview checks.
+- Keep rc.1 and rc.2 immutable. This feature branch does not deploy the app or complete authentication, retention, scenario thresholds or instance coordination.
+
+## 0.1.0-rc.2 - vector logo update
 
 - Prefer the supplied self-contained SVG logo in the sidebar and favicon, retaining the original PNG fallback, palette and proportions.
 - Update README branding and screenshots; remove framework credits, repeated slogans and development-process commentary from product-facing copy.

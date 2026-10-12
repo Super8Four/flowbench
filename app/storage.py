@@ -106,6 +106,21 @@ class SQLiteArchive:
             row = connection.execute("SELECT value FROM metadata WHERE key='presets'").fetchone()
         return json.loads(row[0]) if row else None
 
+    def metadata(self, key, connection=None):
+        """Read additive app metadata within an optional caller transaction."""
+        if connection is None:
+            with self.connection() as connection:
+                return self.metadata(key, connection)
+        row = connection.execute("SELECT value FROM metadata WHERE key=?", (key,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def save_metadata(self, key, value, connection=None):
+        if connection is None:
+            with self.transaction() as connection:
+                return self.save_metadata(key, value, connection)
+        connection.execute("INSERT INTO metadata VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                           (key, encode(value)))
+
     def save_catalog(self, catalog, connection=None):
         if connection is None:
             with self.transaction() as connection:
@@ -179,6 +194,15 @@ class SQLiteArchive:
                 if connection.execute("SELECT 1 FROM metadata WHERE key='presets'").fetchone():
                     raise ValueError("Conflicting saved preset catalog; no files were imported.")
                 self.save_catalog(catalog, connection)
+            projects_path = self.directory / "projects.json"
+            if projects_path.exists():
+                from .projects import catalog_from as project_catalog_from
+                catalog = json.loads(projects_path.read_text(encoding="utf-8"))
+                validate_tree(catalog)
+                catalog = project_catalog_from(catalog, self.records(connection))
+                if self.metadata("projects", connection) is not None:
+                    raise ValueError("Conflicting saved project catalog; no files were imported.")
+                self.save_metadata("projects", catalog, connection)
             connection.execute("INSERT INTO metadata VALUES ('legacy_imported', '1')")
 
     def export_legacy(self, destination):
@@ -199,4 +223,7 @@ class SQLiteArchive:
             row = connection.execute("SELECT value FROM metadata WHERE key='presets'").fetchone()
             if row:
                 (destination / "server-presets.json").write_text(row[0], encoding="utf-8")
+            row = connection.execute("SELECT value FROM metadata WHERE key='projects'").fetchone()
+            if row:
+                (destination / "projects.json").write_text(row[0], encoding="utf-8")
             connection.commit()

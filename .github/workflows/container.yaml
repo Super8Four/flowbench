@@ -2,7 +2,7 @@ name: Ubuntu container
 
 on:
   push:
-    branches: [main, feature/sqlite-storage, feature/svg-logo]
+    branches: [main, feature/sqlite-storage, feature/svg-logo, feature/measurement-workflows]
   pull_request:
   workflow_dispatch:
 
@@ -21,7 +21,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Read application version
@@ -41,6 +41,38 @@ jobs:
           iperf-workspace:local -m unittest discover -s /tests -v
       - name: Test container lifecycle and persistent evidence
         run: python3 scripts/check-container.py
+      - name: Test actual optional Flent RRUL with an isolated loopback peer
+        run: |
+          docker build --file scripts/Flent.Dockerfile --tag flowbench-flent-test .
+          docker run --rm --init --network none --cap-drop ALL --security-opt no-new-privileges:true \
+            --entrypoint /opt/venv/bin/python \
+            --mount type=bind,source="${{ github.workspace }}/scripts/check-flent.py",target=/checks/check-flent.py,readonly \
+            flowbench-flent-test /checks/check-flent.py
+      - name: Render PDF and Word report fixtures
+        run: |
+          mkdir -p report-qa
+          chmod 777 report-qa
+          docker run --rm --network none --entrypoint python \
+            --mount type=bind,source="${{ github.workspace }}/scripts/check-reports.py",target=/checks/check-reports.py,readonly \
+            --mount type=bind,source="${{ github.workspace }}/report-qa",target=/qa \
+            iperf-workspace:local /checks/check-reports.py --output-dir /qa
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils
+          mkdir -p report-qa/docx-pdf report-qa/rendered
+          libreoffice -env:UserInstallation=file:///tmp/flowbench-report-qa-profile --headless \
+            --convert-to pdf --outdir report-qa/docx-pdf report-qa/*.docx
+          test "$(find report-qa/docx-pdf -name '*.pdf' | wc -l)" -eq 3
+          for source in report-qa/*.pdf report-qa/docx-pdf/*.pdf; do
+            name=$(basename "$source" .pdf)
+            folder=$(basename "$(dirname "$source")")
+            pdfinfo "$source"
+            pdftoppm -r 110 -png "$source" "report-qa/rendered/${folder}-${name}"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-qa-${{ matrix.arch }}
+          path: report-qa/
+          retention-days: 14
       - name: Package verified image
         if: github.event_name != 'pull_request'
         run: |

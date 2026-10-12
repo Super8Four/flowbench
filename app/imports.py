@@ -12,6 +12,7 @@ from xml.etree import ElementTree as ET
 
 from .metrics import effective_settings, measurements, series
 from .runner import TERMINAL, now, settings_from
+from .annotations import annotations_from
 
 MAX_IMPORT_BYTES = 20 * 1024 * 1024
 
@@ -145,8 +146,16 @@ def validate_measurement_structure(record):
 def prepare_run(data, filename, allow_job=False):
     if not isinstance(data, dict):
         raise ValueError("Upload a saved run, comparison export, or native iperf3 -J object.")
-    if data.get("kind") == "protocol-job" and not allow_job:
-        raise ValueError("A Both job must be imported as a complete protocol-job export.")
+    if data.get("kind") in {"protocol-job", "matrix-job"} and not allow_job:
+        raise ValueError("A job must be imported as a complete export with its child tests.")
+    if data.get("kind") == "matrix-job":
+        references = data.get("children")
+        if (not isinstance(data.get("id"), str) or not re.fullmatch(r"[a-f0-9]{32}", data["id"])
+                or not isinstance(references, list) or not 1 <= len(references) <= 12
+                or any(not isinstance(row, dict) or not isinstance(row.get("id"), str)
+                       or not re.fullmatch(r"[a-f0-9]{32}", row["id"]) for row in references)
+                or len({data["id"], *(row["id"] for row in references)}) != len(references) + 1):
+            raise ValueError("Invalid matrix identity or child references.")
     if data.get("kind") == "protocol-job":
         references = data.get("children")
         if (not isinstance(data.get("id"), str) or not re.fullmatch(r"[a-f0-9]{32}", data["id"])
@@ -165,6 +174,10 @@ def prepare_run(data, filename, allow_job=False):
             raise ValueError("Unsupported run schema version.")
         record = copy.deepcopy(data)
         record["settings"] = settings_from(data["settings"])
+        if data.get("kind") == "flent-run":
+            if data["settings"].get("flent_workload") != "rrul":
+                raise ValueError("Flent runs must retain their native RRUL workload settings.")
+            record["settings"]["flent_workload"] = "rrul"
         for key in ("metrics", "effective_settings", "series", "peer", "raw_stdout", "raw_stderr", "events"):
             record.pop(key, None)
         record["created_at"] = timestamp(data.get("created_at"))
@@ -243,6 +256,16 @@ def prepare_run(data, filename, allow_job=False):
     if code is not None and (isinstance(code, bool) or not isinstance(code, int)):
         raise ValueError("Saved exit code must be a number or null.")
     validate_measurement_structure(record)
+    if "annotations" in record:
+        record["annotations"] = annotations_from(record["annotations"])
+    if "diagnostics" in record:
+        from .diagnostics import validate_diagnostics
+        validate_diagnostics(record["diagnostics"])
+    if record.get("kind") == "flent-run":
+        from .flent import validate_flent
+        validate_flent(record.get("flent"))
+        if record["settings"].get("flent_workload") != "rrul":
+            raise ValueError("Flent runs must retain their native RRUL workload settings.")
     route = record.get("route")
     if route is not None:
         if not isinstance(route, dict) or not isinstance(route.get("hops"), list):
@@ -257,6 +280,9 @@ def prepare_run(data, filename, allow_job=False):
                     or not isinstance(hop.get("rtt_ms"), list)
                     or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in hop["rtt_ms"])):
                 raise ValueError("Invalid saved route hop.")
+            bounds = hop.get("rtt_upper_bound_ms", [])
+            if not isinstance(bounds, list) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in bounds):
+                raise ValueError("Invalid route RTT upper bounds.")
     record.update(id=uuid4().hex, event_count=len(events),
                   imported={"at": now(), "filename": filename[:255], "source_id": source_id,
                             "sha256": digest, "format": "app" if "settings" in data else "native-iperf"})
@@ -295,6 +321,58 @@ def prepare_job(data, filename):
     return [(parent, []), *children]
 
 
+def prepare_matrix(data, filename):
+    sources, references = data.get("runs"), data.get("children")
+    if not isinstance(sources, list) or not isinstance(references, list) or not 1 <= len(sources) <= 12 or len(sources) != len(references):
+        raise ValueError("A matrix export must contain every referenced child test (at most 12).")
+    parent, events = prepare_run(data, filename, allow_job=True)
+    if parent["summary"] or parent["intervals"] or events:
+        raise ValueError("Matrix measurements and logs must remain in their individual tests.")
+    children = [prepare_run(row, filename) for row in sources]
+    source_ids, combinations = {data["id"]}, set()
+    new_references = []
+    for index, ((child, _), source, reference) in enumerate(zip(children, sources, references), 1):
+        source_id, group, settings = source.get("id"), source.get("matrix_job"), child["settings"]
+        expected = {"id": source_id, "protocol": settings["protocol"], "mode": settings["mode"],
+                    "streams": settings["streams"], "order": index}
+        combination = (settings["protocol"], settings["mode"], settings["streams"])
+        if (not isinstance(source_id, str) or not re.fullmatch(r"[a-f0-9]{32}", source_id)
+                or source_id in source_ids or settings["role"] != "client" or combination in combinations
+                or not isinstance(group, dict) or group.get("id") != data["id"] or group.get("order") != index
+                or reference != expected):
+            raise ValueError("Invalid or mismatched matrix child identity/settings/order.")
+        source_ids.add(source_id)
+        combinations.add(combination)
+        child["matrix_job"] = {"id": parent["id"], "source_id": data["id"], "order": index}
+        new_references.append(dict(expected, id=child["id"]))
+    statuses = [row["status"] for row, _ in children]
+    if parent["status"] == "completed" and any(status != "completed" for status in statuses):
+        raise ValueError("A completed matrix must contain only completed tests.")
+    if parent["status"] == "partial" and not 0 < statuses.count("completed") < len(statuses):
+        raise ValueError("A partial matrix must contain some completed tests and some incomplete tests.")
+    parent.pop("runs", None)
+    parent["children"] = new_references
+    return [(parent, []), *children]
+
+
+def prepare_source_documents(sources, filename):
+    """Validate all sources before writes, remapping coherent job child identities."""
+    if isinstance(sources, dict):
+        sources = [sources]
+    if not isinstance(sources, list) or not sources or len(sources) > 500:
+        raise ValueError("A project may import 1 to 500 top-level test documents.")
+    prepared = []
+    for source in sources:
+        if isinstance(source, dict) and source.get("kind") == "protocol-job":
+            rows = prepare_job(source, filename)
+        elif isinstance(source, dict) and source.get("kind") == "matrix-job":
+            rows = prepare_matrix(source, filename)
+        else:
+            rows = [prepare_run(source, filename)]
+        prepared.extend(rows)
+    return prepared
+
+
 def import_runs(manager, data, filename):
     sources = [data]
     if isinstance(data, dict) and data.get("kind") == "multi-comparison":
@@ -303,9 +381,10 @@ def import_runs(manager, data, filename):
             raise ValueError("A comparison export must contain two or three runs.")
     elif isinstance(data, dict) and "before" in data and "after" in data:
         sources = [data["before"], data["after"]]
+    if len(sources) > 1 and any(isinstance(source, dict) and source.get("kind") in {"protocol-job", "matrix-job"} for source in sources):
+        raise ValueError("Comparison imports must contain individual tests; import complete jobs or projects separately.")
     try:
-        prepared = (prepare_job(data, filename) if isinstance(data, dict) and data.get("kind") == "protocol-job"
-                    else [prepare_run(source, filename) for source in sources])
+        prepared = prepare_source_documents(sources, filename)
     except (TypeError, AttributeError, OverflowError, RecursionError):
         raise ValueError("Invalid saved test structure.") from None
     imported, duplicates = [], []
@@ -317,7 +396,7 @@ def import_runs(manager, data, filename):
             digest = (record.get("imported") or {}).get("sha256")
             if digest:
                 existing[digest] = record["id"]
-        is_job = isinstance(data, dict) and data.get("kind") == "protocol-job"
+        is_job = isinstance(data, dict) and data.get("kind") in {"protocol-job", "matrix-job"}
         if is_job and prepared[0][0]["imported"]["sha256"] in existing:
             parent_id = existing[prepared[0][0]["imported"]["sha256"]]
             parent = manager.read(parent_id)
@@ -328,6 +407,17 @@ def import_runs(manager, data, filename):
                 if digest in existing and not is_job:
                     duplicates.append(existing[digest])
                     continue
+                # A standalone file cannot recreate its project's catalog/baseline
+                # or a parent job. Retain source identities as provenance instead
+                # of attaching evidence to coincidentally matching local IDs.
+                source_project = record["settings"].get("project_id")
+                if source_project:
+                    record["imported"]["source_project_id"] = source_project
+                    record["settings"]["project_id"] = None
+                if not is_job:
+                    for group in ("protocol_job", "matrix_job"):
+                        if group in record:
+                            record["imported"]["source_group"] = record.pop(group)
                 manager.storage.save(record, connection)
                 manager.storage.insert_events(record["id"], events, connection)
                 existing[digest] = record["id"]

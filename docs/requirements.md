@@ -13,7 +13,7 @@ FlowBench's current scope is a portable iPerf3 measurement/evidence workspace wi
 | Route evidence | Post-test bounded tracepath/tracert with raw output, hops and probe RTTs | Not throughput, iPerf RTT or authenticated topology discovery |
 | UI | Supplied FlowBench logo, tagline, gunmetal/navy/crimson, flat measured cards, responsive layouts, visible focus/errors | Targeted browser QA is not a full WCAG certification or full audit closure |
 | R13 profiles/thresholds | Pending | Presets are not automatic threshold evaluation |
-| R14 reports | Pending | Existing JSON/XML evidence exports are not full designed report generation |
+| R14 reports | Implemented on the measurement-workflows feature branch: PDF/DOCX for completed individual tests and selected comparisons, normalized preview and redaction | Rendered fixture validation and targeted testing do not establish full canonical acceptance; rc.2 downloads are unchanged |
 | R15 retention | Pending | No automatic deletion or retention policy |
 | R16 authentication | Pending | Same-origin guards are not login or API authorization |
 | R17 instance coordination | Pending | Managed listener/Both jobs are not authenticated instance-to-instance pairing, coordination or correlation |

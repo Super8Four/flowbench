@@ -59,6 +59,8 @@ Tests cover migration/idempotence, malformed-source rollback/retry, rollback exp
 
 Native Ubuntu AMD64/ARM64 CI also builds the image and checks migration in a disposable volume, SQLite under a read-only root, import/export/deduplication, presets, integrity, container replacement and graceful active-test stop. Results apply only to their exact source commit. They do not establish target deployment, physical power-loss/disk-exhaustion recovery, external-client mappings or jRPI-5 performance. These checks use no live database/target host.
 
-This change covers storage portions of R03/R04/R11/R12. It adds none of the R13–R16 profiles/thresholds, reports, retention or authentication features; those acceptance gaps remain open.
+The original SQLite change covers storage portions of R03/R04/R11/R12. The measurement-workflows feature branch additionally stores diagnostic/native Flent evidence, project metadata, tags and timeline notes in the existing schema 1 JSON documents/metadata table. Legacy snapshot export includes `projects.json` to retain project catalogs and baselines; old applications may ignore that extra file. Keep the full SQLite backup for a complete restore.
+
+R14 PDF/Word reports are implemented on this unmerged feature branch. Profiles/thresholds, retention and authentication remain pending. See [workflows](measurement-workflows.md), [reports](reports.md) and [remaining requirements](requirements.md).
 
 A saved enabled listener resumes on normal app startup. Use the maintenance override shown above for exports. Legacy snapshots retain incoming evidence but do not recreate managed listener configuration on an older release; preserve the complete SQLite backup for that metadata. R17 authenticated instance coordination also remains pending.

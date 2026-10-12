@@ -96,7 +96,8 @@ class WorkspaceTests(unittest.TestCase):
 class RouteTests(unittest.TestCase):
     def test_windows_linux_hops_preserve_unknown_replies(self):
         hops = parse_hops('  1    <1 ms    2 ms    3 ms  192.168.1.1\n  2     *        *        *     Request timed out.\n  3    10 ms  2001:db8::1')
-        self.assertEqual(hops[0]['rtt_ms'], [1,2,3])
+        self.assertEqual(hops[0]['rtt_ms'], [2,3])
+        self.assertEqual(hops[0]['rtt_upper_bound_ms'], [1])
         self.assertFalse(hops[1]['responded'])
         self.assertEqual(hops[2]['address'], '2001:db8::1')
         self.assertEqual(parse_hops(' 1?: [LOCALHOST] pmtu 1500\n 1:  192.168.1.1  0.233ms')[0]['rtt_ms'], [0.233])
@@ -108,8 +109,11 @@ class RouteTests(unittest.TestCase):
 
     def test_timeout_and_cancellation_preserve_output(self):
         process = Mock(returncode=-1)
+        process.poll.return_value = None
         process.communicate.side_effect = [subprocess.TimeoutExpired('tracepath',20), ('1:  127.0.0.1  0.1ms','')]
-        with patch('app.route.route_command', return_value=['tracepath','127.0.0.1']):
+        # A polling timeout is temporary; only the overall deadline ends capture.
+        with patch('app.route.route_command', return_value=['tracepath','127.0.0.1']), patch('app.route.time.monotonic', side_effect=[0, 0, 0, 21]):
+            process.kill.side_effect = lambda: setattr(process.poll, 'return_value', -1)
             result = capture_route(settings_from({'target':'127.0.0.1'}), lambda _:process, lambda:False)
             self.assertEqual(result['status'], 'timeout'); process.kill.assert_called_once()
             self.assertEqual(result['hops'][0]['address'],'127.0.0.1')

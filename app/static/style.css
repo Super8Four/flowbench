@@ -27,6 +27,34 @@
   --bs-link-hover-color-rgb: 154, 203, 255;
 }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: .925rem; }
+.workflow-disclosure summary, #matrix-editor > summary { padding-block: 10px; cursor: pointer; color: var(--workspace-text); }
+.workflow-tags { margin-top: 4px; }
+.workflow-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.workflow-checks label { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; cursor: pointer; }
+.workflow-checks input { width: 18px; height: 18px; accent-color: #a42c42; }
+.workflow-status { min-height: 2.5em; color: var(--workspace-text); }
+.workflow-list { display: grid; gap: 8px; }
+.workflow-project { display: grid; gap: 4px; width: 100%; text-align: left; padding: 12px; background: var(--workspace-raised); border: 1px solid var(--workspace-border); color: var(--workspace-text); border-radius: 5px; overflow-wrap: anywhere; cursor: pointer; }
+.workflow-project span { font-size: .8rem; color: var(--workspace-muted); }
+.workflow-project.selected { border-color: #c95d71; box-shadow: inset 3px 0 #c95d71; }
+.workflow-project:hover { background: var(--workspace-input); }
+.workflow-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-width: 24rem; }
+.workflow-chip { color: var(--workspace-text); background: var(--workspace-input); border: 1px solid var(--workspace-border); border-radius: 4px; padding: 3px 7px; font-size: .75rem; overflow-wrap: anywhere; text-decoration: none; }
+.workflow-annotation, .workflow-report article { margin-block: 12px; padding: 16px; border: 1px solid var(--workspace-border); border-radius: 5px; overflow-wrap: anywhere; }
+.workflow-annotation p { white-space: pre-wrap; }
+.workflow-dl { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: 8px 16px; }
+.workflow-dl dd { margin: 0; overflow-wrap: anywhere; }
+#live-chart, #flent-chart { width: 100%; min-height: 200px; display: block; }
+#history-project { max-width: 200px; min-width: 120px; }
+#diagnostics-output { max-height: 440px; }
+.report-preview { overflow-wrap: anywhere; }
+@media (max-width: 575px) {
+  .workflow-dl { grid-template-columns: 1fr; gap: 4px; }
+  .workflow-dl dd { margin-bottom: 12px; }
+  .workflow-annotation { padding: 12px; }
+  #history-project { max-width: 100%; }
+  .workflow-annotation .btn, .workflow-project { min-height: 44px; }
+}
 .app-content-header { padding-top: 27px; padding-bottom: 23px; }
 .container-fluid { padding-left: 24px; padding-right: 24px; }
 .app-sidebar { background: var(--workspace-panel) !important; }

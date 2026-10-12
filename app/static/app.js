@@ -1,3 +1,4 @@
+import {createWorkflows} from './workflows.js';
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
@@ -8,7 +9,12 @@ const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
 const date = (value) => value ? new Date(value).toLocaleString() : '—';
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const title = (run) => `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
+const title = (run) => run.kind === 'flent-run' || run.settings.flent_workload ? `${run.settings.label || run.settings.target} · Flent RRUL` : `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'matrix-job' ? 'Matrix batch' : run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
+const workflows = createWorkflows({api, message, escape, number, date, title, smoothPath, download,
+  settings: settingsData, state: () => ({runs, selected, selectedId, activeId, engineReady, capabilities}),
+  reportIds: () => $('comparison') ? comparisonIds() : selected && selected.status === 'completed' && !['protocol-job', 'matrix-job'].includes(selected.kind) ? [selected.id] : [],
+  select: selectRun, refresh: loadHistory, reload: loadSelected,
+  start: async (run) => { activeId = run.id; controls(); await selectRun(run.id); await loadHistory(); }});
 
 async function api(path, options = {}) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
@@ -36,6 +42,7 @@ function controls() {
   $('run-button').disabled = !engineReady || Boolean(activeId);
   $('run-button').textContent = activeId ? 'Test running' : 'Start test';
   $('stop-button').disabled = !activeId;
+  workflows.controls();
 }
 function renderStatus(status) {
   capabilities = status.iperf;
@@ -46,6 +53,7 @@ function renderStatus(status) {
   if ($('configuration-engine')) $('configuration-engine').textContent = status.iperf.version || 'Unavailable';
   if ($('configuration-storage')) $('configuration-storage').textContent = status.database;
   renderListener(status.listener);
+  workflows.status(status);
   if (!engineReady) message(status.storage_error || status.iperf.error);
   controls();
 }
@@ -116,7 +124,7 @@ function settingsData() {
   data.traceroute = !($('role').value === 'server') && $('traceroute').checked;
   // Disabled UDP fields still belong to a reusable configuration.
   data.bandwidth = $('bandwidth').value;
-  return data;
+  return {...data, ...workflows.settings()};
 }
 function loadSettings(settings) {
   for (const [key, value] of Object.entries({...settings, ip_version: settings.ip_version || 'auto'})) {
@@ -124,6 +132,7 @@ function loadSettings(settings) {
     if ($(key).type === 'checkbox') $(key).checked = value; else $(key).value = value;
   }
   fields();
+  workflows.loadSettings(settings);
 }
 function presetMatches(row, query) {
   return `${row.name} ${row.settings.target} ${row.country} ${row.city} ${row.continent} ${row.provider} ${row.notes}`.toLowerCase().includes(query);
@@ -260,9 +269,15 @@ function chart(localPoints, remotePoints = []) {
   $('throughput-chart').innerHTML = svg;
 }
 function renderPeer() {
-  if (selected?.kind === 'protocol-job') {
+  if (selected?.kind === 'flent-run') {
+    $('throughput-chart').innerHTML = '';
+    $('chart-source-note').textContent = 'This test uses Flent. Native throughput and latency measurements are in the Flent evidence panel.';
+    $('peer-summary').classList.add('d-none'); $('peer-output').textContent = 'Flent native results are captured separately.';
+    return;
+  }
+  if (['protocol-job', 'matrix-job'].includes(selected?.kind)) {
     const width = chartWidth('throughput-chart');
-    $('chart-source-note').textContent = 'TCP and UDP results are separate. Open a protocol test above to view its measured directions, chart and remote output.';
+    $('chart-source-note').textContent = 'Batch results stay separate. Open a child test to view its measured directions, chart and remote output.';
     $('throughput-chart').innerHTML = `<text x="${width / 2}" y="110" text-anchor="middle" fill="#aab6bf" font-size="12">Open TCP or UDP above</text><text x="${width / 2}" y="130" text-anchor="middle" fill="#aab6bf" font-size="12">for its throughput chart</text>`;
     $('peer-summary').classList.add('d-none');
     $('peer-output').textContent = 'Open a protocol test to view its remote output.';
@@ -310,6 +325,7 @@ function renderSelected() {
   renderLogs();
   if (selected.kind === 'protocol-job') $('log-output').textContent = 'Open a protocol test above to view its captured output.';
   renderResults();
+  workflows.selected(selected);
 }
 async function loadSelected(reset = false) {
   if (!selectedId) return;
@@ -332,6 +348,7 @@ async function selectRun(id) {
   $('annotation-card').classList.remove('d-none');
   $('saved-label').value = selected.settings.label;
   $('saved-notes').value = selected.settings.notes;
+  workflows.edit(selected);
 }
 function historyTrend(overview) {
   const points = overview?.trend || [];
@@ -352,13 +369,13 @@ function historyTrend(overview) {
 function renderHistory() {
   if (!$('history-body')) return;
   const search = $('history-search').value.toLowerCase();
-  const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes}`.toLowerCase().includes(search));
+  const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes} ${Object.values(run.settings.tags || {}).join(' ')}`.toLowerCase().includes(search) && workflows.matches(run));
   $('history-body').innerHTML = visible.map((run) => {
     const config = run.effective_settings || run.settings;
     const stats = run.overview || {};
     const color = {completed: 'success', failed: 'danger', cancelled: 'secondary', interrupted: 'warning', running: 'primary', starting: 'primary'}[run.status] || 'secondary';
-    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div></td>
-      <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}</div></td>
+    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}</td>
+      <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${run.kind === 'flent-run' ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}`}</div></td>
       <td><span class="badge text-bg-${color}">${escape(run.status)}</span></td>
       <td class="history-speed"><strong>${number(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.upload_mbps)}</div></td>
       <td class="history-speed"><strong>${number(stats.max_download_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.download_mbps)}</div></td>
@@ -381,7 +398,7 @@ function comparisonOptions() {
 async function loadHistory() {
   const status = await api('/api/status');
   renderStatus(status);
-  if (!$('history-body') && !$('baseline')) {
+  if (!$('history-body') && !$('baseline') && !testPage && !$('project-form')) {
     activeId = status.active_run; lastHistory = Date.now();
     $('saved-count').textContent = `${status.saved_runs} saved sessions`; controls(); return;
   }
@@ -389,6 +406,7 @@ async function loadHistory() {
   runs = data.runs; activeId = data.active_run; lastHistory = Date.now();
   $('saved-count').textContent = `${runs.length} saved session${runs.length === 1 ? '' : 's'}`;
   controls(); renderHistory(); comparisonOptions();
+  workflows.history(runs);
 }
 function comparisonIds() { return ['baseline', 'candidate', 'third'].map((id) => $(id).value).filter(Boolean); }
 function comparisonPath() { return '/api/comparison?' + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
@@ -449,6 +467,7 @@ async function compare() {
     const data = await api(comparisonPath());
     if (generation !== comparisonVersion) return;
     comparisonData = data; renderComparison(); $('export-comparison').disabled = false;
+    workflows.controls();
   } catch(error) { if (generation === comparisonVersion) $('comparison-result').textContent = error.message; }
 }
 async function download(path, fallback) {
@@ -527,13 +546,19 @@ $('history-body')?.addEventListener('click', safe(async (event) => {
 $('export-button')?.addEventListener('click', safe(() => exportRun(selectedId)));
 $('rerun-button')?.addEventListener('click', () => {
   if (!selected) return;
+  if (workflows.loadFlentSettings(selected)) return;
   $('server-preset').value = ''; editingPreset = null; $('update-preset').disabled = true;
   loadSettings(selected.settings); $('target').focus();
 });
-$('save-notes')?.addEventListener('click', safe(async () => {
-  await api(`/api/runs/${selectedId}`, {method: 'PATCH', body: JSON.stringify({label: $('saved-label').value, notes: $('saved-notes').value})});
-  await loadSelected(); await loadHistory(); message('Session notes saved.', 'success');
-}));
+$('save-notes')?.addEventListener('click', async () => {
+  if ($('save-notes').disabled) return;
+  $('save-notes').disabled = true;
+  try {
+    await api(`/api/runs/${selectedId}`, {method: 'PATCH', body: JSON.stringify({label: $('saved-label').value, notes: $('saved-notes').value, ...workflows.annotationSettings()})});
+    await loadSelected(); await loadHistory(); $('notes-status').textContent = 'Label, notes, project and tags saved.';
+  } catch (error) { $('notes-status').textContent = error.message; message(error.message); }
+  finally { $('save-notes').disabled = false; }
+});
 for (const id of ['baseline', 'candidate', 'third']) $(id)?.addEventListener('change', safe(compare));
 $('export-comparison')?.addEventListener('click', safe(() => download(`${comparisonPath()}&format=${$('export-format').value}`, 'iperf-comparison')));
 document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => {
@@ -553,6 +578,7 @@ async function init() {
     const status = await api('/api/status');
     renderStatus(status);
     await loadHistory();
+    await workflows.init();
     if (testPage || $('preset-body')) await loadPresets();
     if (testPage) {
       fields();
@@ -590,7 +616,7 @@ $('listener-stop')?.addEventListener('click', async () => {
 });
 
 function renderResults() {
-  const job = selected.kind === 'protocol-job';
+  const job = ['protocol-job', 'matrix-job', 'flent-run'].includes(selected.kind);
   $('result-cards').classList.toggle('d-none', job || !terminal.has(selected.status));
   $('live-metrics').classList.toggle('d-none', job || terminal.has(selected.status));
   const metrics = selected.metrics || {};
@@ -607,7 +633,7 @@ function renderResults() {
   $('route-note').textContent = route ? `${route.status}: ${route.note || ''}` : 'No route evidence in this saved run.';
   $('route-output').textContent = route?.raw_output || '';
   const hops = route?.hops || [];
-  $('route-hops').innerHTML = hops.length ? `<table class="table"><thead><tr><th>Hop</th><th>Address</th><th>Probe RTT · ms</th></tr></thead><tbody>${hops.map((h) => `<tr><td>${escape(h.hop)}</td><td>${escape(h.address || 'No reply')}</td><td>${(h.rtt_ms || []).map((v) => number(v)).join(' / ') || '—'}</td></tr>`).join('')}</tbody></table>` : '';
+  $('route-hops').innerHTML = hops.length ? `<table class="table"><thead><tr><th>Hop</th><th>Address</th><th>Probe RTT · ms</th></tr></thead><tbody>${hops.map((h) => `<tr><td>${escape(h.hop)}</td><td>${escape(h.address || 'No reply')}</td><td>${[...(h.rtt_ms || []).map((v) => number(v)), ...(h.rtt_upper_bound_ms || []).map((v) => '&lt;' + number(v))].join(' / ') || '—'}</td></tr>`).join('')}</tbody></table>` : '';
   if (selected.incoming || selected.concurrency) {
     const notes = [];
     if (selected.incoming) notes.push(`Managed incoming capture from ${selected.incoming.remote_host || 'unknown peer'}. Directions use that client's perspective: upload enters this server, download leaves it.`);

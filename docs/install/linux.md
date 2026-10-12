@@ -8,7 +8,7 @@ Install prerequisites:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y git python3-venv build-essential ca-certificates curl libssl-dev iputils-tracepath
+sudo apt-get install -y git python3-venv build-essential ca-certificates curl libssl-dev iputils-tracepath iputils-ping
 git clone https://github.com/Super8Four/flowbench.git
 cd flowbench
 git switch --detach v0.1.0-rc.2
