@@ -223,6 +223,8 @@ class RunManager:
                     )}
                     row["metrics"] = measurements(record)
                     row["overview"] = overview(record)
+                    if row["overview"].get("issues"):
+                        row["measurement_warnings"] = row["overview"]["issues"]
                     row["effective_settings"] = effective_settings(record)
                     row["imported"] = record.get("imported")
                     row["kind"] = record.get("kind")

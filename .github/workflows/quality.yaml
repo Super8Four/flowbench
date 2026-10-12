@@ -32,6 +32,8 @@ jobs:
         run: python scripts/check-source.py --output ci-artifacts/source.json
       - name: Exercise Flent browser workflow with the controlled DOM/API fixture
         run: node tests/workflows-flent-behavior.mjs
+      - name: Exercise malformed-history warning with the controlled DOM/API fixture
+        run: node tests/history-warning-behavior.mjs
       - name: Record source check summary
         if: always()
         run: |

@@ -92,3 +92,12 @@ class JavaScriptWorkflowTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('Flent UI behavior passed:', result.stdout)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is absent; the host CI step runs the isolated JavaScript behavior test.')
+    def test_historical_measurement_warning_preserves_accessible_evidence(self):
+        script = Path(__file__).resolve().with_name('history-warning-behavior.mjs')
+        module = Path(application.__file__).resolve().parent / 'static' / 'app.js'
+        result = subprocess.run([shutil.which('node'), str(script), str(module)],
+                                text=True, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('History warning UI behavior passed:', result.stdout)

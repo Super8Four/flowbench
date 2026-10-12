@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from xml.etree import ElementTree as ET
 
-from .metrics import effective_settings, measurements, series
+from .metrics import effective_settings, measurements, series, identity_issues
 from .runner import TERMINAL, now, settings_from
 from .annotations import annotations_from
 
@@ -112,6 +112,9 @@ def timestamp(value, optional=False):
 
 
 def validate_measurement_structure(record):
+    issues = identity_issues(record)
+    if issues:
+        raise ValueError("Invalid saved measurement identity. " + " ".join(issues))
     numeric = {"bits_per_second", "jitter_ms", "lost_percent", "lost_packets", "packets", "retransmits",
                "num_streams", "duration", "target_bitrate", "reverse", "bidir"}
     objects = {"sum", "sum_received", "sum_sent", "sum_bidir_reverse", "sum_received_bidir_reverse",

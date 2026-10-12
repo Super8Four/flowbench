@@ -1,6 +1,48 @@
 """Normalize iPerf results without fabricating metrics absent from a platform."""
 
 import math
+import re
+
+
+def valid_direction(value):
+    return value is None or isinstance(value, str) and 0 < len(value) <= 200
+
+
+def valid_stream(value):
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return 0 <= value <= 2_147_483_647
+    if not isinstance(value, str) or not 0 < len(value) <= 200:
+        return False
+    if re.fullmatch(r"-\d+", value):
+        return False
+    if re.fullmatch(r"\d+", value):
+        return int(value) <= 2_147_483_647
+    return True  # SUM and legitimate custom text labels are retained verbatim.
+
+
+def identity_issues(record):
+    """Diagnose imported/legacy identity shapes without changing raw evidence."""
+    problems = set()
+    def walk(value, depth=0):
+        if depth > 60:
+            problems.add("Stored measurement nesting exceeds the supported limit.")
+            return
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "direction" and not valid_direction(child):
+                    problems.add("Direction must be optional text up to 200 characters.")
+                if key == "stream" and not valid_stream(child):
+                    problems.add("Stream must be bounded text or an integer identifier from 0 to 2147483647.")
+                if isinstance(child, (dict, list)):
+                    walk(child, depth + 1)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child, depth + 1)
+    for key in ("intervals", "summary", "test_parameters"):
+        walk(record.get(key))
+    return sorted(problems)
 
 
 def effective_settings(record):
@@ -29,6 +71,8 @@ def measurements(record):
             if suffix:
                 result["flent_" + row["name"] + suffix] = mean
         return result
+    if identity_issues({"summary": record.get("summary")}):
+        return {}  # Invalid stream identity cannot establish aggregation ownership.
     summary = record.get("summary") or {}
     settings = effective_settings(record)
     result = {}
@@ -60,6 +104,8 @@ def measurements(record):
 
 
 def series(record):
+    if identity_issues(record):
+        return []  # Raw evidence remains in the record; overview explains why.
     settings = effective_settings(record)
     points = []
     # Streaming JSON aggregates are preferred to avoid counting parallel streams twice.
@@ -97,6 +143,10 @@ def series(record):
 
 def overview(record):
     """Interval peaks and measured runtime, with a bounded trend for history rows."""
+    issues = identity_issues(record)
+    if issues:
+        return {"runtime_seconds": None, "trend": [], "status": "unavailable", "issues": issues,
+                "note": "Stored measurement identities are invalid. Derived interval charts are unavailable; raw captured evidence is preserved."}
     def valid(value):
         return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 

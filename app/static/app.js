@@ -375,6 +375,7 @@ async function selectRun(id) {
   workflows.edit(selected);
 }
 function historyTrend(overview, run) {
+  if (overview?.status === 'unavailable') return '<span class="history-muted">Interval evidence unavailable</span>';
   const points = overview?.trend || [];
   if (!points.length) return '<span class="history-muted">No interval data</span>';
   const maxSeconds = points.reduce((max, point) => Math.max(max, point.seconds), 1);
@@ -397,8 +398,11 @@ function renderHistory() {
   $('history-body').innerHTML = visible.map((run) => {
     const config = run.effective_settings || run.settings;
     const stats = run.overview || {};
+    const warnings = Array.isArray(run.measurement_warnings) ? run.measurement_warnings : [];
+    const warning = stats.status === 'unavailable' || warnings.length
+      ? `<div class="history-date text-warning-emphasis mt-2" role="note" aria-label="Stored measurement warning"><strong>Interval measurements unavailable</strong><p class="mb-1">${escape(stats.note || 'Stored interval evidence could not be interpreted. Raw evidence remains available.')}</p>${warnings.length ? `<ul class="mb-0 ps-3">${warnings.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>` : ''}</div>` : '';
     const color = {completed: 'success', failed: 'danger', cancelled: 'secondary', interrupted: 'warning', running: 'primary', starting: 'primary'}[run.status] || 'secondary';
-    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}</td>
+    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}${warning}</td>
       <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${run.kind === 'flent-run' ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}`}</div></td>
       <td><span class="badge text-bg-${color}">${escape(run.status)}</span></td>
       <td class="history-speed"><strong>${formatMbps(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${formatMbps(run.metrics.upload_mbps)}</div></td>
