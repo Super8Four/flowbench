@@ -9,6 +9,7 @@ Native installs can use `.env` in the checkout. Container installs use the Compo
 | `RUNS_DIRECTORY` | Native `instance/runs`; container `/data/runs` | Writable archive directory; SQLite, events, notes, presets and listener settings |
 | `IPERF_PATH` | Container `/usr/local/bin/iperf3`; native `bin` then PATH | Compatible iPerf3 executable |
 | `WEB_PORT` | Compose host port 5000 | Host web publication, loopback by default |
+| `COMPOSE_PROJECT_NAME` | Checkout folder name | Keep the original project name when upgrading so Compose reuses the same data volume |
 | `IPERF_PORT` | Compose host port 5201 | Host TCP/UDP mapped port; container listener stays on 5201 |
 | `IPERF_BIND_ADDRESS` | Compose host `127.0.0.1` | Host iPerf publication address |
 | `FLOWBENCH_RESUME_LISTENER` | `1` | Set `0` for maintenance commands to suppress saved listener startup without changing its saved setting |
