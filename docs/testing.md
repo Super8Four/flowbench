@@ -1,0 +1,57 @@
+# Testing and evidence map
+
+Tests use disposable archives, controlled loopback peers and synthetic or reserved-address fixtures. Keep production targets, credentials, user history and private visual references out of tests and public artifacts. This map identifies repeatable checks; it does not claim the latest working tree has passed them. Record the full source SHA with each result and use [lifecycle guidance](lifecycle.md) for release decisions.
+
+## Test tiers and platforms
+
+| Tier | How to run or verify | Boundary |
+| --- | --- | --- |
+| Focused regression | `python -m unittest discover -s tests -p test_matrix.py -v` (choose the affected file) | Run meaningful failure/compatibility cases, then the required broader checks; avoid repeated runs without new changes or concerns |
+| Full Python suite | `python -m unittest discover -s tests -v` with the verified engine and application dependencies | Read skips and native-tool availability; mocked results prove adapter logic only |
+| Base container lifecycle | `python3 scripts/check-container.py iperf-workspace:local` after building the intended source | Creates its own containers/volume; checks native traffic, storage and reports under non-root/read-only/capability limits |
+| Actual optional Flent | [Derivative image](../scripts/Flent.Dockerfile) and [check-flent.py](../scripts/check-flent.py), using the workflow's isolated command | Real pinned Linux tools and owned loopback Netserver; no external network, host privilege changes or release-image bundling |
+| Report rendering | [check-reports.py](../scripts/check-reports.py) creates PDF/DOCX fixtures; render PDFs and office-converted DOCX PDFs, then inspect every page | Structural assertions and PNG generation do not replace visual inspection |
+| Browser interaction | Actual app with a disposable archive on desktop, mobile and keyboard navigation | Static HTML tests do not exercise layout, focus, chart paths or repeated interactions |
+
+| Platform | Checks and limits |
+| --- | --- |
+| Windows, Python 3.12, pinned iPerf3 | Full suite and controlled loopback traffic; verify native diagnostics where legitimately available. Bidirectional UDP is explicitly rejected by the bundled engine; native Flent is unavailable |
+| Ubuntu 24.04 AMD64 | Native CI suite, base lifecycle, derivative Flent and report rendering; retain exact-SHA terminal job result |
+| Ubuntu 24.04 ARM64 | Same native checks on the ARM runner; emulator or AMD64 success cannot stand in for it |
+| Physical Raspberry Pi / other native hosts | Deployment, host permissions, external-peer reachability, performance and hardware durability need separate target acceptance; CI does not establish these |
+
+## Feature trace
+
+The named cases below exist in the linked test files. They identify focused acceptance evidence, not percentage coverage or closure of every private canonical requirement.
+
+| Requested behavior | Representative test cases and native evidence |
+| --- | --- |
+| 1. Named changes/projects and baselines | [test_projects.py](../tests/test_projects.py): `test_baseline_validation_and_honest_comparisons`, `test_complete_jobs_export_once_and_import_remaps_all_links`; [test_project_imports.py](../tests/test_project_imports.py): `test_concurrent_identical_project_import_commits_one_copy` |
+| 2. Baseline and loaded ICMP timing | [test_diagnostics.py](../tests/test_diagnostics.py): `test_variability_uses_only_measured_numeric_replies`, `test_failed_echo_phase_never_reports_successful_capture`, `test_loaded_probe_checkpoints_measured_samples_before_traffic_finishes`; base lifecycle checks actual statuses without demanding permitted ping |
+| 3. Controlled sequential matrices | [test_matrix.py](../tests/test_matrix.py): `test_udp_finite_aggregate_limit_includes_streams_and_directions`, `test_cancel_active_test_terminates_and_skips_queue`, `test_restart_interrupts_parent_children_without_auto_resume`, `test_loopback_sequential_tcp_udp_upload_download`; base lifecycle replaces a container during an active matrix |
+| 4. Local endpoint health and unavailable remote health | [test_diagnostics.py](../tests/test_diagnostics.py): `test_local_proc_health_and_counter_reset_are_not_remote_metrics`, `test_windows_local_health_adapter_is_fixed_read_only_and_handles_missing`; base lifecycle reads actual Linux `/proc` provenance |
+| 5. Bounded path/MTU context | [test_diagnostics.py](../tests/test_diagnostics.py): `test_mtu_missing_replies_do_not_invent_path_size`, `test_timeout_and_permission_failure_remain_honest`; [test_requirements.py](../tests/test_requirements.py): `test_post_test_route_failure_keeps_throughput_success`, `test_stop_during_route_capture_cancels_and_keeps_measurements` |
+| 6. Live baseline overlay | [test_live_comparison.py](../tests/test_live_comparison.py): `test_elapsed_time_preserves_gaps_and_absent_metrics`, `test_flags_peer_direction_streams_and_engine_differences`, `test_api_reads_current_interval_snapshot_and_returns_validation_errors` |
+| 7. Tags and timestamped observations | [test_annotations.py](../tests/test_annotations.py): `test_timestamped_notes_edit_restart_and_export`, `test_invalid_timeline_and_partial_patch_never_commit`, `test_group_membership_atomic_and_baseline_protected` |
+| SQLite and portable workflow evidence | [test_workflows.py](../tests/test_workflows.py): `test_native_diagnostic_evidence_is_in_sqlite_and_survives_reopen`, `test_project_import_second_write_failure_is_atomic`, `test_old_run_remains_without_invented_diagnostics_or_annotations`; base lifecycle compares JSON/XML evidence after replacement |
+| Actual optional Flent RRUL | [test_flent.py](../tests/test_flent.py): `test_malformed_native_and_fabricated_derived_values_rejected`, `test_blocked_unprivileged_socket_reports_unavailable_without_network`, `test_json_xml_import_preserves_flent_provenance_and_native_data`; the derivative native script exercises real RRUL, cancellation, descendant cleanup and restart |
+| R14 PDF/Word reports | [test_reports.py](../tests/test_reports.py): `test_default_redaction_overrides_raw_and_retains_actual_measurements`, `test_preview_fingerprint_accepts_same_snapshot_and_rejects_changes`, `test_rendered_formats_escape_text_and_are_repeatable_without_archive_writes`; base lifecycle checks PDF/DOCX structure and redaction, and report QA renders the generated fixtures |
+| More than three selections and mixed durations | [test_comparison_many.py](../tests/test_comparison_many.py): `test_five_and_ten_runs_export_import_and_real_elapsed_duration`, `test_exact_common_window_is_separate_from_whole_run_aggregate`, `test_unknown_starts_gaps_overlap_and_partial_bins_are_unavailable`; [test_reports.py](../tests/test_reports.py): `test_ten_runs_preserve_colors_canonical_rates_and_shared_window`, `test_resource_limits_depend_on_data_not_selection_count` |
+| Saved colors and automatic SI rate display | [test_comparison_many.py](../tests/test_comparison_many.py): `test_persistent_colors_validated_restart_json_xml_and_import`; [test_units.py](../tests/test_units.py): `test_decimal_boundaries_zero_missing_and_large_rates`, `test_shared_axis_scale_and_raw_values_are_unchanged`; browser and rendered charts still require visual checks |
+| Existing storage and listener regression | [test_storage.py](../tests/test_storage.py): `test_legacy_migration_rollback_export_roundtrip_and_idempotence`, `test_sqlite_page_limit_reports_full_and_rolls_back_captured_event`, `test_killed_transaction_and_integrity`; [test_listener.py](../tests/test_listener.py): `test_outbound_overlap_and_busy_incoming_rejection`, `test_enabled_listener_restarts_without_replaying_history_and_disable_persists` |
+
+The full suite also retains original protocol, parser, peer-output, overview, brand and UI-contract tests. [test_workflow_ui.py](../tests/test_workflow_ui.py) checks controls/labels, explicit probe selection, redacted report defaults and dynamic comparison rows. Those checks need actual browser interaction before claiming UI acceptance.
+
+## CI and evidence
+
+The [workflow](../.github/workflows/container.yaml) is configured for pushes to `main` and its named feature branches, pull requests and manual dispatch. It does not automatically run every arbitrary feature-branch push. Select a supported trigger and verify the run's `headSha`.
+
+Each native job validates Compose, builds/checks architecture, runs the complete suite and base lifecycle, then tests actual Flent in a separate pinned derivative image with `--network none`, dropped capabilities and no new privileges. The derivative image is not uploaded as a release download. Report fixtures are generated and rendered using LibreOffice/Poppler; report QA artifacts can be produced after lifecycle success even when another check fails. Their presence is not a successful overall CI result. Non-PR successful packaging writes image archives, inspection metadata and checksums. Read the actual terminal status of every required job and step.
+
+Keep an evidence record with source SHA, app/tool versions, platform, command or CI run link, test counts including skips, failures, screenshot/render artifact location and unresolved limits. Archive failure, permission-blocked probes or a failed native Flent step must remain visible. A later fix requires a new exact-source result; earlier green base-container checks cannot erase a failed optional integration.
+
+For browser QA, cover empty history, project baseline selection, matrix start/stop/restart, diagnostic absence/errors, annotations, live gaps, repeated starts and imports, and report preview/download/redaction. For larger comparisons, check five or more mixed-duration runs, adding/removing rows, saved colors, legend wrapping, shared SI axes, horizontal scrolling and keyboard focus on desktop/mobile. Use only synthetic fixtures. Review console errors and verify a failed request does not display fabricated success.
+
+For report QA, inspect every page of single-run, redacted multi-run and native-format Flent fixtures in both PDF and rendered Word output. Check charts, captions, units, color/label identity, pagination, clipping and redaction. Fixture generation is described in [reports](reports.md); actual Flent setup is in [Flent](flent.md). [Verification](verification.md) contains historical screenshots and release evidence, which must not be relabelled as proof of a newer commit.
+
+No check here establishes physical power-loss recovery, Pi deployment, external network acceptance, full WCAG compliance, complete canonical acceptance, authentication or a support SLA. Use [requirements](requirements.md) and [lifecycle](lifecycle.md) to preserve those boundaries.

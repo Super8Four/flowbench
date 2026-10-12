@@ -61,3 +61,19 @@ class WorkflowUiTests(unittest.TestCase):
                 self.assertNotIn('checked', page.control('report-raw'))
                 self.assertIn('disabled', page.control('report-download'))
                 self.assertIn('disabled', page.control('report-preview-button'))
+
+    def test_comparison_can_add_rows_and_rate_labels_are_dynamic(self):
+        page = self.page('/comparison')
+        self.assertEqual(page.control('add-comparison')['type'], 'button')
+        identifiers = {attributes.get('id') for _, attributes in page.items}
+        self.assertIn('comparison-selections', identifiers)
+        self.assertIn('baseline', identifiers)
+        self.assertNotIn('candidate', identifiers)
+        self.assertNotIn('third', identifiers)
+        self.assertIn('comparison-unit', identifiers)
+        self.assertIn('comparison-visible-count', identifiers)
+        test_page = self.page('/')
+        for identifier in ('throughput-unit', 'upload-unit', 'download-unit', 'result-upload-unit',
+                           'result-download-unit', 'live-unit', 'flent-chart-unit'):
+            test_page.control(identifier)
+        self.assertEqual(test_page.control('saved-color')['type'], 'color')

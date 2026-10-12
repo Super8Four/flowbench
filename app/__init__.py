@@ -17,6 +17,7 @@ from .listener import IncomingListener, ListenerConflict
 from .version import __version__
 from .projects import ProjectStore
 from .diagnostics import diagnostic_capabilities
+from .units import RATE_CONTRACT
 
 
 def create_app(test_config=None):
@@ -51,6 +52,8 @@ def create_app(test_config=None):
                 return jsonify(error="Cross-origin writes are not allowed."), 403
             if not request.is_json:
                 return jsonify(error="Use application/json for control requests."), 415
+            if manager.shutdown_requested or manager.storage_lock.closed:
+                return jsonify(error="This archive process is shutting down. Use the current app process before making changes."), 503
 
     @app.errorhandler(ValueError)
     def invalid_input(error):
@@ -203,7 +206,7 @@ def create_app(test_config=None):
 
     @app.get("/api/runs")
     def list_runs():
-        return jsonify(runs=manager.list_runs(), active_run=manager.active_id)
+        return jsonify(runs=manager.list_runs(), active_run=manager.active_id, rate_units=RATE_CONTRACT)
 
     @app.get("/api/ready")
     def readiness():
@@ -248,6 +251,7 @@ def create_app(test_config=None):
         if not after.isdigit():
             raise ValueError("after must be a non-negative event sequence number.")
         record = manager.read(run_id)
+        record["rate_units"] = RATE_CONTRACT
         record["metrics"] = measurements(record)
         record["series"] = series(record)
         record["overview"] = overview(record)
@@ -309,45 +313,58 @@ def create_app(test_config=None):
 
     @app.get("/api/comparison")
     def compare_runs():
+        from .comparisons import common_window, MAX_COMPARISON_BYTES
+        from .units import RATE_CONTRACT, run_color
+
+        format_name = request.args.get("format")
+        if format_name and format_name not in {"json", "xml"}:
+            raise ValueError("Choose json or xml.")
+
+        def respond(report):
+            report["rate_units"] = RATE_CONTRACT
+            payload = (json.dumps(report, indent=2 if format_name else None, ensure_ascii=False, allow_nan=False).encode("utf-8")
+                       if format_name != "xml" else xml_export(report))
+            if len(payload) > MAX_COMPARISON_BYTES:
+                return jsonify(error="Comparison exceeds the 32 MiB response budget. Select fewer tests or export individual runs."), 413
+            headers = {"Cache-Control": "no-store"}
+            if format_name:
+                headers["Content-Disposition"] = f'attachment; filename="iperf-comparison.{format_name}"'
+            return Response(payload, mimetype="application/" + (format_name or "json"), headers=headers)
+
         ids = request.args.getlist("id")
         if ids:
-            if not 2 <= len(ids) <= 3 or len(set(ids)) != len(ids):
-                raise ValueError("Choose two or three different completed tests.")
-            records = [manager.read(run_id) for run_id in ids]
-            reports = [comparison(records[0], record) for record in records[1:]]
-            format_name = request.args.get("format")
-            selected_runs = []
-            for record in records:
-                if format_name:
-                    selected_runs.append(manager.export(record["id"]))
-                else:
-                    selected_runs.append({"id": record["id"], "status": record["status"],
-                                          "created_at": record["created_at"], "settings": record["settings"],
-                                          "metrics": measurements(record), "series": series(record),
-                                          "effective_settings": effective_settings(record), "peer": peer_results(record)})
+            if len(ids) < 2 or len(set(ids)) != len(ids):
+                raise ValueError("Choose at least two different completed individual tests.")
+            with manager.lock:
+                records = [manager.read(run_id) for run_id in ids]
+                if any(record.get("children") or record.get("kind") in {"protocol-job", "matrix-job"} for record in records):
+                    raise ValueError("Choose completed individual tests rather than complete jobs.")
+                reports = [comparison(records[0], record) for record in records[1:]]
+                selected_runs = []
+                for record in records:
+                    if format_name:
+                        selected_runs.append(manager.export(record["id"]))
+                    else:
+                        selected_runs.append({"id": record["id"], "status": record["status"],
+                                              "created_at": record["created_at"], "settings": record["settings"],
+                                              "color": run_color(record), "imported": record.get("imported"),
+                                              "metrics": measurements(record), "series": series(record),
+                                              "effective_settings": effective_settings(record), "peer": peer_results(record)})
+                window = common_window(records)
             report = {"schema_version": 1, "kind": "multi-comparison", "comparisons": reports,
-                      "runs": selected_runs}
-            if not format_name:
-                return jsonify(report)
-            if format_name not in {"json", "xml"}:
-                raise ValueError("Choose json or xml.")
-            payload = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) if format_name == "json" else xml_export(report)
-            return Response(payload, mimetype="application/" + format_name,
-                            headers={"Content-Disposition": f'attachment; filename="iperf-comparison.{format_name}"', "Cache-Control": "no-store"})
-        before = manager.read(request.args.get("before", ""))
-        after = manager.read(request.args.get("after", ""))
-        report = comparison(before, after)
-        format_name = request.args.get("format")
-        if not format_name:
-            return jsonify(report)
-        if format_name not in {"json", "xml"}:
-            raise ValueError("Choose json or xml.")
-        report["before"] = manager.export(before["id"])
-        report["after"] = manager.export(after["id"])
-        payload = json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) if format_name == "json" else xml_export(report)
-        return Response(payload, mimetype="application/" + format_name,
-                        headers={"Content-Disposition": f'attachment; filename="iperf-comparison.{format_name}"',
-                                 "Cache-Control": "no-store"})
+                      "runs": selected_runs, "aggregate_scope": "whole_run",
+                      "common_window_seconds": window["seconds"], "common_window": window}
+            return respond(report)
+        with manager.lock:
+            before = manager.read(request.args.get("before", ""))
+            after = manager.read(request.args.get("after", ""))
+            if any(record.get("children") or record.get("kind") in {"protocol-job", "matrix-job"} for record in (before, after)):
+                raise ValueError("Choose completed individual tests rather than complete jobs.")
+            report = comparison(before, after)
+            if format_name:
+                report["before"] = manager.export(before["id"])
+                report["after"] = manager.export(after["id"])
+        return respond(report)
 
     @app.get("/api/health")
     def health():

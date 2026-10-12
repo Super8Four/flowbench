@@ -54,6 +54,8 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         time.sleep(.5)
         assert peer.poll() is None, "Owned loopback Netserver did not start"
         assert manager.flent_capabilities["available"], manager.flent_capabilities
+        assert "2.3.0" in manager.flent_capabilities["version"], manager.flent_capabilities
+        assert "2.7.1" in manager.flent_capabilities["netperf_version"], manager.flent_capabilities
         client = app.test_client()
         payload = {"target": "127.0.0.1", "duration": 3, "netserver_port": port, "workload": "rrul",
                    "confirm_netserver": True, "label": "Synthetic loopback RRUL"}
@@ -85,7 +87,11 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         assert client.post("/api/runs/" + cancel_id + "/stop", json={}).status_code == 200
         cancelled = finish(manager, cancel_id)
         assert cancelled["status"] == "cancelled", cancelled
-        time.sleep(.2)
+        # --init reaps terminated descendants asynchronously; allow a bounded
+        # drain before asserting ownership cleanup on slower native runners.
+        deadline = time.monotonic() + 2
+        while owned_group in groups() and time.monotonic() < deadline:
+            time.sleep(.05)
         assert owned_group not in groups(), "Cancelled Flent left process-group descendants"
         assert peer.poll() is None, "Flent cancellation stopped the independent Netserver"
         manager.shutdown()

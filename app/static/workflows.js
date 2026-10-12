@@ -1,8 +1,11 @@
+import {rateScale, formatRate, formatMbps, runColor} from './units.js';
 // Local, offline-capable measurement workflows. No chart values are synthesized.
 export function createWorkflows(context) {
   const {api, message, escape: esc, number: num, date, title, smoothPath, download} = context;
   const $ = (id) => document.getElementById(id);
   const keys = ['site', 'device', 'circuit', 'ticket'];
+  const metricLabel = (key) => key?.replace(/_mbps$/, ' bitrate').replaceAll('_', ' ');
+  const metricValue = (key, value) => key?.endsWith('_mbps') ? formatMbps(value) : key?.endsWith('bits_per_second') ? formatRate(value) : num(value);
   let projects = [], projectId = null, projectReport = null, annotationId = null;
   let liveVersion = 0, liveBusy = false, liveData = null, lastLiveKey = '', initialized = false;
   let reportSignature = '', reportPreview = null;
@@ -121,7 +124,7 @@ export function createWorkflows(context) {
   }
   function metricRows(metrics) {
     const rows = Array.isArray(metrics) ? metrics.map((value) => [value.metric || value.name || value.key, value]) : Object.entries(metrics || {});
-    return rows.map(([key, value]) => `<tr><td>${esc(key?.replaceAll('_', ' '))}</td><td>${num(value.before ?? value.baseline)}</td><td>${num(value.after ?? value.candidate)}</td><td>${num(value.delta ?? value.change)}${Number.isFinite(value.percent_change ?? value.percent ?? value.change_percent) ? ` (${num(value.percent_change ?? value.percent ?? value.change_percent)}%)` : ''}</td></tr>`).join('') || '<tr><td colspan="4">No shared numeric metrics.</td></tr>';
+    return rows.map(([key, value]) => `<tr><td>${esc(metricLabel(key))}</td><td>${metricValue(key,value.before ?? value.baseline)}</td><td>${metricValue(key,value.after ?? value.candidate)}</td><td>${metricValue(key,value.delta ?? value.change)}${Number.isFinite(value.percent_change ?? value.percent ?? value.change_percent) ? ` (${num(value.percent_change ?? value.percent ?? value.change_percent)}%)` : ''}</td></tr>`).join('') || '<tr><td colspan="4">No shared numeric metrics.</td></tr>';
   }
   function matrixData() {
     const checked = (name) => [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((item) => item.value);
@@ -160,7 +163,7 @@ export function createWorkflows(context) {
     if (run.kind !== 'matrix-job') return;
     const rows = run.matrix_runs || [];
     $('matrix-job-status').textContent = `Batch ${run.status}: ${rows.filter((row) => row.status === 'completed').length} of ${rows.length} completed.${run.error ? ' ' + run.error : ''}`;
-    $('matrix-job-results').innerHTML = `<table class="table"><thead><tr><th>Case</th><th>Status</th><th>Upload Mbps</th><th>Download Mbps</th><th>Evidence</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}. ${esc(row.protocol?.toUpperCase())} / ${esc(row.mode)} / ${row.streams} streams</td><td>${esc(row.status)}${row.error ? `<p class="form-text">${esc(row.error)}</p>` : ''}</td><td>${num(row.metrics?.upload_mbps)}</td><td>${num(row.metrics?.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(row.id)}">Open case ${index + 1}</a></td></tr>`).join('')}</tbody></table>`;
+    $('matrix-job-results').innerHTML = `<table class="table"><thead><tr><th>Case</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Evidence</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}. ${esc(row.protocol?.toUpperCase())} / ${esc(row.mode)} / ${row.streams} streams</td><td>${esc(row.status)}${row.error ? `<p class="form-text">${esc(row.error)}</p>` : ''}</td><td>${formatMbps(row.metrics?.upload_mbps)}</td><td>${formatMbps(row.metrics?.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(row.id)}">Open case ${index + 1}</a></td></tr>`).join('')}</tbody></table>`;
   }
   function latencySummary(stage) {
     const summary = stage?.summary || {};
@@ -194,9 +197,10 @@ export function createWorkflows(context) {
   function edit(run) {
     fill($('saved-project'), projects, 'No project', (row) => row.name, run.settings.project_id || '');
     keys.forEach((key) => { $('saved-tag-' + key).value = run.settings.tags?.[key] || ''; });
+    $('saved-color').value = runColor(run);
     resetAnnotation(); renderTimeline(run);
   }
-  function annotationSettings() { return {project_id: $('saved-project').value || null, tags: tagValues('saved-tag-')}; }
+  function annotationSettings() { return {project_id: $('saved-project').value || null, tags: tagValues('saved-tag-'), color: $('saved-color').value}; }
   function resetAnnotation() {
     annotationId = null;
     annotationTimestamp = null;
@@ -219,20 +223,23 @@ export function createWorkflows(context) {
     const chart = $('live-chart'); if (!chart) return;
     const width = Math.max(230, chart.getBoundingClientRect().width || 760);
     chart.setAttribute('viewBox', `0 0 ${width} 240`);
-    const records = liveData?.runs || [], colors = ['#6db5ff', '#ffc857'];
+    const records = liveData?.runs || [], colors = records.map(runColor);
     const lines = records.flatMap((run, index) => ['upload', 'download'].map((direction) => ({index, direction,
       data: [...new Map((run.series || []).filter((row) => row.direction === direction && Number.isFinite(row.seconds) && Number.isFinite(row.mbps)).map((row) => [row.seconds, row])).values()].sort((a, b) => a.seconds - b.seconds)}))).filter((row) => row.data.length);
     const points = lines.flatMap((line) => line.data);
-    $('live-legend').innerHTML = records.map((run, index) => `<span style="color:${colors[index]}">${index ? 'Selected' : 'Baseline'}: ${esc(title(run))}</span>`).join('');
-    if (!points.length) { chart.innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab6bf" font-size="12">No measured intervals to overlay</text>`; return; }
-    const maxTime = Math.max(1, ...points.map((row) => row.seconds)), maxRate = Math.max(1, ...points.map((row) => row.mbps)) * 1.08;
+    $('live-legend').innerHTML = records.map((run, index) => `<span><span class="comparison-color-swatch" style="background:${colors[index]}"></span>${index ? 'Selected' : 'Baseline'}: ${esc(title(run))}</span>`).join('');
+    if (!points.length) { $('live-unit').textContent = 'bps'; chart.innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab6bf" font-size="12">No measured intervals to overlay</text>`; return; }
+    const maxTime = points.reduce((max, row) => Math.max(max, row.seconds), 1), maxRate = points.reduce((max, row) => Math.max(max, row.mbps), 0) * 1.08 || 1e-6;
+    const scale = rateScale(points.map((row) => row.mbps * 1e6));
+    $('live-unit').textContent = scale.unit;
+    chart.setAttribute('aria-label', `Baseline and selected throughput by elapsed seconds in ${scale.unit}`);
     const x = (seconds) => 55 + seconds / maxTime * (width - 70), y = (mbps) => 200 - mbps / maxRate * 175;
     let svg = '';
-    for (let step = 0; step <= 3; step++) svg += `<line x1="55" y1="${y(maxRate * step / 3)}" x2="${width - 15}" y2="${y(maxRate * step / 3)}" stroke="#41494d"/><text x="47" y="${y(maxRate * step / 3) + 4}" text-anchor="end" fill="#aab6bf" font-size="12">${num(maxRate * step / 3, 0)}</text><text x="${x(maxTime * step / 3)}" y="222" text-anchor="${step ? step === 3 ? 'end' : 'middle' : 'start'}" fill="#aab6bf" font-size="12">${num(maxTime * step / 3, 1)}s</text>`;
+    for (let step = 0; step <= 3; step++) svg += `<line x1="55" y1="${y(maxRate * step / 3)}" x2="${width - 15}" y2="${y(maxRate * step / 3)}" stroke="#41494d"/><text x="47" y="${y(maxRate * step / 3) + 4}" text-anchor="end" fill="#aab6bf" font-size="12">${num(maxRate * step / 3*1e6/scale.divisor, 1)}</text><text x="${x(maxTime * step / 3)}" y="222" text-anchor="${step ? step === 3 ? 'end' : 'middle' : 'start'}" fill="#aab6bf" font-size="12">${num(maxTime * step / 3, 1)}s</text>`;
     for (const line of lines) {
       const path = line.data.map((row, index) => `${index && Number.isFinite(row.start) && row.start <= line.data[index - 1].seconds + 0.000001 ? 'L' : 'M'} ${x(row.seconds)},${y(row.mbps)}`).join(' ');
       svg += `<path d="${path}" stroke="${colors[line.index]}" stroke-width="2" fill="none" ${line.direction === 'download' ? 'stroke-dasharray="6 4"' : ''}/>`;
-      for (const row of line.data) svg += `<circle cx="${x(row.seconds)}" cy="${y(row.mbps)}" r="3" fill="${colors[line.index]}"><title>${line.index ? 'Selected' : 'Baseline'} ${line.direction}: ${num(row.mbps)} Mbps at ${num(row.seconds)}s</title></circle>`;
+      for (const row of line.data) svg += `<circle cx="${x(row.seconds)}" cy="${y(row.mbps)}" r="3" fill="${colors[line.index]}"><title>${line.index ? 'Selected' : 'Baseline'} ${line.direction}: ${formatMbps(row.mbps,2,scale)} at ${num(row.seconds)}s</title></circle>`;
     }
     chart.innerHTML = svg;
   }
@@ -268,7 +275,7 @@ export function createWorkflows(context) {
       if (signature !== JSON.stringify(reportOptions())) return;
       reportPreview = result; reportSignature = signature;
       $('report-status').textContent = `Preview ready. ${result.redacted ? 'Sensitive context redacted.' : 'Captured user and endpoint context included.'} ${result.include_raw ? 'Raw evidence included.' : 'Raw evidence excluded.'}`;
-      $('report-preview').innerHTML = `<h3 class="fs-5">${esc(result.title)}</h3><p class="form-text">Generated ${esc(date(result.generated_at))} · FlowBench ${esc(result.version)}</p>${(result.runs || []).map((run) => `<article class="workflow-annotation"><h4 class="fs-6">${esc(run.label)}</h4><p>${esc(date(run.created_at))}</p><div class="table-responsive"><table class="table"><tbody>${Object.entries(run.metrics || {}).map(([key, value]) => `<tr><th>${esc(key.replaceAll('_', ' '))}</th><td>${num(value)}</td></tr>`).join('')}</tbody></table></div></article>`).join('')}<ul>${(result.limitations || []).map((text) => `<li>${esc(text)}</li>`).join('')}</ul><details><summary>Complete report content preview</summary><pre class="peer-output mt-3" tabindex="0">${esc(JSON.stringify(result, null, 2))}</pre></details>`;
+      $('report-preview').innerHTML = `<h3 class="fs-5">${esc(result.title)}</h3><p class="form-text">Generated ${esc(date(result.generated_at))} · FlowBench ${esc(result.version)}</p>${(result.runs || []).map((run, index) => `<article class="workflow-annotation"><h4 class="fs-6"><span class="comparison-color-swatch" style="background:${runColor(run)}"></span>${index + 1}. ${esc(run.label)}</h4><p>${esc(date(run.created_at))}</p><div class="table-responsive"><table class="table"><tbody>${Object.entries(run.metrics || {}).map(([key, value]) => `<tr><th>${esc(metricLabel(key))}</th><td>${metricValue(key,value)}</td></tr>`).join('')}</tbody></table></div></article>`).join('')}<ul>${(result.limitations || []).map((text) => `<li>${esc(text)}</li>`).join('')}</ul><details><summary>Complete report content preview</summary><pre class="peer-output mt-3" tabindex="0">${esc(JSON.stringify(result, null, 2))}</pre></details>`;
     } catch (error) { reportPreview = null; $('report-status').textContent = error.message; message(error.message); }
     finally { reportPending = false; controls(); }
   }
@@ -315,9 +322,9 @@ export function createWorkflows(context) {
     flentRun = run;
     const native = run.flent || {}, summaries = native.summaries || [];
     $('flent-status').textContent = `Flent ${native.workload || 'RRUL'} · ${native.status || run.status}${run.error ? ' · ' + run.error : ''}`;
-    $('flent-summaries').innerHTML = `<table class="table"><thead><tr><th>Native series</th><th>Unit</th><th>Samples</th><th>Missing</th><th>Mean</th><th>Min / max</th></tr></thead><tbody>${summaries.map((row) => `<tr><td>${esc(row.name)}</td><td>${esc(row.unit)}</td><td>${num(row.count, 0)}</td><td>${num(row.missing, 0)}</td><td>${num(row.mean)}</td><td>${num(row.min)} / ${num(row.max)}</td></tr>`).join('') || '<tr><td colspan="6">Native result samples are not yet available.</td></tr>'}</tbody></table>`;
+    $('flent-summaries').innerHTML = `<table class="table"><thead><tr><th>Native series</th><th>Unit</th><th>Samples</th><th>Missing</th><th>Mean</th><th>Min / max</th></tr></thead><tbody>${summaries.map((row) => `<tr><td>${esc(row.name)}</td><td>${row.unit === 'Mbits/s' ? 'SI bitrate' : esc(row.unit)}</td><td>${num(row.count, 0)}</td><td>${num(row.missing, 0)}</td><td>${row.unit === 'Mbits/s' ? formatMbps(row.mean) : num(row.mean)}</td><td>${row.unit === 'Mbits/s' ? formatMbps(row.min) : num(row.min)} / ${row.unit === 'Mbits/s' ? formatMbps(row.max) : num(row.max)}</td></tr>`).join('') || '<tr><td colspan="6">Native result samples are not yet available.</td></tr>'}</tbody></table>`;
     const rows = (native.series || []).map((row, index) => ({...row, id: String(index)}));
-    fill($('flent-series'), rows, 'Choose native series', (row) => `${row.name} (${row.unit || 'native units'})`);
+    fill($('flent-series'), rows, 'Choose native series', (row) => `${row.name} (${row.unit === 'Mbits/s' ? 'SI bitrate' : row.unit || 'native units'})`);
     if (!$('flent-series').value && rows.length) $('flent-series').value = '0';
     $('flent-output').textContent = JSON.stringify(native, null, 2);
     drawFlent();
@@ -329,17 +336,19 @@ export function createWorkflows(context) {
     const width = Math.max(230, chart.getBoundingClientRect().width || 760);
     chart.setAttribute('viewBox', `0 0 ${width} 240`);
     if (!measured.length) { chart.innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab6bf" font-size="12">No measured native samples</text>`; return; }
-    const maxTime = Math.max(1, ...measured.map((row) => row.seconds)), maxValue = Math.max(1, ...measured.map((row) => row.value)) * 1.08;
+    const maxTime = measured.reduce((max, row) => Math.max(max, row.seconds), 1), maxValue = measured.reduce((max, row) => Math.max(max, row.value), 0) * 1.08 || 1e-6;
+    const rate = record.unit === 'Mbits/s', scale = rate ? rateScale(measured.map((row) => row.value * 1e6)) : null;
     const x = (seconds) => 55 + seconds / maxTime * (width - 70), y = (value) => 200 - value / maxValue * 175;
     let svg = '', path = '', previous = false;
-    for (let step = 0; step <= 3; step++) svg += `<line x1="55" y1="${y(maxValue * step / 3)}" x2="${width - 15}" y2="${y(maxValue * step / 3)}" stroke="#41494d"/><text x="47" y="${y(maxValue * step / 3) + 4}" text-anchor="end" fill="#aab6bf" font-size="12">${num(maxValue * step / 3, 0)}</text><text x="${x(maxTime * step / 3)}" y="222" text-anchor="${step ? step === 3 ? 'end' : 'middle' : 'start'}" fill="#aab6bf" font-size="12">${num(maxTime * step / 3, 1)}s</text>`;
+    for (let step = 0; step <= 3; step++) svg += `<line x1="55" y1="${y(maxValue * step / 3)}" x2="${width - 15}" y2="${y(maxValue * step / 3)}" stroke="#41494d"/><text x="47" y="${y(maxValue * step / 3) + 4}" text-anchor="end" fill="#aab6bf" font-size="12">${num(maxValue * step / 3 * (rate ? 1e6 / scale.divisor : 1), 1)}</text><text x="${x(maxTime * step / 3)}" y="222" text-anchor="${step ? step === 3 ? 'end' : 'middle' : 'start'}" fill="#aab6bf" font-size="12">${num(maxTime * step / 3, 1)}s</text>`;
     for (const row of points) {
       if (!Number.isFinite(row.seconds) || !Number.isFinite(row.value)) { previous = false; continue; }
       path += `${previous ? 'L' : 'M'} ${x(row.seconds)},${y(row.value)} `; previous = true;
-      svg += `<circle cx="${x(row.seconds)}" cy="${y(row.value)}" r="3" fill="#6db5ff"><title>${num(row.value)} ${esc(record.unit)} at ${num(row.seconds)}s</title></circle>`;
+      svg += `<circle cx="${x(row.seconds)}" cy="${y(row.value)}" r="3" fill="${runColor(flentRun)}"><title>${rate ? formatMbps(row.value,2,scale) : num(row.value) + ' ' + esc(record.unit)} at ${num(row.seconds)}s</title></circle>`;
     }
-    chart.setAttribute('aria-label', `${record.name} in ${record.unit || 'native units'} over elapsed seconds`);
-    chart.innerHTML = svg + `<path d="${path}" stroke="#6db5ff" stroke-width="2" fill="none"/>`;
+    chart.setAttribute('aria-label', `${record.name} in ${scale?.unit || record.unit || 'native units'} over elapsed seconds`);
+    $('flent-chart-unit').textContent = scale?.unit || record.unit || 'native units';
+    chart.innerHTML = svg + `<path d="${path}" stroke="${runColor(flentRun)}" stroke-width="2" fill="none"/>`;
   }
   async function init() {
     await loadProjects();
@@ -383,7 +392,8 @@ export function createWorkflows(context) {
     $('timeline-cancel')?.addEventListener('click', resetAnnotation);
     $('report-preview-button')?.addEventListener('click', previewReport);
     $('report-download')?.addEventListener('click', downloadReport);
-    for (const id of ['report-redact', 'report-raw', 'baseline', 'candidate', 'third']) $(id)?.addEventListener('change', controls);
+    for (const id of ['report-redact', 'report-raw']) $(id)?.addEventListener('change', controls);
+    $('comparison-selections')?.addEventListener('change', controls);
     $('timeline-form')?.addEventListener('submit', async (event) => {
       event.preventDefault(); $('timeline-error').textContent = '';
       try { await busy('timeline-save', async () => {

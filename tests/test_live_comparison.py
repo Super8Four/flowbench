@@ -8,6 +8,25 @@ from test_imports import saved_run
 
 
 class LiveComparisonTests(unittest.TestCase):
+    def test_closed_process_cannot_write_after_new_writer_takes_archive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = create_app({'TESTING': True, 'RUNS_DIRECTORY': directory, 'IPERF_PATH': 'missing-iperf'})
+            previous = app.extensions['iperf_runs']
+            source = saved_run()
+            previous.save(source)
+            previous.shutdown()
+            current = create_app({'TESTING': True, 'RUNS_DIRECTORY': directory, 'IPERF_PATH': 'missing-iperf'})
+            writer = current.extensions['iperf_runs']
+            try:
+                old_client = app.test_client()
+                self.assertEqual(old_client.patch('/api/runs/' + source['id'], json={'notes': 'stale edit'}).status_code, 503)
+                self.assertEqual(old_client.post('/api/projects', json={'name': 'stale project'}).status_code, 503)
+                self.assertEqual(writer.read(source['id'])['settings']['notes'], source['settings']['notes'])
+                self.assertEqual(current.test_client().post('/api/projects', json={'name': 'Current writer'}).status_code, 201)
+                self.assertFalse(old_client.get('/api/ready').get_json()['ready'])
+            finally:
+                writer.shutdown()
+
     def test_text_parallel_streams_keep_common_interval_boundaries(self):
         record = saved_run()
         record['output_format'] = 'text'

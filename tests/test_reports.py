@@ -127,14 +127,17 @@ class ReportTests(unittest.TestCase):
 
     def test_chart_does_not_bridge_missing_intervals(self):
         from PIL import Image
+        from PIL import ImageColor
         model = prepare_report(self.manager, {"ids": [self.before["id"]]})
         image = Image.open(BytesIO(_chart(model["runs"])))
         # Seconds 2 lies in the uncaptured span between [0,1] and [3,4].
         x = int(130 + 2 / 4 * 1305)
         for y in range(80, 460):
-            self.assertNotEqual(image.getpixel((x, y)), (24, 59, 80))
+            self.assertNotEqual(image.getpixel((x, y)), ImageColor.getrgb(model["runs"][0]["color"]))
 
     def test_sqlite_restart_and_json_xml_roundtrip_preserve_report_evidence(self):
+        self.before["settings"]["color"] = "#ABCDEF"
+        self.manager.save(self.before)
         self.manager.shutdown()
         self.manager = RunManager(self.temp.name, "missing-iperf")
         original = self.manager.export(self.before["id"])
@@ -150,6 +153,7 @@ class ReportTests(unittest.TestCase):
                     self.assertEqual(row["route"]["hops"], original["route"]["hops"])
                     self.assertEqual(row["annotations"], original["annotations"])
                     self.assertTrue(row["provenance"]["imported"])
+                    self.assertEqual(row["color"], "#abcdef")
                 finally:
                     restored.shutdown()
 
@@ -188,6 +192,40 @@ class ReportTests(unittest.TestCase):
             fingerprints = list(pool.map(generate, range(4)))
         self.assertEqual(len(set(fingerprints)), 1)
         self.assertEqual(self.manager.export(self.before["id"]), before)
+
+    def test_ten_runs_preserve_colors_canonical_rates_and_shared_window(self):
+        ids = []
+        for index in range(10):
+            source = copy.deepcopy(self.before)
+            source["id"] = format(index + 1, "032x")
+            source["settings"].update(duration=30 if index == 0 else 10, color="#123456" if index == 0 else "#b52b3d")
+            source["finished_at"] = "2026-01-01T10:00:30+00:00" if index == 0 else "2026-01-01T10:00:10+00:00"
+            source["summary"]["sum_received"]["bits_per_second"] = (0 if index == 0 else 3000) * 1e6
+            source["intervals"] = [{"sum": {"start": seconds, "end": seconds + 1, "bits_per_second": (0 if index == 0 else 3000) * 1e6}} for seconds in range(source["settings"]["duration"])]
+            self.manager.save(source)
+            ids.append(source["id"])
+        model = prepare_report(self.manager, {"ids": ids})
+        self.assertEqual(len(model["runs"]), 10)
+        self.assertEqual(len(model["comparisons"]), 9)
+        self.assertEqual(model["runs"][0]["color"], "#123456")
+        self.assertEqual(model["runs"][1]["metrics"]["upload_mbps"], 3000)
+        self.assertEqual(model["runs"][1]["series"][-1]["seconds"], 10)
+        self.assertEqual(model["runs"][0]["series"][-1]["seconds"], 30)
+        self.assertEqual(model["common_window"]["seconds"], 10)
+        self.assertEqual(model["display"]["rate_axis"]["unit"], "Gbps")
+        word = Document(BytesIO(render_docx(model)))
+        text = " ".join(cell.text for table in word.tables for row in table.rows for cell in row.cells)
+        self.assertIn("3 Gbps", text)
+        self.assertIn("0 bps", text)
+        self.assertIn("#123456", text)
+
+    def test_resource_limits_depend_on_data_not_selection_count(self):
+        with patch("app.reports.CHART_POINTS", 1):
+            with self.assertRaisesRegex(ValueError, "measured-point resource budget"):
+                prepare_report(self.manager, {"ids": [self.before["id"]]})
+        with patch("app.reports.MODEL_BYTES", 1):
+            with self.assertRaisesRegex(ValueError, "normalized-data resource budget"):
+                prepare_report(self.manager, {"ids": [self.before["id"]]})
 
 
 if __name__ == "__main__":

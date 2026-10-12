@@ -36,6 +36,12 @@ The app validates the whole plan and native engine support before writing a job 
 
 ## Live comparison and annotations
 
+Saved comparisons accept additional completed individual tests through **Add test**, with a saved color picker for each run. The original three-run cap is removed. Legends label each trace and use line patterns as well as colors; colors can repeat. Large selections initially show a subset of traces that can be enabled in the legend, while retaining all selected rows and evidence. API responses and prepared imports have a 32 MiB data budget; uploads remain limited to 20 MiB files in 32 MiB requests. Resource errors ask for smaller groups rather than discarding data silently.
+
+Different durations share an elapsed-time axis. A ten-second trace ends at its last captured interval when displayed beside a thirty-second trace. Whole-run summary values still describe each complete test. The common window ends at the shortest measured series; a separate duration-weighted window mean is available only from exact interval bins with complete coverage. Missing, overlapping, end-only or cut intervals leave that mean unavailable.
+
+Rates display decimal SI units (`bps`, `kbps`, `Mbps`, `Gbps`, `Tbps`), with a common axis unit across compared curves. These are bits per second, distinct from byte counts. Native `bits_per_second` and derived `*_mbps` measurements remain numeric and unchanged in SQLite, JSON and XML; the exports include their unit contract. Color is optional presentation metadata, separate from test settings used for comparability.
+
 Choose a completed measured individual baseline to overlay against an active individual test. Elapsed seconds begin at each test's traffic start; wall-clock timestamps are not aligned. Only measured intervals appear, and missing spans remain gaps. The overlay flags mismatched settings and keeps ICMP timing separate from throughput. Selecting a Both or matrix parent does not create a combined baseline; select its child.
 
 Run labels, notes and the site/device/circuit/ticket tags are editable. Timeline notes have a timezone-aware timestamp and an optional elapsed second. They are user observations, separate from original native measurement output. Editing a parent job's project or tags also updates its children transactionally; timeline notes apply to the selected record. Metadata edits publish only after storage commits.

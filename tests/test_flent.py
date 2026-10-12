@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from app.flent import capabilities, command, normalize, read_result, settings, validate_flent
+from app.flent import capabilities, command, normalize, read_result, settings, unprivileged_icmp, validate_flent
 from app.imports import import_runs, parse_document
 from app.exports import xml_export
 from app.runner import RunManager
@@ -82,6 +82,34 @@ class FlentEvidenceTests(unittest.TestCase):
             self.assertFalse(capabilities()["available"])
         with patch("app.flent.sys.platform", "linux"), patch("app.flent.shutil.which", return_value=None):
             self.assertFalse(capabilities()["available"])
+
+    def test_detected_cli_versions_are_harmless_and_explicit(self):
+        replies = [Mock(returncode=0, stdout="fping Version 5\n", stderr=""),
+                   Mock(returncode=0, stdout="Flent 2.3.0\n", stderr=""),
+                   Mock(returncode=0, stdout="Netperf version 2.7.1\n", stderr="")]
+        with patch("app.flent.sys.platform", "linux"), patch("app.flent.unprivileged_icmp", return_value={"available": True}), patch("app.flent.shutil.which", side_effect=lambda name: "/tools/" + name), patch("app.flent.subprocess.run", side_effect=replies) as probe:
+            detected = capabilities()
+        self.assertTrue(detected["available"])
+        self.assertEqual(detected["version"], "Flent 2.3.0")
+        self.assertEqual(detected["netperf_version"], "Netperf version 2.7.1")
+        self.assertEqual([call.args[0] for call in probe.call_args_list], [["/tools/fping", "-v"], ["/tools/flent", "--version"], ["/tools/netperf", "-V"]])
+
+    def test_blocked_unprivileged_socket_reports_unavailable_without_network(self):
+        with patch("app.flent.socket.socket", side_effect=PermissionError("Fixture kernel permission denied")) as create_socket:
+            result = unprivileged_icmp()
+        self.assertFalse(result["available"])
+        self.assertIn("kernel", result["error"])
+        create_socket.assert_called_once()
+        with patch("app.flent.sys.platform", "linux"), patch("app.flent.unprivileged_icmp", return_value=result), patch("app.flent.shutil.which", return_value="tool"), patch("app.flent.subprocess.run") as probe:
+            detected = capabilities()
+        self.assertFalse(detected["available"])
+        probe.assert_not_called()
+
+    def test_ping_exec_permission_error_reports_unavailable(self):
+        with patch("app.flent.sys.platform", "linux"), patch("app.flent.unprivileged_icmp", return_value={"available": True}), patch("app.flent.shutil.which", return_value="tool"), patch("app.flent.subprocess.run", side_effect=PermissionError("Fixture ping EPERM")):
+            result = capabilities()
+        self.assertFalse(result["available"])
+        self.assertIn("EPERM", result["error"])
 
 
 class FlentRunnerTests(unittest.TestCase):

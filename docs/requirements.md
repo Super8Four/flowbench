@@ -8,7 +8,7 @@ FlowBench's current scope is a portable iPerf3 measurement/evidence workspace wi
 | --- | --- | --- |
 | Client configuration and measurement | TCP/UDP/Both, explicit directions, default bidirectional, bounded validation, logs/local and available remote reports | Peer compatibility, real network conditions and target performance need evaluation |
 | Persistence and portability | SQLite transactions, unchanged evidence formats, additive imports, presets/notes, automatic legacy-file migration, legacy snapshot export | Backups, hardware durability and operator restore validation remain required |
-| History and comparison | Peaks/averages/runtime, search, notes, two/three-test overlays, settings warnings, JSON/XML evidence | Broader chart interaction and accessibility acceptance are not established by this release |
+| History and comparison | Add completed tests with saved colors, elapsed overlays across mixed durations, whole-run/common-window context, automatic SI display, notes and JSON/XML interchange | Practical data/rendering resource budgets apply; no physical unlimited-capacity claim or full accessibility certification |
 | Incoming listener | Managed independent process, raw client captures, one incoming at a time, restart/stop/error and overlap metadata | No unlimited concurrency or guaranteed measurement isolation |
 | Route evidence | Post-test bounded tracepath/tracert with raw output, hops and probe RTTs | Not throughput, iPerf RTT or authenticated topology discovery |
 | UI | Supplied FlowBench logo, tagline, gunmetal/navy/crimson, flat measured cards, responsive layouts, visible focus/errors | Targeted browser QA is not a full WCAG certification or full audit closure |

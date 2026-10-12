@@ -147,8 +147,9 @@ class ProjectStore:
                 except ValueError as exc:
                     excluded.append({"id": record["id"], "reason": str(exc)})
                     continue
-                directions = {row["direction"] for row in report["metrics"] if row["direction"] != "unchanged"}
-                report["result"] = ("mixed" if len(directions) > 1 else next(iter(directions), "unchanged"))
+                directions = {row["direction"] for row in report["metrics"] if row["direction"] not in {"unchanged", "volume change"}}
+                report["result"] = ("mixed" if len(directions) > 1 else next(iter(directions),
+                                     "volume change" if any(row["direction"] == "volume change" for row in report["metrics"]) else "unchanged"))
                 report["comparable"] = not report["settings_differences"]
                 report["caveat"] = ("Settings differ; this measured change does not establish an improvement or regression."
                                     if not report["comparable"] else report["interpretation"])
@@ -204,20 +205,22 @@ class ProjectStore:
             except (ValueError, TypeError, KeyError, AttributeError):
                 raise ValueError("Exported project dates must include a timezone.") from None
         sources = data.get("runs")
-        if not isinstance(sources, list) or len(sources) > 500:
-            raise ValueError("A project import must contain at most 500 top-level runs.")
+        if not isinstance(sources, list):
+            raise ValueError("A project import must contain an array of runs within the import size budget.")
         digest = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
-        project_id, prepared, remap = uuid4().hex, [], {}
+        project_id, prepared, remap, prepared_bytes = uuid4().hex, [], {}, 0
         for source in sources:
-            for record, events in prepare_source(source, filename):
+            rows = prepare_source(source, filename)
+            prepared_bytes += len(json.dumps(rows, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+            if prepared_bytes > 32 * 1024 * 1024:
+                raise ValueError("Prepared project exceeds the 32 MiB archive import budget. Export smaller groups separately.")
+            for record, events in rows:
                 old_id = identifier(record["imported"].get("source_id"), "Source run ID")
                 if old_id in remap or record["settings"].get("project_id") != source_id:
                     raise ValueError("Project runs must have unique IDs and belong to the exported project.")
                 remap[old_id] = record["id"]
                 record["settings"]["project_id"] = project_id
                 prepared.append((record, events))
-        if len(prepared) > 2000:
-            raise ValueError("A project import must contain at most 2000 runs including job children.")
         baseline_id = fields["baseline_id"]
         if baseline_id is not None and baseline_id not in remap:
             raise ValueError("The exported baseline is missing from this project.")

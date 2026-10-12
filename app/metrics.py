@@ -187,11 +187,15 @@ def comparison(before, after):
         delta = current - baseline
         # A zero baseline has no defined percentage change.
         percent = delta / baseline * 100 if baseline else None
-        better = delta > 0 if key.endswith(("mbps", "_packets")) and not key.endswith("lost_packets") else delta < 0
+        volume = key.endswith("_packets") and not key.endswith("lost_packets")
+        better = delta > 0 if key.endswith("mbps") else delta < 0
         rows.append({"metric": key, "before": baseline, "after": current, "delta": delta,
-                     "percent_change": percent, "direction": "unchanged" if delta == 0 else "improved" if better else "worse"})
+                     "percent_change": percent, "direction": "unchanged" if delta == 0 else "volume change" if volume else "improved" if better else "worse"})
     if not rows:
         raise ValueError("These tests have no comparable metrics in common.")
+    from .comparisons import common_window
+    window = common_window([before, after])
     return {"schema_version": 1, "before_id": before["id"], "after_id": after["id"],
             "settings_differences": differences, "metrics": rows,
+            "aggregate_scope": "whole_run", "common_window_seconds": window["seconds"], "common_window": window,
             "interpretation": "A test comparison records a measured change. Repeat tests under matching conditions to establish an improvement."}

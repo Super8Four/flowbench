@@ -1,15 +1,23 @@
 import {createWorkflows} from './workflows.js';
+import {rateScale, formatRate, formatMbps, runColor, palette} from './units.js';
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
 let engineReady = false, capabilities = {}, selectionVersion = 0, lastHistory = 0, comparisonVersion = 0;
 let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null, listenerState = null;
+let comparisonController = null, comparisonRowsInitialized = false, comparisonRowSequence = 0, comparisonRenderVersion = 0;
+let comparisonPlotVersion = 0;
+let comparisonTableVersion = 0;
+const hiddenComparisonRuns = new Set();
+const knownComparisonRuns = new Set();
 const testPage = Boolean($('test-form'));
 const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
 const date = (value) => value ? new Date(value).toLocaleString() : '—';
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const title = (run) => run.kind === 'flent-run' || run.settings.flent_workload ? `${run.settings.label || run.settings.target} · Flent RRUL` : `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'matrix-job' ? 'Matrix batch' : run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
+const metricLabel = (key) => key.replace(/_mbps$/, ' bitrate').replaceAll('_', ' ');
+const metricValue = (key, value) => key.endsWith('_mbps') ? formatMbps(value) : key.endsWith('bits_per_second') ? formatRate(value) : number(value);
 const workflows = createWorkflows({api, message, escape, number, date, title, smoothPath, download,
   settings: settingsData, state: () => ({runs, selected, selectedId, activeId, engineReady, capabilities}),
   reportIds: () => $('comparison') ? comparisonIds() : selected && selected.status === 'completed' && !['protocol-job', 'matrix-job'].includes(selected.kind) ? [selected.id] : [],
@@ -18,16 +26,27 @@ const workflows = createWorkflows({api, message, escape, number, date, title, sm
 
 async function api(path, options = {}) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
-  let response;
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  options.signal?.addEventListener('abort', abort, {once: true});
   try {
-    response = await fetch(path, {cache: 'no-store', ...options, signal: controller.signal,
+    const response = await fetch(path, {cache: 'no-store', ...options, signal: controller.signal,
       headers: {'Content-Type': 'application/json', ...options.headers}});
+    let data;
+    try { data = await response.json(); } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      throw new Error(`Server returned ${response.status} without a JSON response. The selected evidence may exceed available request or memory limits; reduce the selection and retry.`);
+    }
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
   } catch (error) {
     throw new Error(error.name === 'AbortError' ? 'Request timed out. Refresh status before retrying; an accepted test may still be running.' : error.message);
-  } finally { clearTimeout(timer); }
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
-  return data;
+  } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
+}
+function rateCard(id, value, unitId) {
+  const scale = rateScale([Number.isFinite(value) ? value * 1e6 : NaN]);
+  $(id).textContent = Number.isFinite(value) ? number(value * 1e6 / scale.divisor) : '—';
+  $(unitId).textContent = scale.unit;
 }
 function message(text, type = 'danger') {
   $('message').className = `alert alert-${type}`;
@@ -233,20 +252,24 @@ function chart(localPoints, remotePoints = []) {
   const lines = [];
   for (const [source, input] of [['local', localPoints], ['remote', remotePoints]]) {
     if (perspective !== 'compare' && source !== perspective) continue;
-    for (const [direction, color] of [['upload', '#1683ff'], ['download', '#15d3a6']]) {
+    for (const direction of ['upload', 'download']) {
+      const color = runColor(selected || {});
       const valid = (input || []).filter((p) => p.direction === direction && Number.isFinite(p.seconds) && Number.isFinite(p.mbps));
       const data = Array.from(new Map(valid.map((p) => [p.seconds, p])).values()).sort((a, b) => a.seconds - b.seconds);
       if (data.length) lines.push({source, direction, color, data});
     }
   }
   const points = lines.flatMap((line) => line.data);
+  const scale = rateScale(points.map((point) => point.mbps * 1e6));
+  $('throughput-unit').textContent = scale.unit;
+  $('throughput-chart').setAttribute('aria-label', `Throughput by elapsed seconds in ${scale.unit}`);
   $('peer-legend').classList.toggle('d-none', perspective !== 'compare');
   if (!points.length) {
     $('throughput-chart').innerHTML = `<text x="${width / 2}" y="110" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'No remote interval measurements' : 'Interval measurements'}</text><text x="${width / 2}" y="130" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'are available for this session' : 'will appear here'}</text>`;
     return;
   }
   const maxTime = points.reduce((max, p) => Math.max(max, p.seconds), 1);
-  const rawMax = points.reduce((max, p) => Math.max(max, p.mbps), 1) * 1.08;
+  const rawMax = points.reduce((max, p) => Math.max(max, p.mbps), 0) * 1.08 || 1e-6;
   const step = 10 ** Math.floor(Math.log10(rawMax)) / 2;
   const maxRate = Math.ceil(rawMax / step) * step;
   const x = (t) => 57 + t / maxTime * (width - 72), y = (n) => 202 - n / maxRate * 177;
@@ -255,16 +278,17 @@ function chart(localPoints, remotePoints = []) {
   svg += '</defs>';
   for (let i = 0; i <= ticks; i++) {
     const value = maxRate * i / ticks, height = y(value);
-    svg += `<line x1="57" y1="${height}" x2="${right}" y2="${height}" stroke="#353c41"/><text x="47" y="${height + 3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(value, maxRate < 10 ? 1 : 0)}</text>`;
+    svg += `<line x1="57" y1="${height}" x2="${right}" y2="${height}" stroke="#353c41"/><text x="47" y="${height + 3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(value*1e6/scale.divisor, 1)}</text>`;
   }
   for (let i = 0; i <= ticks; i++) {
     const seconds = maxTime * i / ticks;
     svg += `<text x="${x(seconds)}" y="222" text-anchor="${i === 0 ? 'start' : i === ticks ? 'end' : 'middle'}" fill="#aab3bb" font-size="12">${number(seconds, 1)}s</text>`;
   }
   for (const line of lines) {
-    const path = smoothPath(line.data, x, y), dashed = line.source === 'remote' && perspective === 'compare';
-    svg += `<path d="${path}" stroke="${line.color}" stroke-width="${dashed ? '1.6' : '1.9'}" ${dashed ? 'stroke-dasharray="6 4"' : ''} fill="none"/>`;
-    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="${line.data.length === 1 ? 3 : 5}" fill="${line.color}" fill-opacity="${line.data.length === 1 ? 1 : 0}"><title>${line.source} ${line.direction}: ${number(p.mbps)} Mbps at ${number(p.seconds, 2)}s</title></circle>`;
+    const path = smoothPath(line.data, x, y), remote = line.source === 'remote' && perspective === 'compare';
+    const pattern = remote ? line.direction === 'download' ? '8 3 2 3' : '2 4' : line.direction === 'download' ? '7 5' : '';
+    svg += `<path d="${path}" stroke="${line.color}" stroke-width="${remote ? '1.6' : '1.9'}" ${pattern ? `stroke-dasharray="${pattern}"` : ''} fill="none"/>`;
+    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="${line.data.length === 1 ? 3 : 5}" fill="${line.color}" fill-opacity="${line.data.length === 1 ? 1 : 0}"><title>${line.source} ${line.direction}: ${formatMbps(p.mbps,2,scale)} at ${number(p.seconds, 2)}s</title></circle>`;
   }
   $('throughput-chart').innerHTML = svg;
 }
@@ -286,13 +310,13 @@ function renderPeer() {
   const peer = selected?.peer;
   $('peer-output').textContent = peer?.raw_output || peer?.note || 'Remote output will appear after the server supplies it.';
   const perspective = $('chart-perspective').value;
-  $('chart-source-note').textContent = perspective === 'local' ? 'Local iPerf measurements · blue: upload · green: download. Hover a measured point for its value.' : (peer?.note || 'Choose a session to view the remote server output.');
+  $('chart-source-note').textContent = perspective === 'local' ? 'Local iPerf measurements · solid: upload · dashed: download. Saved run color identifies this session; measured point tooltips include SI units.' : (peer?.note || 'Choose a session to view the remote server output.');
   const visible = perspective !== 'local';
   $('peer-summary').classList.toggle('d-none', !visible);
   if (visible) {
     const left = selected?.metrics || {}, right = peer?.metrics || {};
     const keys = Object.keys({...left, ...right}).sort();
-    $('peer-summary').innerHTML = keys.length ? `<div class="table-responsive"><table class="table"><thead><tr><th>Metric · client perspective</th><th>Local report</th><th>Remote report</th></tr></thead><tbody>${keys.map((key) => `<tr><td>${escape(key.replaceAll('_', ' '))}</td><td>${number(left[key])}</td><td>${number(right[key])}</td></tr>`).join('')}</tbody></table></div><p class="small text-body-secondary">${escape(peer?.note || '')}</p>` : `<p class="small text-body-secondary">${escape(peer?.note || 'No results yet.')}</p>`;
+    $('peer-summary').innerHTML = keys.length ? `<div class="table-responsive"><table class="table"><thead><tr><th>Metric · client perspective</th><th>Local report</th><th>Remote report</th></tr></thead><tbody>${keys.map((key) => `<tr><td>${escape(metricLabel(key))}</td><td>${metricValue(key,left[key])}</td><td>${metricValue(key,right[key])}</td></tr>`).join('')}</tbody></table></div><p class="small text-body-secondary">${escape(peer?.note || '')}</p>` : `<p class="small text-body-secondary">${escape(peer?.note || 'No results yet.')}</p>`;
   }
   chart(selected?.series || [], peer?.series || []);
 }
@@ -306,8 +330,8 @@ function renderSelected() {
   const metrics = selected.metrics || {};
   for (const direction of ['upload', 'download']) {
     const latest = (selected.series || []).filter((p) => p.direction === direction).at(-1);
-    $(direction + '-rate').textContent = number(metrics[direction + '_mbps'] ?? (!terminal.has(selected.status) ? latest?.mbps : undefined));
-    $(direction + '-peak').textContent = `Mbps · Peak ${number(selected.overview?.['max_' + direction + '_mbps'])} Mbps`;
+    rateCard(direction + '-rate', metrics[direction + '_mbps'] ?? (!terminal.has(selected.status) ? latest?.mbps : undefined), direction + '-unit');
+    $(direction + '-peak').textContent = `Peak ${formatMbps(selected.overview?.['max_' + direction + '_mbps'])}`;
   }
   $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.incoming && selected.finished_at ? `Incoming session captured · ${date(selected.finished_at)}. The listener has a separate lifetime.` : selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
   $('export-button').disabled = false;
@@ -316,7 +340,7 @@ function renderSelected() {
   if (selected.kind === 'protocol-job') {
     const tests = selected.protocol_runs || [];
     $('protocol-job-status').textContent = `Job: ${selected.status}. ${tests.filter((test) => test.status === 'completed').length} of 2 protocols completed.`;
-    $('protocol-job-results').innerHTML = `<table class="table"><thead><tr><th>Protocol / direction</th><th>Status</th><th>Upload Mbps</th><th>Download Mbps</th><th>Evidence</th></tr></thead><tbody>${tests.map((test) => `<tr><td>${escape(test.protocol.toUpperCase())} / ${escape(test.mode)}</td><td>${escape(test.status)}${test.error ? `<div class="form-text">${escape(test.error)}</div>` : ''}</td><td>${number(test.metrics.upload_mbps)}</td><td>${number(test.metrics.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(test.id)}">Open ${escape(test.protocol.toUpperCase())}</a></td></tr>`).join('')}</tbody></table>`;
+    $('protocol-job-results').innerHTML = `<table class="table"><thead><tr><th>Protocol / direction</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Evidence</th></tr></thead><tbody>${tests.map((test) => `<tr><td>${escape(test.protocol.toUpperCase())} / ${escape(test.mode)}</td><td>${escape(test.status)}${test.error ? `<div class="form-text">${escape(test.error)}</div>` : ''}</td><td>${formatMbps(test.metrics.upload_mbps)}</td><td>${formatMbps(test.metrics.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(test.id)}">Open ${escape(test.protocol.toUpperCase())}</a></td></tr>`).join('')}</tbody></table>`;
   }
   renderPeer();
   if (selected.kind === 'protocol-job') {
@@ -350,21 +374,21 @@ async function selectRun(id) {
   $('saved-notes').value = selected.settings.notes;
   workflows.edit(selected);
 }
-function historyTrend(overview) {
+function historyTrend(overview, run) {
   const points = overview?.trend || [];
   if (!points.length) return '<span class="history-muted">No interval data</span>';
-  const maxSeconds = Math.max(1, ...points.map((point) => point.seconds));
-  const maxRate = Math.max(1, ...points.map((point) => point.mbps));
+  const maxSeconds = points.reduce((max, point) => Math.max(max, point.seconds), 1);
+  const maxRate = points.reduce((max, point) => Math.max(max, point.mbps), 0) || 1e-6;
   const x = (point) => (4 + point.seconds / maxSeconds * 128).toFixed(2);
   const y = (point) => (32 - point.mbps / maxRate * 28).toFixed(2);
   const lines = ['upload', 'download'].map((direction) => {
     const values = points.filter((point) => point.direction === direction);
     if (!values.length) return '';
-    const color = direction === 'upload' ? '#1683ff' : '#15d3a6';
-    return `<polyline points="${values.map((point) => `${x(point)},${y(point)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/>` +
-      values.map((point) => `<circle cx="${x(point)}" cy="${y(point)}" r="1.3" fill="${color}"><title>${direction}: ${number(point.mbps)} Mbps at ${number(point.seconds)}s</title></circle>`).join('');
+    const color = runColor(run);
+    return `<polyline points="${values.map((point) => `${x(point)},${y(point)}`).join(' ')}" fill="none" stroke="${color}" ${direction === 'download' ? 'stroke-dasharray="4 3"' : ''} stroke-width="1.6" stroke-linejoin="round"/>` +
+      values.map((point) => `<circle cx="${x(point)}" cy="${y(point)}" r="1.3" fill="${color}"><title>${direction}: ${formatMbps(point.mbps)} at ${number(point.seconds)}s</title></circle>`).join('');
   }).join('');
-  return `<svg class="history-sparkline" viewBox="0 0 140 36" role="img" aria-label="Upload and download throughput trend, scaled to this test"><title>Upload (blue), download (green). Peak ${number(maxRate)} Mbps; ${number(maxSeconds)} seconds. Scale varies by test.</title>${lines}</svg>`;
+  return `<svg class="history-sparkline" viewBox="0 0 140 36" role="img" aria-label="Upload and download throughput trend, scaled to this test"><title>Solid upload, dashed download. Peak ${formatMbps(maxRate)}; ${number(maxSeconds)} seconds. Scale varies by test; color is saved with the run.</title>${lines}</svg>`;
 }
 function renderHistory() {
   if (!$('history-body')) return;
@@ -377,23 +401,64 @@ function renderHistory() {
     return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}</td>
       <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${run.kind === 'flent-run' ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}`}</div></td>
       <td><span class="badge text-bg-${color}">${escape(run.status)}</span></td>
-      <td class="history-speed"><strong>${number(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.upload_mbps)}</div></td>
-      <td class="history-speed"><strong>${number(stats.max_download_mbps)}</strong><div class="history-date">Avg ${number(run.metrics.download_mbps)}</div></td>
+      <td class="history-speed"><strong>${formatMbps(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${formatMbps(run.metrics.upload_mbps)}</div></td>
+      <td class="history-speed"><strong>${formatMbps(stats.max_download_mbps)}</strong><div class="history-date">Avg ${formatMbps(run.metrics.download_mbps)}</div></td>
       <td class="text-nowrap"><strong>${number(stats.runtime_seconds)}${Number.isFinite(stats.runtime_seconds) ? 's' : ''}</strong><div class="history-date">${config.role === 'server' && !run.test_parameters ? 'Measured time' : `Set ${number(config.duration)}s`}</div></td>
-      <td>${historyTrend(stats)}</td>
+      <td>${historyTrend(stats, run)}</td>
       <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-open="${run.id}">Open</button> <button class="btn btn-sm btn-outline-secondary" data-export="${run.id}">Export</button></td></tr>`;
   }).join('') || '<tr><td colspan="8" class="text-center py-5 history-muted">No matching saved sessions.</td></tr>';
   $('history-count').textContent = `${visible.length} of ${runs.length} saved sessions`;
 }
 function comparisonOptions() {
   if (!$('baseline')) return;
-  const complete = runs.filter((run) => run.status === 'completed' && Object.keys(run.metrics).length);
-  for (const id of ['baseline', 'candidate', 'third']) {
-    const chosen = $(id).value || localStorage.getItem(`iperf-${id}`) || '';
-    $(id).replaceChildren(new Option('Choose a completed test', ''));
-    for (const run of complete) $(id).add(new Option(`${title(run)} · ${date(run.created_at)}`, run.id));
-    if (complete.some((run) => run.id === chosen)) $(id).value = chosen;
+  if (!comparisonRowsInitialized) {
+    let saved;
+    try { saved = JSON.parse(localStorage.getItem('flowbench-comparison-ids')); } catch { saved = null; }
+    if (!Array.isArray(saved)) saved = ['baseline', 'candidate', 'third'].map((key) => localStorage.getItem(`iperf-${key}`)).filter(Boolean);
+    const ids = [...new Set(saved.filter((value) => typeof value === 'string'))];
+    $('baseline').dataset.chosen = ids[0] || '';
+    (ids.length > 1 ? ids.slice(1) : ['']).forEach((id) => addComparisonRow(id, false));
+    comparisonRowsInitialized = true;
   }
+  const complete = runs.filter((run) => run.status === 'completed' && !['protocol-job', 'matrix-job'].includes(run.kind) && Object.keys(run.metrics || {}).length);
+  const signature = JSON.stringify(complete.map((run) => [run.id, title(run), run.created_at]));
+  for (const select of document.querySelectorAll('.comparison-select')) {
+    const chosen = select.value || select.dataset.chosen || '';
+    if (select.dataset.options !== signature) {
+      select.replaceChildren(new Option('Choose a completed test', ''));
+      const fragment = document.createDocumentFragment();
+      complete.forEach((run) => fragment.append(new Option(`${title(run)} · ${date(run.created_at)}`, run.id)));
+      select.append(fragment); select.dataset.options = signature;
+    }
+    select.value = complete.some((run) => run.id === chosen) ? chosen : '';
+    delete select.dataset.chosen;
+  }
+}
+function addComparisonRow(chosen = '', focus = true) {
+  const id = `comparison-run-${++comparisonRowSequence}`, row = document.createElement('div');
+  row.className = 'comparison-selection'; row.dataset.comparisonRow = id;
+  const label = document.createElement('label'); label.htmlFor = id; label.className = 'form-label'; label.textContent = 'Additional test';
+  const select = document.createElement('select'); select.id = id; select.className = 'form-select comparison-select'; select.dataset.chosen = chosen;
+  const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn btn-outline-secondary'; remove.dataset.removeComparison = id; remove.textContent = 'Remove test';
+  row.append(label, select, remove); $('comparison-selections').append(row);
+  if (comparisonRowsInitialized) comparisonOptions();
+  if (focus) select.focus();
+}
+function comparisonSelectionChanged() {
+  comparisonVersion++; comparisonController?.abort();
+  comparisonData = null; comparisonRenderVersion++; comparisonTableVersion++; comparisonPlotVersion++;
+  $('comparison-result').textContent = 'Updating the selected evidence…';
+  $('comparison-legend').replaceChildren(); $('comparison-chart').innerHTML = '';
+  $('export-comparison').disabled = true; workflows.controls();
+  try { localStorage.setItem('flowbench-comparison-ids', JSON.stringify(comparisonIds())); } catch { message('This browser could not remember the comparison selection.', 'warning'); }
+}
+async function persistComparisonColor(id) {
+  const run = runs.find((row) => row.id === id);
+  if (!run || run.settings.color) return;
+  const used = new Set(comparisonIds().filter((value) => value !== id).map((value) => runs.find((row) => row.id === value)).filter(Boolean).map(runColor));
+  const current = runColor(run), color = used.has(current) ? palette.find((value) => !used.has(value)) || current : current;
+  await api(`/api/runs/${id}`, {method: 'PATCH', body: JSON.stringify({color})});
+  run.settings.color = color;
 }
 async function loadHistory() {
   const status = await api('/api/status');
@@ -408,63 +473,119 @@ async function loadHistory() {
   controls(); renderHistory(); comparisonOptions();
   workflows.history(runs);
 }
-function comparisonIds() { return ['baseline', 'candidate', 'third'].map((id) => $(id).value).filter(Boolean); }
+function comparisonIds() { return [...document.querySelectorAll('.comparison-select')].map((select) => select.value).filter(Boolean); }
 function comparisonPath() { return '/api/comparison?' + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
-function overlay() {
+async function overlay(renderLegend = true) {
+  const plotGeneration = ++comparisonPlotVersion;
   const width = chartWidth('comparison-chart'), right = width - 15, ticks = width < 600 ? 3 : 5;
-  const colors = ['#1683ff', '#15d3a6', '#ffc857'];
   const remote = $('comparison-perspective').value === 'remote';
   const records = comparisonData?.runs || [];
+  records.forEach((run, index) => { if (!knownComparisonRuns.has(run.id)) { if (index >= 8) hiddenComparisonRuns.add(run.id); knownComparisonRuns.add(run.id); } });
   const lines = [];
   records.forEach((run, index) => {
     for (const direction of ['upload', 'download']) {
       const input = (remote ? run.peer?.series : run.series) || [];
       const valid = input.filter((p) => p.direction === direction && Number.isFinite(p.seconds) && Number.isFinite(p.mbps));
       const data = [...new Map(valid.map((p) => [p.seconds, p])).values()].sort((a,b) => a.seconds-b.seconds);
-      if (data.length) lines.push({data, direction, color: colors[index], name: title(run)});
+      if (data.length) lines.push({data, direction, color: runColor(run), name: `${index + 1}. ${title(run)}`, id: run.id, index});
     }
   });
-  $('comparison-legend').innerHTML = records.map((run,i) => `<span style="color:${colors[i]}">● ${escape(title(run))} · ${escape(date(run.created_at))}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span>`).join('');
+  if (renderLegend) renderComparisonLegend(records, remote);
   const points = lines.flatMap((l) => l.data);
-  if (!points.length) { $('comparison-chart').innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab3bb">No interval data for this selection</text>`; return; }
-  const maxTime = Math.max(1, ...points.map((p) => p.seconds)), maxRate = Math.max(1, ...points.map((p) => p.mbps)) * 1.1;
+  if (!points.length) { $('comparison-unit').textContent = 'bps'; $('comparison-visible-count').textContent = 'No iPerf intervals are available for this selection. All selected evidence remains in tables and exports.'; $('comparison-chart').innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab3bb">No iPerf interval data for this selection</text>`; return; }
+  const maxTime = points.reduce((max, point) => Math.max(max, point.seconds), 1), maxRate = points.reduce((max, point) => Math.max(max, point.mbps), 0) * 1.1 || 1e-6;
+  const scale = rateScale(points.map((point) => point.mbps * 1e6));
+  $('comparison-unit').textContent = scale.unit;
+  $('comparison-chart').setAttribute('aria-label', `Selected throughput traces by elapsed seconds in ${scale.unit}`);
   const x = (t) => 57 + t / maxTime * (width - 72), y = (v) => 202 - v / maxRate * 177;
   let svg = '';
   for (let i=0;i<=ticks;i++) {
-    svg += `<line x1="57" y1="${y(i*maxRate/ticks)}" x2="${right}" y2="${y(i*maxRate/ticks)}" stroke="#353c41"/><text x="47" y="${y(i*maxRate/ticks)+3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(i*maxRate/ticks,1)}</text><text x="${x(i*maxTime/ticks)}" y="222" text-anchor="middle" fill="#aab3bb" font-size="12">${number(i*maxTime/ticks,1)}s</text>`;
+    svg += `<line x1="57" y1="${y(i*maxRate/ticks)}" x2="${right}" y2="${y(i*maxRate/ticks)}" stroke="#353c41"/><text x="47" y="${y(i*maxRate/ticks)+3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(i*maxRate/ticks*1e6/scale.divisor,1)}</text><text x="${x(i*maxTime/ticks)}" y="222" text-anchor="${i ? i === ticks ? 'end' : 'middle' : 'start'}" fill="#aab3bb" font-size="12">${number(i*maxTime/ticks,1)}s</text>`;
   }
   for (const line of lines) {
-    svg += `<path d="${smoothPath(line.data,x,y)}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.direction === 'download' ? 'stroke-dasharray="7 5"' : ''}/>`;
-    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="3" fill="${line.color}"><title>${escape(line.name)} · ${line.direction}: ${number(p.mbps)} Mbps at ${number(p.seconds)}s</title></circle>`;
+    if (hiddenComparisonRuns.has(line.id)) continue;
+    let path = '', markers = '', markerStride = Math.max(1, Math.ceil(line.data.length / 500));
+    for (let index = 0; index < line.data.length; index++) {
+      if (index && index % 2500 === 0) { await new Promise((resolve) => requestAnimationFrame(resolve)); if (plotGeneration !== comparisonPlotVersion) return; }
+      const point = line.data[index], previous = line.data[index - 1];
+      path += `${index && Number.isFinite(point.start) && point.start <= previous.seconds + 0.000001 ? 'L' : 'M'} ${x(point.seconds)},${y(point.mbps)} `;
+      if (index % markerStride === 0 || index === line.data.length - 1) markers += `<circle cx="${x(point.seconds)}" cy="${y(point.mbps)}" r="3" fill="${line.color}"><title>${escape(line.name)} · ${line.direction}: ${formatMbps(point.mbps, 2, scale)} at ${number(point.seconds)}s</title></circle>`;
+    }
+    svg += `<path d="${path}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.direction === 'download' ? 'stroke-dasharray="7 5"' : ''}><title>${escape(line.name)} ${line.direction} measured curve; point tooltips are sampled for display only.</title></path>` + markers;
+    const last = line.data.at(-1);
+    svg += `<text x="${x(last.seconds)}" y="${Math.max(15, y(last.mbps) + (line.direction === 'upload' ? -8 : 13))}" text-anchor="end" fill="${line.color}" font-size="11">${line.index + 1} ${line.direction === 'upload' ? 'U' : 'D'}<title>${escape(line.name)} ends at ${number(last.seconds)} elapsed seconds; ${line.direction}</title></text>`;
   }
+  if (plotGeneration !== comparisonPlotVersion) return;
   $('comparison-chart').innerHTML = svg;
+  const shown = records.filter((run) => !hiddenComparisonRuns.has(run.id)).length;
+  $('comparison-visible-count').textContent = `${shown} of ${records.length} traces shown. All selected runs remain in tables, exports and reports. Point markers are sampled on dense curves; measured paths and saved values are retained.`;
+}
+function renderComparisonLegend(records, remote) {
+  const generation = ++comparisonRenderVersion; $('comparison-legend').replaceChildren();
+  let index = 0;
+  const batch = () => {
+    if (generation !== comparisonRenderVersion) return;
+    const fragment = document.createDocumentFragment(), end = Math.min(index + 20, records.length);
+    for (; index < end; index++) {
+      const run = records[index], item = document.createElement('div'); item.className = 'comparison-legend-row';
+      item.innerHTML = `<label class="comparison-trace"><input type="checkbox" data-visible-run="${escape(run.id)}" ${hiddenComparisonRuns.has(run.id) ? '' : 'checked'}><span class="comparison-color-swatch" style="background:${runColor(run)}"></span><span>${index + 1}. ${escape(title(run))}${index === 0 ? ' · baseline' : ''}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span></label><label class="comparison-color-label">Saved color<input type="color" class="comparison-color" data-run-color="${escape(run.id)}" value="${runColor(run)}" aria-label="Saved trace color for ${escape(title(run))}"></label>`;
+      fragment.append(item);
+    }
+    $('comparison-legend').append(fragment);
+    if (index < records.length) requestAnimationFrame(batch);
+  };
+  batch();
 }
 function renderComparison() {
   overlay();
+  const generation = ++comparisonTableVersion;
   const remote = $('comparison-perspective').value === 'remote';
   const records = comparisonData.runs;
   const values = records.map((run) => remote ? run.peer?.metrics || {} : run.metrics || {});
   const keys = [...new Set(values.flatMap((v) => Object.keys(v)))].sort();
-  $('comparison-result').innerHTML = `<div class="table-responsive"><table class="table"><thead><tr><th>Metric</th>${records.map((r) => `<th>${escape(title(r))}</th>`).join('')}</tr></thead><tbody>${keys.map((key) => `<tr><td>${escape(key.replaceAll('_',' '))}</td>${values.map((v) => `<td>${number(v[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` + comparisonData.comparisons.map((report,i) => `<p class="comparison-note ${report.settings_differences.length ? 'text-warning-emphasis' : 'text-success-emphasis'}">Baseline → ${escape(title(records[i+1]))}: ${report.settings_differences.length ? 'Settings differ: ' + escape(report.settings_differences.join(', ')) : 'Settings match.'}</p>`).join('') + '<p class="comparison-note">Repeat under matching conditions to establish improvement. Missing metrics display —. Each curve ends at its own last interval.</p>';
-  $('comparison-result').innerHTML += records.slice(1).map((run,i) => {
-    const left = values[0], right = values[i+1];
-    const common = Object.keys(left).filter((key) => Number.isFinite(left[key]) && Number.isFinite(right[key]));
-    return `<details class="mt-2"><summary>Change from baseline → ${escape(title(run))}</summary><div class="table-responsive"><table class="table"><thead><tr><th>Metric</th><th>Change</th><th>Change %</th></tr></thead><tbody>${common.map((key) => {
-      const delta = right[key]-left[key], percent = left[key] ? delta/left[key]*100 : null;
-      return `<tr><td>${escape(key.replaceAll('_',' '))}</td><td>${delta > 0 ? '+' : ''}${number(delta)}</td><td>${percent === null ? 'Undefined from zero' : (percent > 0 ? '+' : '') + number(percent,1)+'%'}</td></tr>`;
-    }).join('')}</tbody></table></div></details>`;
-  }).join('');
-
+  $('comparison-result').innerHTML = `<p class="comparison-note">Shared measured window: ${number(comparisonData.common_window_seconds)} seconds. The table contains whole-run final aggregates; 30-second and 10-second averages represent different durations. Curves share elapsed seconds and stop at their own last interval. ${escape(comparisonData.common_window?.note || '')}</p><div class="table-responsive"><table class="table"><caption>Whole-run final measurements for all ${records.length} selected tests. Missing measurements stay unavailable.</caption><thead><tr><th>Test</th>${keys.map((key) => `<th>${escape(metricLabel(key))}</th>`).join('')}</tr></thead><tbody id="comparison-metric-rows"></tbody></table></div><div id="comparison-change-details"></div><p class="comparison-note">Repeat under matching conditions to establish improvement. Missing metrics display —.</p>`;
+  const reports = comparisonData.comparisons;
+  let index = 0;
+  const batch = () => {
+    if (generation !== comparisonTableVersion) return;
+    const rowFragment = document.createDocumentFragment(), detailFragment = document.createDocumentFragment();
+    const end = Math.min(index + 20, records.length);
+    for (; index < end; index++) {
+      const run = records[index], tr = document.createElement('tr');
+      tr.innerHTML = `<th scope="row"><span class="comparison-color-swatch" style="background:${runColor(run)}"></span>${index + 1}. ${escape(title(run))}${index === 0 ? ' · baseline' : ''}</th>${keys.map((key) => `<td>${metricValue(key,values[index][key])}</td>`).join('')}`;
+      rowFragment.append(tr);
+      if (!index) continue;
+      const report = reports[index - 1], details = document.createElement('details'); details.className = 'mt-3';
+      const common = Object.keys(values[0]).filter((key) => Number.isFinite(values[0][key]) && Number.isFinite(values[index][key]));
+      details.innerHTML = `<summary>Change from baseline → ${index + 1}. ${escape(title(run))}</summary><p class="comparison-note">${report?.settings_differences?.length ? 'Settings differ: ' + escape(report.settings_differences.join(', ')) : 'Settings match.'} ${escape(report?.interpretation || '')}</p><div class="table-responsive"><table class="table"><thead><tr><th>Whole-run metric</th><th>Change</th><th>Change %</th></tr></thead><tbody>${common.map((key) => {
+        const delta = values[index][key] - values[0][key], percent = values[0][key] ? delta / values[0][key] * 100 : null;
+        return `<tr><td>${escape(metricLabel(key))}</td><td>${delta > 0 ? '+' : ''}${metricValue(key,delta)}</td><td>${percent === null ? 'Undefined from zero' : (percent > 0 ? '+' : '') + number(percent,1)+'%'}</td></tr>`;
+      }).join('')}</tbody></table></div>`;
+      detailFragment.append(details);
+    }
+    $('comparison-metric-rows').append(rowFragment); $('comparison-change-details').append(detailFragment);
+    if (index < records.length) requestAnimationFrame(batch);
+  };
+  batch();
 }
 async function compare() {
   if (!$('baseline')) return;
   const generation = ++comparisonVersion;
+  comparisonTableVersion++;
+  comparisonController?.abort(); comparisonController = new AbortController();
   $('export-comparison').disabled = true;
-  for (const id of ['baseline', 'candidate', 'third']) localStorage.setItem(`iperf-${id}`, $(id).value);
+  try { localStorage.setItem('flowbench-comparison-ids', JSON.stringify(comparisonIds())); } catch { /* Optional local preference only. */ }
   comparisonData = null; overlay();
-  if (!$('baseline').value || !$('candidate').value) { $('comparison-result').textContent = 'Choose a baseline and second test; the third is optional.'; return; }
+  const ids = comparisonIds();
+  if (!$('baseline').value || ids.length < 2) { $('comparison-result').textContent = 'Choose a completed baseline and at least one additional test.'; return; }
+  if (new Set(ids).size !== ids.length) { $('comparison-result').textContent = 'Choose different tests in each row.'; return; }
+  $('comparison-result').textContent = `Loading ${ids.length} selected tests…`;
   try {
-    const data = await api(comparisonPath());
+    for (const id of ids) {
+      await persistComparisonColor(id);
+      if (generation !== comparisonVersion) return;
+    }
+    const data = await api(comparisonPath(), {signal: comparisonController.signal});
     if (generation !== comparisonVersion) return;
     comparisonData = data; renderComparison(); $('export-comparison').disabled = false;
     workflows.controls();
@@ -559,7 +680,34 @@ $('save-notes')?.addEventListener('click', async () => {
   } catch (error) { $('notes-status').textContent = error.message; message(error.message); }
   finally { $('save-notes').disabled = false; }
 });
-for (const id of ['baseline', 'candidate', 'third']) $(id)?.addEventListener('change', safe(compare));
+$('add-comparison')?.addEventListener('click', () => addComparisonRow());
+$('comparison-selections')?.addEventListener('change', safe(async (event) => {
+  if (!event.target.matches('.comparison-select')) return;
+  comparisonSelectionChanged();
+  if (event.target.value) await persistComparisonColor(event.target.value);
+  await compare();
+}));
+$('comparison-selections')?.addEventListener('click', safe(async (event) => {
+  const button = event.target.closest('[data-remove-comparison]'); if (!button) return;
+  const row = button.closest('.comparison-selection'), previous = row.previousElementSibling;
+  row.remove(); comparisonSelectionChanged(); previous?.querySelector('select')?.focus(); await compare();
+}));
+$('comparison-legend')?.addEventListener('change', safe(async (event) => {
+  const input = event.target;
+  if (input.dataset.visibleRun) {
+    if (input.checked) hiddenComparisonRuns.delete(input.dataset.visibleRun); else hiddenComparisonRuns.add(input.dataset.visibleRun);
+    await overlay(false);
+  }
+  if (input.dataset.runColor) {
+    const id = input.dataset.runColor; input.disabled = true;
+    try {
+      await api(`/api/runs/${id}`, {method: 'PATCH', body: JSON.stringify({color: input.value})});
+      for (const row of [...runs, ...(comparisonData?.runs || [])]) if (row.id === id) row.settings.color = input.value;
+      workflows.controls(); await overlay(false);
+      input.closest('.comparison-legend-row').querySelector('.comparison-color-swatch').style.background = input.value;
+    } finally { input.disabled = false; }
+  }
+}));
 $('export-comparison')?.addEventListener('click', safe(() => download(`${comparisonPath()}&format=${$('export-format').value}`, 'iperf-comparison')));
 document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => {
   if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current', 'page');
@@ -621,7 +769,7 @@ function renderResults() {
   $('live-metrics').classList.toggle('d-none', job || terminal.has(selected.status));
   const metrics = selected.metrics || {};
   for (const direction of ['upload','download']) {
-    $('result-' + direction).textContent = number(metrics[direction+'_mbps']);
+    rateCard('result-' + direction, metrics[direction+'_mbps'], 'result-' + direction + '-unit');
     $('result-' + direction + '-foot').textContent = Number.isFinite(metrics[direction+'_mbps']) ? 'Final receiver report' : 'No final measurement reported';
   }
   $('result-runtime').textContent = number(selected.overview?.runtime_seconds);

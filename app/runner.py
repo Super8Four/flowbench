@@ -20,6 +20,7 @@ from .peer import peer_results
 from .route import capture_route
 from .storage import SQLiteArchive
 from .matrix import matrix_plan
+from .units import RATE_CONTRACT
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "partial", "skipped"}
@@ -231,7 +232,7 @@ class RunManager:
                     for key in ("matrix_job", "diagnostics", "annotations"):
                         row[key] = record.get(key)
                     row["flent"] = ({key: record["flent"].get(key) for key in
-                                     ("tool", "version", "workload", "status", "summaries", "provenance")}
+                                     ("tool", "version", "netperf_version", "workload", "status", "summaries", "provenance")}
                                     if record.get("flent") else None)
                     row["project_id"] = record["settings"].get("project_id")
                     row["tags"] = record["settings"].get("tags", {})
@@ -772,6 +773,7 @@ class RunManager:
                       "iperf_version": None, "output_format": "flent-native", "exit_code": None, "error": None,
                       "summary": {}, "intervals": [], "native_result": None, "test_parameters": None, "event_count": 0,
                       "flent": {"tool": "Flent", "version": self.flent_capabilities["version"], "workload": "rrul",
+                                "netperf_version": self.flent_capabilities.get("netperf_version"),
                                 "status": "missing", "data": None, "series": [], "summaries": [],
                                 "provenance": "External Flent CLI; native result pending."}}
             self.save(record)
@@ -833,6 +835,7 @@ class RunManager:
                         self.record["error"] = self.record["error"] or f"Flent exited with code {code}; inspect the captured logs and partial native evidence."
                     try:
                         evidence = read_result(directory, self.flent_capabilities["version"])
+                        evidence["netperf_version"] = self.flent_capabilities.get("netperf_version")
                         if self.cancel_requested or code != 0:
                             evidence["status"] = "partial"
                         self.record["flent"] = evidence
@@ -872,6 +875,7 @@ class RunManager:
     def export(self, run_id):
         with self.lock:
             record = self.read(run_id)
+            record["rate_units"] = RATE_CONTRACT
             if record.get("kind") in {"protocol-job", "matrix-job"}:
                 record["runs"] = [self.export(child["id"]) for child in record["children"]]
                 return record

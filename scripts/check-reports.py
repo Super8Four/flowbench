@@ -62,6 +62,19 @@ def main():
             after["intervals"] = [{"sum": {"start": i, "end": i + 1, "bits_per_second": rate * 1e6}} for i, rate in ((0, 160), (1, 190), (4, 200), (5, 170))]
             manager.save(before)
             manager.save(after)
+            comparison_ids = [before["id"], after["id"]]
+            before["settings"].update(duration=30, color="#183b50")
+            before["finished_at"] = "2026-01-01T10:00:30+00:00"
+            before["intervals"] = [{"sum": {"start": i, "end": i + 1, "bits_per_second": rate * 1e6}} for i, rate in ((0, 90), (1, 110), (20, 120), (29, 100))]
+            manager.save(before)
+            for ordinal, rate, color in ((5, 0, "#b52b3d"), (6, .0005, "#437456"), (7, 3000, "#884f00")):
+                extra = copy.deepcopy(after)
+                extra["id"] = format(ordinal, "032x")
+                extra["settings"].update(label="Synthetic selected test " + str(ordinal), duration=10, color=color)
+                extra["summary"]["sum_received"]["bits_per_second"] = rate * 1e6
+                extra["intervals"] = [{"sum": {"start": i, "end": i + 1, "bits_per_second": rate * 1e6}} for i in (0, 1, 4, 9)]
+                manager.save(extra)
+                comparison_ids.append(extra["id"])
             flent = copy.deepcopy(before)
             flent.update(id="c" * 32, kind="flent-run", summary={}, intervals=[], iperf_version=None)
             flent["settings"].update(engine="flent", flent_workload="rrul", streams=4, mode="bidir", label="Synthetic actual Flent format")
@@ -71,7 +84,7 @@ def main():
                               "summaries": [{"name": row["name"], "unit": row["unit"], "count": 3, "missing": 1, "mean": sum(p["value"] for p in row["points"] if p["value"] is not None) / 3,
                                              "min": min(p["value"] for p in row["points"] if p["value"] is not None), "max": max(p["value"] for p in row["points"] if p["value"] is not None)} for row in native_series]}
             manager.save(flent)
-            for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", [before["id"], after["id"]], True), ("flent", [flent["id"]], False)):
+            for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", comparison_ids, True), ("flent", [flent["id"]], False)):
                 model = prepare_report(manager, {"ids": ids, "redact": redact})
                 (args.output_dir / (name + ".json")).write_text(json.dumps(model, indent=2), encoding="utf-8")
                 for extension, renderer in (("pdf", render_pdf), ("docx", render_docx)):

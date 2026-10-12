@@ -36,7 +36,7 @@ Open **http://127.0.0.1:5000**. [0.1.0-rc.2 downloads](https://github.com/Super8
 1. Start `iperf3 -s` on a server you have permission to test. Tests run from the FlowBench host.
 2. Choose TCP, UDP or **Both** and a direction. New tests default to bidirectional. Both runs TCP then UDP and keeps their results separate.
 3. Start the test, review throughput and logs, then export JSON/XML or save notes. Stopping keeps the output already captured.
-4. Use **History** to search/import sessions and **Compare tests** for two or three completed tests.
+4. Use **History** to search/import sessions and **Compare tests** to add completed tests, choose their colors and compare actual elapsed measurements. Shorter tests end at their captured duration; stored rates keep their original numeric units while the interface scales bps through Tbps.
 
 To receive tests, enable the listener in **Configuration**. Incoming iPerf3 clients are saved automatically. One incoming test can run alongside one outgoing test; overlap may affect measurements and is labeled. The listener restarts with the app until you turn it off. See [incoming capture](docs/incoming-listener.md).
 

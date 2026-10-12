@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import socket
 import statistics
 import subprocess
 import sys
@@ -15,9 +16,20 @@ MAX_RESULT_BYTES = 20 * 1024 * 1024
 WORKLOADS = {"rrul"}
 
 
+def unprivileged_icmp():
+    """Check existing kernel permission only; no packets or sysctl writes."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_ICMP):
+            pass
+        return {"available": True, "method": "Existing ICMP datagram socket permission; no packets sent."}
+    except OSError as exc:
+        return {"available": False, "error": "The kernel does not permit an unprivileged ICMP datagram socket for this process: " + str(exc)}
+
+
 def capabilities():
     dependencies = {name: shutil.which(name) for name in ("flent", "netperf", "ping", "fping")}
-    result = {"available": False, "version": None, "platform": sys.platform, "dependencies": dependencies,
+    result = {"available": False, "version": None, "netperf_version": None, "unprivileged_icmp": None,
+              "platform": sys.platform, "dependencies": dependencies,
               "workloads": ["rrul"], "max_duration": 60,
               "note": "RRUL uses eight TCP load flows plus UDP/ICMP RTT. Requires an owned, ready Netserver target; tools are optional external installs."}
     if not sys.platform.startswith("linux"):
@@ -27,11 +39,26 @@ def capabilities():
         result["error"] = "Install optional Flent, Netperf with demo support and timestamped ping/fping locally, then restart FlowBench."
         return result
     try:
+        result["unprivileged_icmp"] = unprivileged_icmp()
+        if not result["unprivileged_icmp"]["available"]:
+            result["error"] = result["unprivileged_icmp"]["error"]
+            return result
+        # Verify exec permission without a destination or any network traffic.
+        # A file capability masked by cap-drop may cause execve itself to fail.
+        ping_tool = dependencies["fping"] or dependencies["ping"]
+        ping_version = subprocess.run([ping_tool, "-v" if dependencies["fping"] else "-V"],
+                                      capture_output=True, text=True, timeout=5)
+        if ping_version.returncode != 0:
+            raise ValueError("The detected ping tool cannot execute its version check under the current permissions.")
         info = subprocess.run([dependencies["flent"], "--version"], capture_output=True, text=True, timeout=5)
         version = (info.stdout + info.stderr).strip()
         if info.returncode != 0 or "flent" not in version.lower():
             raise ValueError("The detected Flent CLI did not identify itself successfully.")
-        result.update(available=True, version=version[:500])
+        netperf = subprocess.run([dependencies["netperf"], "-V"], capture_output=True, text=True, timeout=5)
+        netperf_version = (netperf.stdout + netperf.stderr).strip()
+        if netperf.returncode != 0 or "netperf" not in netperf_version.lower():
+            raise ValueError("The detected Netperf CLI did not identify itself successfully.")
+        result.update(available=True, version=version[:500], netperf_version=netperf_version[:500])
     except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         result["error"] = str(exc)
     return result

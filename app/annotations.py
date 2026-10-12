@@ -35,6 +35,14 @@ def settings_metadata(data):
         result["project_id"] = identifier(data["project_id"], "Project ID", nullable=True)
     if "tags" in data:
         result["tags"] = tags_from(data["tags"])
+    if "color" in data:
+        color = data["color"]
+        if color in (None, ""):
+            result["color"] = None
+        elif isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            result["color"] = color.lower()
+        else:
+            raise ValueError("Run color must be a #RRGGBB hex color, or empty to use the default.")
     return result
 
 

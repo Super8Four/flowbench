@@ -22,7 +22,10 @@ RUN python3 -m venv /opt/flent-venv \
 
 FROM iperf-workspace:local
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping \
+RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping libcap2-bin \
+    && if [ -n "$(getcap /usr/bin/ping)" ]; then setcap -r /usr/bin/ping; fi \
+    && test -z "$(getcap /usr/bin/ping)" \
+    && apt-get purge -y --auto-remove libcap2-bin \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=tools /opt/flent-venv /opt/flent-venv
 COPY --from=tools /out/netperf /usr/local/bin/netperf

@@ -41,7 +41,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     IPERF_PATH=/usr/local/bin/iperf3
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 ca-certificates libssl3t64 iputils-tracepath iputils-ping \
+    && apt-get install -y --no-install-recommends python3 ca-certificates libssl3t64 iputils-tracepath iputils-ping libcap2-bin \
+    && if [ -n "$(getcap /usr/bin/ping)" ]; then setcap -r /usr/bin/ping; fi \
+    && test -z "$(getcap /usr/bin/ping)" \
+    && apt-get purge -y --auto-remove libcap2-bin \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 iperf \
     && useradd --uid 10001 --gid iperf --no-create-home --home-dir /data --shell /usr/sbin/nologin iperf \

@@ -8,6 +8,7 @@
 - Capture opt-in native ping, route and MTU evidence, with local CPU/interface counters and explicit missing/blocked states; save diagnostic checkpoints in SQLite.
 - Run bounded sequential TCP/UDP, direction and stream-count matrices, retaining cancellation, child failures and restart evidence.
 - Add elapsed-time live baseline overlays, endpoint tags and editable timestamped timeline notes with JSON/XML and project interchange.
+- Remove the three-run comparison/report cap; retain actual mixed-duration endpoints, save editable colors and use decimal SI rate displays while keeping numeric archive units unchanged.
 - Integrate optional actual Linux Flent RRUL through local tools, preserving native result data and stopping owned child processes.
 - Generate branded PDF/Word reports for completed tests and comparisons, with default redaction, an evidence preview and stale-preview checks.
 - Keep rc.1 and rc.2 immutable. This feature branch does not deploy the app or complete authentication, retention, scenario thresholds or instance coordination.

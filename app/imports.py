@@ -15,6 +15,7 @@ from .runner import TERMINAL, now, settings_from
 from .annotations import annotations_from
 
 MAX_IMPORT_BYTES = 20 * 1024 * 1024
+MAX_PREPARED_BYTES = 32 * 1024 * 1024
 
 
 def parse_document(content):
@@ -359,9 +360,10 @@ def prepare_source_documents(sources, filename):
     """Validate all sources before writes, remapping coherent job child identities."""
     if isinstance(sources, dict):
         sources = [sources]
-    if not isinstance(sources, list) or not sources or len(sources) > 500:
-        raise ValueError("A project may import 1 to 500 top-level test documents.")
+    if not isinstance(sources, list) or not sources:
+        raise ValueError("Choose one or more test documents within the import size budget.")
     prepared = []
+    prepared_bytes = 0
     for source in sources:
         if isinstance(source, dict) and source.get("kind") == "protocol-job":
             rows = prepare_job(source, filename)
@@ -369,6 +371,9 @@ def prepare_source_documents(sources, filename):
             rows = prepare_matrix(source, filename)
         else:
             rows = [prepare_run(source, filename)]
+        prepared_bytes += len(json.dumps(rows, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+        if prepared_bytes > MAX_PREPARED_BYTES:
+            raise ValueError("Prepared tests exceed the 32 MiB archive import budget. Import smaller groups separately.")
         prepared.extend(rows)
     return prepared
 
@@ -377,8 +382,8 @@ def import_runs(manager, data, filename):
     sources = [data]
     if isinstance(data, dict) and data.get("kind") == "multi-comparison":
         sources = data.get("runs")
-        if not isinstance(sources, list) or not 2 <= len(sources) <= 3:
-            raise ValueError("A comparison export must contain two or three runs.")
+        if not isinstance(sources, list) or len(sources) < 2:
+            raise ValueError("A comparison export must contain at least two individual runs.")
     elif isinstance(data, dict) and "before" in data and "after" in data:
         sources = [data["before"], data["after"]]
     if len(sources) > 1 and any(isinstance(source, dict) and source.get("kind") in {"protocol-job", "matrix-job"} for source in sources):
