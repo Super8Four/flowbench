@@ -2,12 +2,15 @@ name: Ubuntu container
 
 on:
   push:
-    branches: [main, feature/sqlite-storage, feature/svg-logo, feature/measurement-workflows]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -23,10 +26,16 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Read application version
         run: |
-          version=$(python3 -c "import runpy; print(runpy.run_path('app/version.py')['__version__'])")
+          version=$(python3 -c "import re, runpy; value=runpy.run_path('app/version.py')['__version__']; assert isinstance(value, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', value), 'Use a valid application version'; print(value)")
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" == v* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "Version tag must exactly match app/version.py: expected v$version" >&2
+            exit 1
+          fi
           echo "FLOWBENCH_VERSION=$version" >> "$GITHUB_ENV"
       - name: Validate Compose and build Ubuntu image
         run: |
@@ -65,13 +74,14 @@ jobs:
           libreoffice -env:UserInstallation=file:///tmp/flowbench-report-qa-profile --headless \
             --convert-to pdf --outdir report-qa/docx-pdf report-qa/*.docx
           test "$(find report-qa/docx-pdf -name '*.pdf' | wc -l)" -eq 3
+          python3 scripts/check-report-layout.py --docx-dir report-qa --pdf-dir report-qa/docx-pdf
           for source in report-qa/*.pdf report-qa/docx-pdf/*.pdf; do
             name=$(basename "$source" .pdf)
             folder=$(basename "$(dirname "$source")")
             pdfinfo "$source"
             pdftoppm -r 110 -png "$source" "report-qa/rendered/${folder}-${name}"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() && steps.reports.outcome == 'success' }}
         with:
           name: report-qa-${{ matrix.arch }}
@@ -85,10 +95,36 @@ jobs:
           docker save iperf-workspace:local | gzip > "${prefix}.tar.gz"
           docker image inspect iperf-workspace:local > "${prefix}.image.json"
           sha256sum "${prefix}.tar.gz" "${prefix}.image.json" > "${prefix}.SHA256SUMS"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request'
         with:
           name: flowbench-linux-${{ matrix.arch }}
           path: flowbench-${{ env.FLOWBENCH_VERSION }}-linux-${{ matrix.arch }}.*
           retention-days: 14
           compression-level: 0
+      - name: Write exact-source job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          SOURCE_SHA: ${{ github.sha }}
+          ARCH: ${{ matrix.arch }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p ci-artifacts
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = {name.lower(): os.environ[name] for name in ('JOB_STATUS', 'SOURCE_SHA', 'ARCH', 'EVENT_NAME', 'RUN_ID')}
+          data['note'] = 'Summary presence is not a passing CI result. Verify all exact-source job and step conclusions.'
+          Path('ci-artifacts/container-summary.json').write_text(json.dumps(data, indent=2) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Native container result\n\n' + '\n'.join(f'- {key}: `{value}`' for key, value in data.items()) + '\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ci-container-summary-${{ matrix.arch }}
+          path: ci-artifacts/container-summary.json
+          retention-days: 14
+          if-no-files-found: warn

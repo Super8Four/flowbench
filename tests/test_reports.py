@@ -13,6 +13,7 @@ import zlib
 from docx import Document
 
 from app.exports import xml_export
+from app.flent import normalize as normalize_flent, RRUL_TCP, RRUL_RTT
 from app.diagnostics import latency_summary
 from app.imports import import_runs, parse_document
 from app.projects import ProjectStore
@@ -56,6 +57,13 @@ def report_fixture():
                             "mean_increase_ms": 2.1, "error": "private.example timed out", "raw_stdout": "192.0.2.10"},
                             "endpoint_health": {"enabled": True, "local": {"provenance": "detected local", "delta": {"cpu_busy_percent": 15.2}}, "remote": {"status": "unavailable"}},
                             "path_context": {"mtu": {"status": "disabled", "tested_packet_sizes": [], "largest_confirmed_packet_bytes": None}}}}
+
+
+def native_rrul_fixture():
+    return {"version": 4, "metadata": {"NAME": "rrul", "HOST": "192.0.2.10", "LENGTH": 10},
+            "x_values": [0, 1, 2, 3],
+            "results": {name: [index + 1, None, index + 3, index + 4]
+                        for index, name in enumerate(sorted(RRUL_TCP | RRUL_RTT))}}
 
 
 class ReportTests(unittest.TestCase):
@@ -176,15 +184,60 @@ class ReportTests(unittest.TestCase):
                     restored.shutdown()
 
     def test_external_series_and_metric_names_are_redacted(self):
-        source = dict(self.before, kind="flent-run", flent={"version": "private.example version",
-                      "series": [{"name": "TCP upload private.example", "unit": "Mbits/s", "points": [{"seconds": 1, "value": 10}, {"seconds": 2, "value": None}]}],
-                      "summaries": [{"name": "TCP upload private.example", "unit": "Mbits/s", "count": 1, "missing": 1, "mean": 10, "min": 10, "max": 10}]})
+        native = native_rrul_fixture()
+        native["results"]["TCP upload private.example"] = [10, None, 30, 40]
+        native["results"]["private-unit-series.example"] = [1, None, 2, 3]
+        native["metadata"]["SERIES_META"] = {
+            "TCP upload private.example": {"UNITS": "Mbits/s"},
+            "private-unit-series.example": {"UNITS": "private-unit.example"}}
+        source = dict(self.before, kind="flent-run", summary={}, intervals=[],
+                      flent=normalize_flent(native, "private.example version"))
         self.manager.save(source)
-        with patch("app.reports.measurements", return_value={"flent_TCP upload private.example_mbps": 10}):
-            model = prepare_report(self.manager, {"ids": [source["id"]]})
+        model = prepare_report(self.manager, {"ids": [source["id"]], "include_raw": True})
         self.assertNotIn("private.example", json.dumps(model))
-        self.assertEqual(model["runs"][0]["flent_series"][0]["points"][1]["value"], None)
-        self.assertEqual(model["runs"][0]["flent_summaries"][0]["missing"], 1)
+        self.assertNotIn("private-unit", json.dumps(model))
+        self.assertEqual(model["runs"][0]["flent_series"][-2]["points"][1]["value"], None)
+        self.assertEqual(model["runs"][0]["flent_summaries"][-2]["missing"], 1)
+        self.assertIsNone(model["runs"][0]["flent_series"][-1]["unit"])
+        for output in (decoded_pdf_streams(render_pdf(model)), render_docx(model)):
+            if output.startswith(b"PK"):
+                with ZipFile(BytesIO(output)) as package:
+                    output = b"\n".join(package.read(name) for name in package.namelist() if name.endswith(".xml"))
+            self.assertNotIn(b"private.example", output)
+            self.assertNotIn(b"private-unit", output)
+
+    def test_historical_completed_flent_rows_require_complete_native_rrul_without_mutation(self):
+        from app import create_app
+        with tempfile.TemporaryDirectory() as archive:
+            app = create_app({"TESTING": True, "RUNS_DIRECTORY": archive, "IPERF_PATH": "missing-iperf"})
+            manager = app.extensions["iperf_runs"]
+            try:
+                native = native_rrul_fixture()
+                complete = dict(self.before, kind="flent-run", summary={}, intervals=[],
+                                flent=normalize_flent(native, "Synthetic fixture"))
+                manager.save(complete)
+                client = app.test_client()
+                self.assertEqual(client.post("/api/reports/preview", json={"ids": [complete["id"]]}).status_code, 200)
+                damaged = copy.deepcopy(native)
+                for name in RRUL_TCP:
+                    damaged["results"][name] = [None] * len(damaged["x_values"])
+                partial = normalize_flent(damaged, "Synthetic fixture")
+                for evidence in (dict(partial, status="captured"), partial,
+                                 dict(complete["flent"], data=None),
+                                 dict(complete["flent"], summaries=[])):
+                    with self.subTest(evidence_status=evidence["status"], native_source=evidence.get("data") is not None):
+                        # Direct storage models an older SQLite row; no import can
+                        # manufacture today's impossible completed evidence.
+                        legacy = dict(complete, flent=evidence)
+                        manager.save(legacy)
+                        original = manager.export(legacy["id"])
+                        for endpoint in ("/api/reports/preview", "/api/reports/download?format=pdf", "/api/reports/download?format=docx"):
+                            response = client.post(endpoint, json={"ids": [legacy["id"]]})
+                            self.assertEqual(response.status_code, 400)
+                            self.assertIn("complete native Flent RRUL", response.get_json()["error"])
+                        self.assertEqual(original, manager.export(legacy["id"]))
+            finally:
+                manager.shutdown()
 
     def test_preview_fingerprint_accepts_same_snapshot_and_rejects_changes(self):
         options = {"ids": [self.before["id"]]}

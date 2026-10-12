@@ -6,6 +6,7 @@ the derivative image. The original runtime image remains free of optional tools.
 """
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -56,9 +57,13 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         assert manager.flent_capabilities["available"], manager.flent_capabilities
         assert "2.3.0" in manager.flent_capabilities["version"], manager.flent_capabilities
         assert "2.7.1" in manager.flent_capabilities["netperf_version"], manager.flent_capabilities
+        resolver_patch = Path("/usr/local/share/licenses/netperf/netperf-loopback-resolver.patch")
+        patch_hash = hashlib.sha256(resolver_patch.read_bytes()).hexdigest()
+        assert patch_hash == "1d08ee0d3154fa82af48d3f1ff44218c5a1317f0d95eed32721445656967451f"
+        print("Test-only tool provenance: unmodified Flent 2.3.0; Netperf 2.7.1 source afc51ff9764741da4ed6702651fba9d9c23f8557 with numeric-loopback resolver patch SHA256 " + patch_hash, flush=True)
         client = app.test_client()
         payload = {"target": "127.0.0.1", "duration": 3, "netserver_port": port, "workload": "rrul",
-                   "confirm_netserver": True, "label": "Synthetic loopback RRUL"}
+                   "confirm_netserver": True, "label": "Synthetic loopback RRUL", "bind": "127.0.0.1", "ip_version": "4"}
         response = client.post("/api/flent", json=payload)
         assert response.status_code == 201, response.get_json()
         record = finish(manager, response.get_json()["id"])

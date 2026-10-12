@@ -12,6 +12,7 @@ import threading
 from xml.sax.saxutils import escape
 
 from .annotations import identifier
+from .flent import normalize as normalize_flent, validate_flent
 from .metrics import comparison, effective_settings, measurements, series
 from .version import __version__
 from .units import format_mbps, format_rate, rate_scale, run_color
@@ -110,6 +111,18 @@ def prepare_report(manager, data):
                 raise ValueError("Choose individual tests within a protocol or matrix batch.")
             if record.get("status") != "completed" or not record.get("finished_at"):
                 raise ValueError("Reports require completed tests.")
+            if record.get("kind") == "flent-run":
+                # Legacy archive rows can claim completion despite missing load
+                # flows. Revalidate source evidence without changing that row.
+                evidence = record.get("flent")
+                try:
+                    validate_flent(evidence)
+                    parsed = normalize_flent(evidence.get("data"), evidence.get("version"))
+                    complete = evidence.get("status") == "captured" and parsed["quality"]["complete"]
+                except ValueError:
+                    complete = False
+                if not complete:
+                    raise ValueError("Reports require a complete native Flent RRUL capture with all eight TCP load flows and four RTT series.")
             if not measurements(record):
                 raise ValueError("Reports require captured performance measurements; this workload has no reportable metrics.")
             point_count += len(series(record)) + sum(len(item.get("points", [])) for item in (record.get("flent") or {}).get("series", []))
@@ -660,6 +673,9 @@ def render_docx(model):
                 props.append(margins)
                 for p in cell.paragraphs:
                     p.paragraph_format.space_after = Pt(2)
+                    # LibreOffice can orphan a repeated table header at a page
+                    # boundary and omit its first body row during PDF conversion.
+                    p.paragraph_format.keep_with_next = index == 0
                     if len(head) == 4 and column > 0:
                         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in p.runs:

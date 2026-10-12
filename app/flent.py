@@ -17,6 +17,9 @@ WORKLOADS = {"rrul"}
 RRUL_TCP = {f"TCP {direction} {marking}" for direction in ("upload", "download")
             for marking in ("BE", "BK", "CS5", "EF")}
 RRUL_RTT = {"Ping (ms) ICMP", "Ping (ms) UDP BE", "Ping (ms) UDP BK", "Ping (ms) UDP EF"}
+RRUL_UNITS = {name: "Mbits/s" for name in RRUL_TCP | {
+    "TCP upload avg", "TCP upload sum", "TCP download avg", "TCP download sum", "TCP totals"}}
+RRUL_UNITS.update({name: "ms" for name in RRUL_RTT | {"Ping (ms) avg"}})
 
 
 def unprivileged_icmp():
@@ -79,8 +82,8 @@ def settings(data):
                                 duration=duration, port=port, bandwidth="0", traceroute=False))
     if result["duration"] > 60:
         raise ValueError("Flent workload duration is limited to 60 seconds.")
-    if result.get("bind") or any(result.get(key) for key in ("latency", "endpoint_health", "mtu")):
-        raise ValueError("Flent captures its own native evidence; separate iPerf bind and diagnostic options are not accepted here.")
+    if any(result.get(key) for key in ("latency", "endpoint_health", "mtu")):
+        raise ValueError("Flent captures its own native evidence; separate iPerf diagnostic options are not accepted here.")
     result["flent_workload"] = "rrul"
     return result
 
@@ -94,6 +97,8 @@ def command(info, settings, directory):
               "-r", str(rcfile), "-D", str(directory)]
     if settings.get("ip_version", "auto") != "auto":
         result.append("-" + settings["ip_version"])
+    if settings.get("bind"):
+        result += ["--local-bind", settings["bind"], "--control-local-bind", settings["bind"]]
     return result
 
 
@@ -123,6 +128,8 @@ def validate_flent(value):
         raise ValueError("Invalid Flent evidence status.")
     data = value.get("data")
     if data is None:
+        if value["status"] in {"captured", "partial"}:
+            raise ValueError("Captured or partial Flent evidence requires its native source data.")
         if value.get("series") or value.get("summaries"):
             raise ValueError("Flent summaries require native source data.")
         return value
@@ -155,7 +162,14 @@ def normalize(data, version=None):
             raise ValueError("Flent values must be finite numbers or missing null values.")
         # These units are defined by the official RRUL workload, not inferred
         # from magnitude. Unknown native series retain unknown units.
-        unit = "Mbits/s" if name.startswith("TCP upload") or name.startswith("TCP download") else "ms" if name.startswith("Ping (ms)") else None
+        series_metadata = data["metadata"].get("SERIES_META") or {}
+        if not isinstance(series_metadata, dict):
+            raise ValueError("Invalid Flent series metadata.")
+        meta = series_metadata.get(name, {})
+        declared_unit = meta.get("UNITS") if isinstance(meta, dict) else None
+        if declared_unit is not None and (not isinstance(declared_unit, str) or len(declared_unit) > 80):
+            raise ValueError("Invalid Flent declared series unit.")
+        unit = (declared_unit if declared_unit in {"Mbits/s", "ms"} else None) if declared_unit else RRUL_UNITS.get(name)
         present = [v for v in values if v is not None]
         series.append({"name": name, "unit": unit, "points": [{"seconds": t, "value": value} for t, value in zip(x, values)]})
         summaries.append({"name": name, "unit": unit, "count": len(present), "missing": len(values) - len(present),

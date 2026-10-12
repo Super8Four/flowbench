@@ -20,6 +20,7 @@ if not (source_root / "app").is_dir():
 sys.path.insert(0, str(source_root))
 
 from app.diagnostics import latency_summary
+from app.flent import normalize as normalize_flent, RRUL_TCP, RRUL_RTT
 from app.projects import ProjectStore
 from app.reports import prepare_report, render_pdf, render_docx
 from app.runner import RunManager, settings_from
@@ -76,13 +77,15 @@ def main():
                 manager.save(extra)
                 comparison_ids.append(extra["id"])
             flent = copy.deepcopy(before)
-            flent.update(id="c" * 32, kind="flent-run", summary={}, intervals=[], iperf_version=None)
-            flent["settings"].update(engine="flent", flent_workload="rrul", streams=4, mode="bidir", label="Synthetic actual Flent format")
-            native_series = [{"name": name, "unit": unit, "points": [{"seconds": i, "value": value} for i, value in enumerate(values)]}
-                             for name, unit, values in (("TCP upload 1", "Mbits/s", [10, 20, None, 30]), ("TCP download 1", "Mbits/s", [50, 60, None, 70]), ("Ping (ms)", "ms", [2, 3, None, 4]))]
-            flent["flent"] = {"tool": "Flent", "workload": "rrul", "version": "Synthetic fixture", "status": "captured", "data": {}, "series": native_series,
-                              "summaries": [{"name": row["name"], "unit": row["unit"], "count": 3, "missing": 1, "mean": sum(p["value"] for p in row["points"] if p["value"] is not None) / 3,
-                                             "min": min(p["value"] for p in row["points"] if p["value"] is not None), "max": max(p["value"] for p in row["points"] if p["value"] is not None)} for row in native_series]}
+            flent.update(id="c" * 32, kind="flent-run", summary={}, intervals=[], iperf_version=None,
+                         diagnostics=None, route=None, annotations=[])
+            flent["settings"].update(engine="flent", flent_workload="rrul", streams=4, mode="bidir", port=12865,
+                                     bandwidth="0", label="Synthetic complete native Flent format")
+            native = {"version": 4, "metadata": {"NAME": "rrul", "HOST": "192.0.2.10", "LENGTH": 30},
+                      "x_values": [0, 1, 2, 3],
+                      "results": {name: [index + 1, index + 2, None, index + 4]
+                                  for index, name in enumerate(sorted(RRUL_TCP | RRUL_RTT))}}
+            flent["flent"] = normalize_flent(native, "Synthetic fixture")
             manager.save(flent)
             for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", comparison_ids, True), ("flent", [flent["id"]], False)):
                 model = prepare_report(manager, {"ids": ids, "redact": redact})

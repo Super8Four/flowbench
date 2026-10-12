@@ -302,7 +302,7 @@ export function createWorkflows(context) {
     const duration = Number(values.duration);
     if (duration > 60 || !$('flent-confirm').checked) { error.textContent = 'Use 1–60 seconds and confirm a controlled, ready netserver peer.'; error.classList.remove('d-none'); error.focus(); return; }
     const data = {target: values.target, duration, netserver_port: Number($('flent-port').value), workload: 'rrul', confirm_netserver: true,
-      label: values.label, notes: values.notes, project_id: values.project_id, tags: values.tags, ip_version: values.ip_version || 'auto'};
+      label: values.label, notes: values.notes, project_id: values.project_id, tags: values.tags, ip_version: values.ip_version || 'auto', bind: values.bind || ''};
     flentStarting = true; $('flent-start').disabled = true; $('flent-start').textContent = 'Starting Flent…';
     try { await context.start(await api('/api/flent', {method: 'POST', body: JSON.stringify(data)})); }
     catch (problem) { error.textContent = problem.message; error.classList.remove('d-none'); error.focus(); }
@@ -312,6 +312,7 @@ export function createWorkflows(context) {
     if (run.kind !== 'flent-run') return false;
     for (const key of ['target', 'duration', 'label', 'notes']) $(key).value = run.settings[key] || '';
     $('ip_version').value = run.settings.ip_version || 'auto';
+    $('bind').value = run.settings.bind || '';
     loadSettings(run.settings); $('flent-port').value = run.settings.port; $('flent-confirm').checked = false;
     $('flent-editor').open = true; $('flent-port').focus(); controls();
     message('Flent settings loaded. Confirm the ready netserver peer before starting the RRUL workload.', 'success');

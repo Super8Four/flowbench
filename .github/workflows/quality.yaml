@@ -1,0 +1,110 @@
+name: Source and Windows checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    name: First-party source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check Python, JavaScript, local documentation links and action pins
+        run: python scripts/check-source.py --output ci-artifacts/source.json
+      - name: Exercise Flent browser workflow with the controlled DOM/API fixture
+        run: node tests/workflows-flent-behavior.mjs
+      - name: Record source check summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          path = Path('ci-artifacts/source.json')
+          if path.exists():
+              data = json.loads(path.read_text())
+              data['source_sha'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+              path.write_text(json.dumps(data, indent=2) + '\n')
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                  summary.write('## Source checks\n\nTested source: ' + data['source_sha'] + '\n\n' + json.dumps(data['checks']) + '\n\nPassed: ' + str(data['passed']) + '\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ci-source-summary
+          path: ci-artifacts/source.json
+          retention-days: 14
+          if-no-files-found: warn
+
+  windows:
+    name: Windows Python 3.12 full suite
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install and verify the pinned Windows iPerf engine
+        shell: pwsh
+        run: |
+          ./scripts/install-iperf.ps1
+          $engines = @(Get-ChildItem -LiteralPath ./bin -Filter iperf3.exe -File -Recurse)
+          if ($engines.Count -ne 1) { throw 'Expected exactly one verified Windows iPerf engine.' }
+          "IPERF_PATH=$($engines[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          & $engines[0].FullName --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run every test with controlled loopback peers
+        shell: pwsh
+        run: |
+          @'
+          import json, os, platform, subprocess, sys, unittest
+          from pathlib import Path
+          suite = unittest.defaultTestLoader.discover('tests')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          data = {'source_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+                  'python': platform.python_version(), 'platform': 'Windows', 'tests_run': result.testsRun,
+                  'passed': result.wasSuccessful(), 'failures': [test.id() for test, _ in result.failures],
+                  'errors': [test.id() for test, _ in result.errors],
+                  'skipped': [{'test': test.id(), 'reason': reason} for test, reason in result.skipped],
+                  'note': 'Actual optional Flent runs separately on native Linux. Skips and unavailable platform probes are not passed native checks.'}
+          Path('ci-artifacts').mkdir(exist_ok=True)
+          Path('ci-artifacts/windows-tests.json').write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## Windows full suite\n\nTested source: ' + data['source_sha'] + '\n\nTests run: ' + str(data['tests_run']) + '; failures: ' + str(len(data['failures'])) + '; errors: ' + str(len(data['errors'])) + '; skipped: ' + str(len(data['skipped'])) + '\n')
+          sys.exit(0 if result.wasSuccessful() else 1)
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ci-windows-test-summary
+          path: ci-artifacts/windows-tests.json
+          retention-days: 14
+          if-no-files-found: warn

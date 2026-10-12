@@ -4,6 +4,8 @@
 
 ## Unreleased - measurement workflows
 
+- Add independent review regressions for report redaction, Flent IP-family preservation and incomplete RRUL evidence. Keep native Word legends together across page boundaries.
+- Add Windows/source checks alongside native AMD64/ARM64 CI, pinned actions, report text-retention checks, sanitized summaries, grouped dependency updates and review/release templates. CI packages tested images; publication and deployment remain explicit actions.
 - Group runs in named projects with completed baselines, observed change summaries and comparability warnings.
 - Capture opt-in native ping, route and MTU evidence, with local CPU/interface counters and explicit missing/blocked states; save diagnostic checkpoints in SQLite.
 - Run bounded sequential TCP/UDP, direction and stream-count matrices, retaining cancellation, child failures and restart evidence.

@@ -24,7 +24,7 @@ class Element {
 
 const fields = new Map();
 for (const name of ['test-form', 'project_id', 'latency', 'endpoint_health', 'mtu',
-  'target', 'duration', 'label', 'notes', 'ip_version', 'flent-port', 'flent-confirm',
+  'target', 'duration', 'label', 'notes', 'ip_version', 'bind', 'flent-port', 'flent-confirm',
   'flent-start', 'flent-error', 'flent-editor', ...['site', 'device', 'circuit', 'ticket'].map((key) => 'tag-' + key)]) {
   fields.set(name, new Element());
 }
@@ -54,7 +54,7 @@ const workflow = createWorkflows({
     return {id: '1'.repeat(32), kind: 'flent-run', settings: body};
   },
   settings: () => ({target: field('target').value, duration: field('duration').value,
-    label: field('label').value, notes: field('notes').value, ip_version: field('ip_version').value,
+    label: field('label').value, notes: field('notes').value, ip_version: field('ip_version').value, bind: field('bind').value,
     project_id: null, tags: {}}),
   state: () => ({engineReady: true, activeId: null, runs: [], capabilities: {}}),
   start: async (run) => { starts.push(run); },
@@ -65,16 +65,20 @@ await workflow.init();
 workflow.status({flent: {available: true, version: 'fixture'}});
 await field('flent-start').dispatch('click');
 assert.equal(requests[0].ip_version, '6', 'The selected IPv6 family must reach the Flent API.');
+assert.equal(requests[0].bind, '', 'An empty bind must stay automatic in the Flent API request.');
 assert.equal(starts.length, 1);
 field('ip_version').value = '4';
 field('target').value = '127.0.0.1';
+field('bind').value = '127.0.0.1';
 await field('flent-start').dispatch('click');
 assert.equal(requests[1].ip_version, '4', 'The selected IPv4 family must reach the Flent API.');
+assert.equal(requests[1].bind, '127.0.0.1', 'The selected loopback bind must reach the Flent API.');
 
 const saved = {kind: 'flent-run', settings: {target: '::1', duration: 7, label: 'Saved fixture',
-  notes: '', port: 12866, ip_version: '6', tags: {}}};
+  notes: '', port: 12866, ip_version: '6', bind: '::1', tags: {}}};
 assert.equal(workflow.loadFlentSettings(saved), true);
 assert.equal(field('ip_version').value, '6', 'Loading saved Flent settings must restore IPv6.');
+assert.equal(field('bind').value, '::1', 'Loading saved Flent settings must restore the selected bind.');
 assert.equal(field('flent-port').value, 12866);
 assert.equal(field('flent-confirm').checked, false, 'A rerun must require fresh peer confirmation.');
 assert.equal(field('flent-start').disabled, true);
@@ -84,10 +88,13 @@ field('flent-confirm').checked = true;
 await field('flent-confirm').dispatch('change');
 await field('flent-start').dispatch('click');
 assert.equal(requests[2].ip_version, '6', 'The reloaded family must survive a new Flent request.');
+assert.equal(requests[2].bind, '::1', 'The reloaded bind must survive a new Flent request.');
 workflow.loadFlentSettings({kind: 'flent-run', settings: {target: '127.0.0.1', duration: 5, port: 12865, tags: {}}});
 assert.equal(field('ip_version').value, 'auto', 'Legacy saved settings must fall back to automatic family.');
+assert.equal(field('bind').value, '', 'Legacy saved settings must clear a previously selected bind.');
 field('flent-confirm').checked = true;
 await field('flent-confirm').dispatch('change');
 await field('flent-start').dispatch('click');
 assert.equal(requests[3].ip_version, 'auto', 'Legacy automatic family must reach the new request explicitly.');
-console.log('Flent UI behavior passed: IPv6/IPv4 request, saved-family reload, fresh confirmation and legacy fallback.');
+assert.equal(requests[3].bind, '', 'Legacy automatic bind must reach the new request explicitly.');
+console.log('Flent UI behavior passed: IP family and optional bind requests/reloads, fresh confirmation and legacy fallback.');

@@ -61,6 +61,15 @@ class FlentEvidenceTests(unittest.TestCase):
         self.assertEqual(zero["status"], "captured")
         self.assertTrue(zero["quality"]["complete"])
 
+    def test_captured_status_requires_native_source_even_without_derived_rows(self):
+        evidence = {"tool": "Flent", "workload": "rrul", "status": "captured", "data": None,
+                    "series": [], "summaries": []}
+        with self.assertRaises(ValueError): validate_flent(evidence)
+        evidence["status"] = "partial"
+        with self.assertRaises(ValueError): validate_flent(evidence)
+        evidence["status"] = "missing"
+        validate_flent(evidence)
+
     def test_malformed_native_and_fabricated_derived_values_rejected(self):
         for alteration in ("test", "time", "length", "numeric", "decreasing", "infinity"):
             bad = native()
@@ -78,7 +87,7 @@ class FlentEvidenceTests(unittest.TestCase):
     def test_bounded_settings_argument_safety_confirmation(self):
         for changes in ({"confirm_netserver": False}, {"confirm_netserver": "true"}, {"target": "host;id"},
                         {"workload": "udp_flood"}, {"duration": 61}, {"duration": True}, {"netserver_port": 0},
-                        {"netserver_port": "12865;id"}, {"latency": True}, {"bind": "127.0.0.1"}):
+                        {"netserver_port": "12865;id"}, {"latency": True}, {"bind": "127.0.0.1;id"}):
             with self.subTest(changes=changes), self.assertRaises(ValueError): settings(payload(**changes))
         validated = settings(payload(duration=60, label="Owned test"))
         self.assertEqual(validated["flent_workload"], "rrul")
@@ -89,6 +98,27 @@ class FlentEvidenceTests(unittest.TestCase):
             self.assertNotIn("--remote-metadata", args)
             self.assertNotIn("-x", args)
             self.assertTrue((Path(directory) / "empty.flentrc").is_file())
+
+    def test_bind_is_validated_saved_and_passed_to_control_and_data_flows(self):
+        configured = settings(payload(bind="127.0.0.1", ip_version="4"))
+        self.assertEqual(configured["bind"], "127.0.0.1")
+        with tempfile.TemporaryDirectory() as directory:
+            args = command({"dependencies": {"flent": "/tool/flent"}}, configured, directory)
+        self.assertIn("-4", args)
+        self.assertEqual(args[args.index("--local-bind") + 1], "127.0.0.1")
+        self.assertEqual(args[args.index("--control-local-bind") + 1], "127.0.0.1")
+
+    def test_native_declared_units_preserved_and_ambiguous_names_not_inferred(self):
+        source = native()
+        source["results"]["TCP totals"] = [1, None, 3]
+        source["results"]["TCP upload unknown"] = [1, None, 3]
+        source["results"]["Native extra"] = [1, None, 3]
+        source["metadata"]["SERIES_META"] = {"Native extra": {"UNITS": "bytes/s"}}
+        units = {row["name"]: row["unit"] for row in normalize(source)["series"]}
+        self.assertEqual(units["TCP totals"], "Mbits/s")
+        self.assertIsNone(units["TCP upload unknown"])
+        self.assertIsNone(units["Native extra"])
+        self.assertEqual(normalize(source)["data"]["metadata"]["SERIES_META"]["Native extra"]["UNITS"], "bytes/s")
 
     def test_compressed_native_file_and_symlink_ambiguous_missing_rejection(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -2,6 +2,8 @@
 
 Generate a report from completed individual tests, with no fixed selection-count cap. The first selected test is the baseline. Choose individual children from a protocol or matrix batch. Failed, running, cancelled and empty tests are rejected rather than presented as completed evidence. Resource budgets are 32 MiB of normalized report data, 500000 measured points, 32 MiB of generated chart images, 500 PDF pages and 32 MiB of Word document content. If exceeded, split the selection into smaller reports.
 
+Completed Flent records are revalidated against their native RRUL source before reporting. All eight expected TCP load flows and four RTT series require actual finite samples, and derived series must match the source. Historical rows that incorrectly claimed completion, missing sources and partial captures are rejected without rewriting or deleting the archived evidence.
+
 The preview and both downloads use one versioned report model. PDF and Word contain captured metrics, settings, timestamps, endpoint context when permitted, project labels, timeline notes, measured charts, comparison caveats and available diagnostics. Rate displays use decimal SI bps, kbps, Mbps, Gbps or Tbps, without changing stored native bps or derived Mbps. Saved per-run colors are reused; colors can repeat, so labels identify each trace. Chart panels and legends paginate for larger selections with common axes. Actual Flent throughput and RTT use separate plots. Missing values stay missing. Packet counts describe traffic volume rather than a universal improvement. Settings differences prevent claims that the measured change establishes a network improvement or regression.
 
 Runs with different durations retain their actual endpoints. The elapsed common window is disclosed separately from whole-run summary metrics. A duration-weighted common-window mean is available only where explicit, contiguous intervals exactly cover the window; a partial boundary interval or missing span is reported as unavailable. Summary averages are not recomputed or relabelled as common-window measurements.
@@ -23,5 +25,7 @@ The report APIs accept a JSON object:
 - `POST /api/reports/download?format=docx` returns a Word attachment.
 
 The preview returns a `fingerprint` of its displayed evidence. Pass that fingerprint with the download options to reject a changed archive snapshot and require a fresh preview. Report generation timestamps are excluded from the fingerprint.
+
+Native CI renders the synthetic Word fixtures with LibreOffice, then runs `scripts/check-report-layout.py` using Poppler `pdftotext`. It checks that captured Word text remains present in the converted PDF, including table labels and saved colors across page boundaries. This detects omitted table rows; it supplements visual inspection of every rendered page rather than establishing layout quality by itself.
 
 The PDF renderer is [ReportLab 4.4.9](https://pypi.org/project/reportlab/4.4.9/) under its BSD license. Word generation uses [python-docx 1.2.0](https://pypi.org/project/python-docx/1.2.0/) under the MIT license. Their installed distributions preserve the upstream notices, including the bundled font license. Report generation does not provide authentication; use FlowBench on loopback or the intended trusted network.

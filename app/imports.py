@@ -265,6 +265,8 @@ def prepare_run(data, filename, allow_job=False):
     if record.get("kind") == "flent-run":
         from .flent import validate_flent
         validate_flent(record.get("flent"))
+        if record.get("status") == "completed" and record["flent"].get("status") != "captured":
+            raise ValueError("A completed Flent run requires complete captured RRUL measurement evidence.")
         if record["settings"].get("flent_workload") != "rrul":
             raise ValueError("Flent runs must retain their native RRUL workload settings.")
     route = record.get("route")

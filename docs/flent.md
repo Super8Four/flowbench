@@ -4,6 +4,8 @@ FlowBench can run actual [Flent RRUL](https://flent.org/tests.html) through an i
 
 RRUL intentionally creates four upload and four download TCP flows plus separately identified UDP/ICMP RTT probes. It has no bandwidth cap. Confirm a controlled target with Netserver already running before selecting **Start Flent RRUL**. The adapter supports one RRUL at a time, 1–60 seconds of load, two seconds of pre/post measurement, and a bounded worker deadline. It does not install or configure a peer, credentials or firewall rules. FlowBench's managed incoming listener is an iPerf service, not Netserver.
 
+The saved IP-family choice applies to Flent. An optional validated bind address is passed to both its data flows (`--local-bind`) and control connection (`--control-local-bind`); leaving it empty preserves Flent's normal address selection. These options select an existing local address and do not configure an interface or change network permissions.
+
 ## Local tools and prerequisites
 
 The adapter detects `flent`, `netperf`, and `ping` or `fping` in the local PATH, records their availability and the reported Flent version, and exposes an unavailable message when a prerequisite is missing. Restart FlowBench after installing optional tools. Follow the [official installation guide](https://flent.org/intro.html#installation) and [command documentation](https://flent.org/options.html). Netperf requires demo support; plain iPerf peers cannot run RRUL. Runtime tests still determine whether detected dependencies and the peer actually work.
@@ -11,6 +13,8 @@ The adapter detects `flent`, `netperf`, and `ping` or `fping` in the local PATH,
 The optional verification environment uses Flent **2.3.0** and Netperf **2.7.1** source commit `afc51ff9764741da4ed6702651fba9d9c23f8557`, configured with `--enable-demo --enable-omni`. The exact source has an [MIT COPYING file](https://github.com/HewlettPackard/netperf/blob/afc51ff9764741da4ed6702651fba9d9c23f8557/COPYING). Older Netperf distributions may carry different licensing. The source archive checksum and configuration are pinned in [the test Dockerfile](../scripts/Flent.Dockerfile).
 
 The portable application image includes iPerf, ping, tracepath and report dependencies. It does not include Flent or Netperf. [The derivative test image](../scripts/Flent.Dockerfile) installs them only to validate this integration with a disposable loopback peer; it is not uploaded as a release asset. Published rc.2 downloads remain separate from this unmerged feature branch.
+
+For its loopback-only test namespace, the derivative applies [an auditable Netperf resolver patch](../scripts/netperf-loopback-resolver.patch) at two exact pinned-source sites. It omits `AI_ADDRCONFIG` only for the literal addresses `127.0.0.1` and `::1`, which otherwise fail resolution when no non-loopback interface exists. The fixture binds control and data flows to `127.0.0.1` and uses IPv4. Patch SHA-256: `1d08ee0d3154fa82af48d3f1ff44218c5a1317f0d95eed32721445656967451f`. CI prints this modified test-tool provenance; Flent itself and its native output remain unchanged. The test retains `--network none`, all capabilities dropped and `no-new-privileges`; no host settings or sysctls are changed. Ordinary installations use their preinstalled Netperf executable without this application making source changes.
 
 ## Saved evidence and cancellation
 
