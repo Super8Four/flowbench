@@ -17,7 +17,7 @@ def main():
 
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
-    print("iPerf workspace listening on container port 5000", flush=True)
+    print("FlowBench listening on container port 5000", flush=True)
     try:
         server.run()
     finally:

@@ -17,6 +17,8 @@ Run iPerf3 tests, capture incoming sessions, and compare saved results. FlowBenc
 
 ## Start on Ubuntu
 
+**[Installation wiki](docs/install/README.md)** — Windows, native Linux, Docker/Compose and Raspberry Pi ARM64.
+
 With Docker Engine and Compose v2 installed, run:
 
 ```sh

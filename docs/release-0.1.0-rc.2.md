@@ -8,6 +8,8 @@ The sidebar and favicon now prefer the supplied true vector SVG. Lettering is ou
 
 README branding and screenshots now use the vector artwork. The UI and product documentation have shorter copy, without framework credits, repeated slogans or development-process notes. Third-party licenses and attribution remain in their notice files.
 
+The [installation wiki](install/README.md) covers Windows, native Ubuntu, containers, Pi ARM64 caveats, configuration, backups and troubleshooting. It distinguishes verified packaging/startup from untested physical-device deployment.
+
 Native AMD64 and ARM64 images are rebuilt for this version. CI derives package names and OCI version labels from `app/version.py`, checks the app/version and both logo resources inside the running image, and runs the complete regression/lifecycle suite. Publication requires terminal success at the exact final main commit, checked image source/version/architecture/config identities and asset checksums. The release page records that commit and run.
 
 Use the matching architecture's `.tar.gz`, `.image.json` and `.SHA256SUMS` files following [installation](setup-and-testing.md). GitHub source downloads contain the same SVG and PNG. Compatibility image tag remains `iperf-workspace:local`.

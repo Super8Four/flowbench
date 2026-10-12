@@ -6,6 +6,7 @@
 
 - Prefer the supplied self-contained SVG logo in the sidebar and favicon, retaining the original PNG fallback, palette and proportions.
 - Update README branding and screenshots; remove framework credits, repeated slogans and development-process commentary from product-facing copy.
+- Add a linked installation wiki for Windows, Ubuntu native, Docker/Compose and Pi ARM64 caveats, with configuration, maintenance and troubleshooting.
 - Include outlined lettering without fonts, scripts, embedded raster or external resources; verify safe SVG content and asset serving.
 - Derive CI package names/OCI version labels from the application version and rebuild both native image archives for this prerelease.
 - Keep 0.1.0-rc.1 and its downloads unchanged. Database schema and operational/security scope remain unchanged.
