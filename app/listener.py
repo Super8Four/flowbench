@@ -230,8 +230,8 @@ class IncomingListener:
                     self.record = before
                     raise
             elif item.get("event"):
-                if item.get("event") == "error":
-                    self.error = str(item.get("data"))
+                if item.get("event") == "error" and not self.stopping:
+                    self.error = self.error or str(item.get("data"))
                 self.diagnostic(line)
             if "start" in item and "end" in item:
                 self.full_report(item)
@@ -245,7 +245,8 @@ class IncomingListener:
             if cookie and cookie == self.last_cookie:
                 return
             if not (start.get("accepted_connection") or start.get("connected")):
-                self.error = full.get("error") or self.error
+                if not self.stopping:
+                    self.error = self.error or full.get("error")
                 self.diagnostic(json.dumps(full, ensure_ascii=False))
                 return
             self.begin(start)

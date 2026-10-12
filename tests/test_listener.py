@@ -121,6 +121,9 @@ class ListenerTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/listener/stop', json={}).status_code, 200)
         self.assertFalse(self.listener.running)
         self.assertFalse(self.manager.storage.listener_config()['enabled'])
+        self.listener.consume_line(json.dumps({'event': 'error', 'data': 'interrupt - server terminated by signal'}))
+        self.listener.full_report({'start': {}, 'error': 'interrupt - server terminated by signal'})
+        self.assertIsNone(self.listener.error)
 
     def test_stop_active_incoming_retains_partial_evidence(self):
         port = self.start_listener()
@@ -193,6 +196,8 @@ class ListenerTests(unittest.TestCase):
             response = self.client.post('/api/listener/stop', json={})
         self.assertEqual(response.status_code, 503)
         self.assertFalse(self.listener.running)
+        self.listener.consume_line(json.dumps({'event': 'error', 'data': 'interrupt - server terminated by signal'}))
+        self.listener.full_report({'start': {}, 'error': 'interrupt - server terminated by signal'})
         self.assertIn('could not be saved', self.listener.error)
         self.assertTrue(self.manager.storage.listener_config()['enabled'])
 
