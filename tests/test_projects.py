@@ -8,7 +8,10 @@ from app.annotations import annotate_run
 from app.imports import prepare_run, prepare_source_documents
 from app.projects import ProjectStore, validate_project_assignment
 from app.runner import RunManager
-from tests.test_annotations import sample_record
+try:
+    from test_annotations import sample_record
+except ModuleNotFoundError:
+    from tests.test_annotations import sample_record
 
 
 class ProjectTests(unittest.TestCase):

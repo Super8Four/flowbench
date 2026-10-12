@@ -6,7 +6,10 @@ import unittest
 from unittest.mock import patch
 
 from app import create_app
-from tests.test_annotations import sample_record
+try:
+    from test_annotations import sample_record
+except ModuleNotFoundError:
+    from tests.test_annotations import sample_record
 
 
 class ProjectImportAPITests(unittest.TestCase):
