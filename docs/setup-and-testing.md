@@ -1,184 +1,84 @@
-# Setup and testing guide
+# FlowBench installation and operation
 
-This guide covers running the iPerf workspace on an Ubuntu Docker host, testing both ends of a connection, and keeping evidence to compare a network fix. The app records the iPerf3 process it starts, including stdout, stderr, timestamps, settings, measurements, and returned server output. Tests run from the Docker host's container; the browser controls and displays them.
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
 
-Use your own addresses and SSH account in the examples. `192.168.1.100` represents the Docker host; `192.168.1.200` represents another iPerf server. These are example addresses, not discovered machines.
+## Ubuntu container
 
-## Install and start
+Install Docker Engine and Compose v2 using [Docker's Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/) on the approved host. Build from the intended branch/tag using the README commands. Use native `linux/amd64` or `linux/arm64`; choose ARM64 only on a compatible 64-bit host. The runtime is non-root UID/GID `10001:10001`, with a read-only root, `/tmp` tmpfs, dropped capabilities and a writable `/data` volume.
 
-Use native Docker Engine on Ubuntu with the Compose plugin. Follow the [official Ubuntu installation instructions](https://docs.docker.com/engine/install/ubuntu/) if Docker is missing. Git, Python 3, and curl are needed for checkout and testing. The account running these commands needs Docker access.
-
-On the Ubuntu host:
-
-```bash
-uname -m
-docker version
-docker compose version
-python3 --version
-git clone https://github.com/Super8Four/iPerfWeb.git
-cd iPerfWeb
-docker compose config --quiet
-docker compose up -d --build --wait
-docker compose ps
-curl --fail http://127.0.0.1:5000/api/ready
-```
-
-For an existing checkout, enter its directory and use `git pull --ff-only` instead of cloning again. Build on the host to match its architecture. GitHub CI provides separate AMD64 and ARM64 image archives. Use the archive matching the host architecture, or build natively on that host.
-
-Expect a healthy container and a readiness response containing `"ready": true`. Compose's [`--wait` option](https://docs.docker.com/reference/cli/docker/compose/up/) waits for service startup and health. The app requires no separate PostgreSQL container.
-
-Open http://127.0.0.1:5000 if the browser is on the Docker host. From another computer, run this tunnel in a terminal and leave it open:
+To use the prerelease image instead of building, download its architecture-specific `.tar.gz`, `.image.json` and `.SHA256SUMS` files into a clean directory. Verify the checksum list **before** loading. Example for ARM64:
 
 ```sh
-ssh -N -L 127.0.0.1:8080:127.0.0.1:5000 user@192.168.1.100
-```
-
-Open http://127.0.0.1:8080 on that computer. Replace `user` with the host's actual SSH account. The app's web API has no login. Compose requests loopback publication, and the tunnel provides remote access. Docker [releases before 28.0.0 can expose loopback-published ports to the same network segment](https://docs.docker.com/engine/network/port-publishing/); review the host's access boundary before deployment.
-
-## Verify the container
-
-In the repository directory on the Docker host, run:
-
-```bash
-set -euo pipefail
-mkdir -p test-artifacts
-git rev-parse HEAD | tee test-artifacts/tested-commit.txt
-docker run --rm --entrypoint python --mount "type=bind,source=$(pwd)/tests,target=/tests,readonly" iperf-workspace:local -m unittest discover -s /tests -v 2>&1 | tee test-artifacts/container-tests.log
-python3 scripts/check-container.py 2>&1 | tee test-artifacts/container-lifecycle.log
-```
-
-Expect `OK` and `Container checks passed`. Tests include SQLite transactions, concurrency, errors, migration and rollback. Lifecycle checks use a disposable archive and verify real TCP bidirectional measurements, remote output, JSON/XML import/export, legacy migration, SQLite integrity, presets, container replacement and shutdown during a test. They clean up only their own test containers/volume. The persistent app can stay running, but wait until checks finish before measuring network performance.
-
-These checks establish application behavior using loopback traffic. The [native Ubuntu CI run for commit `57c64ca`](https://github.com/Super8Four/iPerfWeb/actions/runs/38115446084) passed 48 tests on each of AMD64 and ARM64, plus the container lifecycle checks. The [README testing instructions](../README.md#test-on-the-ubuntu-server) include build logging. See [Project state](project-state.md) for target-host verification boundaries; successful CI checks do not establish deployment on another host.
-
-## Run a client test
-
-Start iPerf3 on the other machine. For example, with iPerf3 already installed:
-
-```sh
-iperf3 -s -p 5201
-```
-
-Leave it running during testing, then stop it with Ctrl+C. That machine must accept the connection on port 5201. UDP tests also need UDP traffic to that port; their control connection uses TCP.
-
-In the web interface:
-
-1. Choose **Client · test a remote server** and enter the other machine's address, such as `192.168.1.200`, with port `5201`.
-2. Start with TCP, 10 seconds, and one stream. Leave **Local bind address** blank.
-3. Choose Upload, Download, or Bidirectional. Upload sends from the app's client to the target; Download sends from the target to that client. Bidirectional runs both together. These directions follow [iPerf3's client perspective](https://software.es.net/iperf/invoking.html).
-4. Give the run a label and record the link, location, connection type, and conditions in Notes. Select **Start session**.
-5. Check the live graph and log, then open the completed run from **Previous tests**. Its row shows interval maximum upload/download, averages, measured runtime, and a throughput trend.
-
-Only one session runs at a time in an app instance. For UDP, choose a deliberate bandwidth target such as `10M`; it is applied per stream. Preserve that target and stream count when comparing runs. Windows builds disable UDP bidirectional; the Ubuntu container supports it when the peer supports it.
-
-## Accept an incoming test
-
-Use this when another machine should connect to the app as the iPerf server. Publishing port 5201 alone does not start a server; start a server session in the interface.
-
-In the repository's `.env` file, set the following values, replacing the example address with an IPv4 address assigned to the Docker host. Merge these settings into an existing file:
-
-```dotenv
-IPERF_BIND_ADDRESS=192.168.1.100
-IPERF_PORT=5201
-```
-
-Apply the mapping:
-
-```sh
+sha256sum -c flowbench-0.1.0-rc.1-linux-arm64.SHA256SUMS
+gzip -dc flowbench-0.1.0-rc.1-linux-arm64.tar.gz | docker load
+docker image inspect iperf-workspace:local --format '{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
 docker compose up -d --no-build --wait
-docker compose port app 5201
 ```
 
-Compose publishes TCP and UDP on that host address. Keep the web port on loopback. Confirm that the network path permits incoming iPerf traffic from the test client. Docker's published ports require appropriate host/network controls; [Docker documents their interaction with Ubuntu firewalls](https://docs.docker.com/engine/install/ubuntu/#firewall-limitations).
+The compatibility image tag remains `iperf-workspace:local`. Metadata records its source revision, version, architecture and image ID. Release source archives are GitHub-generated source downloads; they contain no local `.env`, archives or Windows engine. A container archive does **not** include your data volume.
 
-In the web interface, choose **Server · accept one test**, set port `5201`, leave **Local bind address** blank, label the session, and select **Start session**. The server accepts one test and then exits. Start another server session before each subsequent test. Waiting for a client defaults to 300 seconds and produces no throughput result if it times out.
+## Configuration and reachability
 
-From the other machine, run one of these commands while the app's server session is waiting:
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `WEB_PORT` (Compose substitution) | `5000` | Host web port, bound to loopback |
+| `IPERF_PORT` (Compose substitution) | `5201` | Host TCP/UDP mapped port; keep listener's container port at 5201 |
+| `IPERF_BIND_ADDRESS` (Compose substitution) | `127.0.0.1` | Host publication address |
+| `RUNS_DIRECTORY` | `/data/runs` container; `instance/runs` local | Writable archive directory |
+| `IPERF_PATH` | Bundled container engine; local bin/PATH lookup | Executable, checked at startup |
+| `FLOWBENCH_RESUME_LISTENER` | `1` | Set `0` for maintenance commands to suppress saved listener startup; does not change saved enable state |
 
-```sh
-# Upload from this client to the app server; save a native JSON result.
-iperf3 -c 192.168.1.100 -p 5201 -t 10 -J --get-server-output > client-upload.json
+The web server and iPerf listener are independent. Client tests require no inbound iPerf publication. For an incoming peer, choose the listener bind deliberately: `127.0.0.1` accepts clients inside that container only; `0.0.0.0` allows the container's IPv4 interfaces to receive the existing mapping. Listener settings do not change host publication/firewall rules. Configure external reachability only after approving the access boundary. The API is unauthenticated. [Docker documents additional loopback publication limits on Engine versions before 28](https://docs.docker.com/engine/network/port-publishing/).
 
-# Start another server session in the app before this download test.
-iperf3 -c 192.168.1.100 -p 5201 -t 10 -R -J --get-server-output > client-download.json
-```
+Read status at `/api/status`, health at `/api/health` and readiness at `/api/ready`. Failed archive capture disables readiness until repair/restart. The UI shows the archive path, engine and version on Configuration.
 
-The app archives its server measurements and logs. The client files preserve the client's measurements and returned server output. Import those files using **Import saved tests** if both records are needed in the app. Native JSON contains the data supplied by iPerf; full app exports also contain the app's event history and notes.
+## Tests, directions and evidence
 
-If host port 5201 is occupied, set `IPERF_PORT=5202` and recreate the app. The other machine connects to **5202**, while the port inside the app stays **5201**. Do not run a separate host `iperf3 -s` on the same published host address and port.
+Use an authorized controlled peer, not an arbitrary public endpoint. `iperf3 -s` stays available for repeated tests; `-s -1` accepts only one and cannot serve a complete Both job. Directions always use the client perspective: upload is client to server, download is server to client, bidirectional runs both directions together. Both runs TCP **then** UDP with distinct identities and charts. UDP bandwidth is per stream; start with a bounded rate, such as `2M`, for checks.
 
-## Inspect remote results and compare a fix
+Live final averages use reported receiver evidence where available. Interval peaks are separate from final averages. Missing data is displayed as unavailable rather than zero. Remote output requires the peer to supply it. Optional route probes run after throughput, use at most 16 hops/20 seconds, and retain probe RTTs separately; they are not iPerf latency or throughput measurements.
 
-For a completed client session, use **Chart results source** to select **Remote server results** or **Compare local & remote**. Returned server curves are dashed, and **Remote server raw output** retains what the peer supplied. The app requests that output automatically. iPerf supplies server output after a completed test; cancelled tests and some public servers may have no usable remote measurements. Local server sessions already display the server's own measurements.
-
-To document a fix:
-
-1. Run a baseline before making the change. Record the client and server locations, wired/Wi-Fi connection, protocol, direction, duration, streams, UDP target if used, and relevant background traffic in Notes.
-2. Export the session using **JSON** or **XML**, then **Export session**. Both formats retain the same available measurements and complete captured app logs.
-3. Apply the change and repeat with the same configuration. Use **Load settings** on the baseline to fill the form, then change the label and notes before starting.
-4. Under **Compare tests**, select the baseline and follow-up. Review throughput, retransmissions, jitter, and packet loss where reported, plus any warnings about different settings.
-5. Choose the export format and select **Export comparison**. It includes both source runs and their calculated differences.
-
-Upload is blue and download is green. Missing measurements are blank; a blank is not zero. A row's maximum is a recorded interval peak, while its average is a final reported rate. Sparkline scales vary by run, so compare the numbers and full graph rather than sparkline height alone. Keep container networking and test conditions consistent; one higher peak does not establish a sustained improvement.
-
-## Share results and server presets
-
-Share full session or comparison JSON/XML exports through the usual file-sharing method. In the receiving app, open **History & import** and select **Import saved tests**. Imported records get new local IDs and retain supplied settings, results, notes, dates, logs, and provenance. Importing equivalent JSON/XML objects again skips duplicates of earlier imports. Files are limited to 20 MiB each. A bare `run.json` metadata file lacks the separate log file; use full exports when sharing evidence.
-
-Server presets are separate from test evidence. In **Server presets**, use **Export presets JSON** and **Import server JSON** to share them. Public listings can be loaded and edited; loading does not start a test. Use **Save the current test settings as a custom preset** for a private endpoint.
-
-The [example server preset](examples/server-presets.json) contains TCP upload defaults for `192.168.1.100:5201`. Replace the address and any port mapping before importing it. Its endpoint must have a waiting server session or a running standalone iPerf server. Imported preset files merge into the catalog and do not delete saved tests.
+History imports saved/native JSON and compatible XML; individual files are limited to 20 MiB, preset catalogs to 8 MiB. Imports are additive, remap local IDs and skip repeated identical evidence. Both/comparison envelopes preserve group provenance. Keep full exports with raw logs; summary-only reports cannot recreate evidence. Public presets are bundled reference data, not checked live; custom presets are editable and portable through JSON.
 
 ## Keep and back up the archive
 
-The app saves in `/data/runs/archive.sqlite3` in the Compose volume. JSON/XML export is an additional portable copy. Stop, restart and rebuild preserve the volume. Keep the same checkout directory/Compose project name; changing it can select another volume and hide history. `docker compose down --volumes` deletes the archive. Follow the [SQLite migration/rollback guide](sqlite-storage.md) when upgrading from file storage.
-
-For a complete backup, run these commands on the host while no test is active:
-
-```bash
-set -euo pipefail
-backup_dir="$HOME/iperf-backups/$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$backup_dir"
-docker compose stop app
-container_id=$(docker compose ps --all --quiet app)
-docker cp "$container_id:/data/runs" "$backup_dir/"
-git rev-parse HEAD > "$backup_dir/tested-commit.txt"
-docker compose up -d --no-build --wait
-printf 'Backup saved to %s\n' "$backup_dir"
-```
-
-This copies SQLite evidence/presets, sidecars and retained legacy sources outside the container/repository. Keep the whole stopped backup together; copying only a running database can miss committed WAL data. Copy it to another machine for recovery. Restore portable exports through the interface, or follow the [fresh archive procedure](../README.md#ubuntu-container) to preserve IDs. Never restore over an archive containing evidence.
-
-Before updating, back up the archive, then run:
+Finish/stop active tests, then stop the app. Keep the Compose project name and volume when upgrading. **Do not run `docker compose down --volumes`** when retaining history.
 
 ```sh
-git pull --ff-only
-docker compose up -d --build --wait
-docker compose ps
+docker compose stop app
+container_id=$(docker compose ps --all --quiet app)
+docker cp "$container_id:/data" ./flowbench-backup-2026-10-12
 ```
 
-Confirm that an older run still opens with its notes and logs after the update.
+Choose a new destination for each backup, outside the data volume. Copy all files, including `archive.sqlite3`, any WAL/SHM sidecars and legacy sources. Never copy only a running database or delete its journal sidecars. Start again with `docker compose up -d --wait`.
+
+Restore into a **fresh** archive/volume, not over newer history. Keep an independent untouched backup. Set ownership `10001:10001` for the container's restored files, start one app and verify IDs, notes, logs, metrics, presets and listener settings. A restored enabled listener resumes unless maintenance startup suppression is set. See [SQLite rollback](sqlite-storage.md#rollback) before using an older application.
+
+## Local development
+
+Windows PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\scripts\install-iperf.ps1
+.\scripts\start.ps1
+```
+
+On Linux, use a Python virtual environment and a compatible iPerf3 executable. The container pins 3.22 because older distribution packages can lack full streaming JSON. Start one Waitress process from `wsgi:app`, bound to loopback, without a debugger/reloader. `.env.example` lists local overrides; `.env` is ignored and excluded from the image build.
 
 ## Troubleshooting
 
-| Symptom | Check |
+| Symptom | Action |
 | --- | --- |
-| SSH reports permission denied | Use the correct host account and authorized SSH key. The app does not create SSH access. |
-| Docker reports permission denied | Confirm that the host account has Docker access; follow Docker's installation/post-install instructions. |
-| Web page is unreachable | Check `docker compose ps`, readiness, and the SSH tunnel. The default mapping requests loopback; see the pre-28 Docker limitation above. |
-| Container is unhealthy | Check logs, `/api/ready`, free disk space, archive permissions and migration errors. `/api/health` checks writable SQLite; readiness also needs iPerf and archive ownership. |
-| Server test cannot connect | Check the address, published host port, TCP/UDP reachability, and that the one-test server session is waiting. |
-| Port is already allocated | Check for another listener. Set `WEB_PORT` for the host web port or `IPERF_PORT` for the host iPerf port, then recreate the container and use the new port. |
-| Another process owns the archive | Keep one app process per archive. Do not mount the same archive into two running app instances. |
-| Remote graph is empty | Finish a client test and inspect its raw server output. The peer may omit output or usable measurements. |
-| History appears empty after an update | Check the Compose project name and volume before running new tests or restoring data. |
+| Listener failed / address in use | Stop the conflicting test/process or choose a matching unused port; inspect listener diagnostics, then explicitly restart |
+| A second incoming client fails | One accepted session is supported at a time; wait for it to finish. Windows can report a reset instead of "busy" |
+| No incoming history | Confirm the client reaches this managed process and its bind/mapping; other independent iPerf servers are not captured |
+| UDP/Both bidirectional rejected on Windows | Use native Linux, or select upload/download explicitly |
+| Missing remote measurements | Keep local evidence; peers may not supply remote output; no data is fabricated |
+| HTTP 503 / archive errors | Stop traffic, retain the archive, inspect free space/permissions and SQLite diagnostics, restore access then restart; never delete the database as a repair shortcut |
+| Another writer owns archive | Stop the duplicate app; one process with threads owns each directory |
+| Import fails / unsupported schema | Preserve original file, validate a copy and supported envelope; failed transactions do not partially import |
+| Browser request times out | Refresh status before retrying a start/enable action; it may have completed on the server |
 
-For help, share the tested Git commit, host architecture, `docker compose ps`, relevant app/test logs, and a full export of the affected run. Review logs and notes for private addresses or other sensitive details before sharing them outside the team.
-
-## Updated workspace navigation
-
-Tests, final result cards, logs, exports, saved-session notes, and custom preset editing live on **Test & export**. Use **History & import** to load saved JSON/XML evidence, then Open a row for its detail. **Compare tests** overlays two or three completed runs, with one color per test and solid upload / dashed download lines; it also offers the remote-report view when available. Exporting retains every selected run and its logs.
-
-The optional route checkbox captures at most 16 hops / 20 seconds after successful client throughput measurement. Raw route output and RTTs are retained in session exports. Clear it for throughput-only tests. Incoming server sessions skip it. Missing replies do not establish packet loss.
-
-The Ubuntu image is intended for native AMD64 and ARM64 operation. The workflow builds/tests each architecture independently and packages the matching archive. An ARM64 artifact from CI still needs target-host verification before treating jRPI-5 deployment as complete. See [requirements](requirements.md) and [project state](project-state.md).
+Run `python -m unittest discover -s tests -v` with a verified engine. Docker checks use `python3 scripts/check-container.py` with disposable containers/volume; do not point them at the production Compose project. See [verification](verification.md) for checked and unverified scope.

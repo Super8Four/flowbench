@@ -27,7 +27,7 @@ jobs:
       - name: Validate Compose and build Ubuntu image
         run: |
           docker compose config --quiet
-          docker build --tag iperf-workspace:local .
+          docker build --build-arg VCS_REF="${{ github.sha }}" --tag iperf-workspace:local .
           test "$(docker image inspect iperf-workspace:local --format '{{.Architecture}}')" = "${{ matrix.arch }}"
           docker run --rm --entrypoint tracepath iperf-workspace:local -V
       - name: Run all tests with Linux iPerf3
@@ -39,11 +39,15 @@ jobs:
         run: python3 scripts/check-container.py
       - name: Package verified image
         if: github.event_name != 'pull_request'
-        run: docker save iperf-workspace:local | gzip > iperf-workspace-linux-${{ matrix.arch }}.tar.gz
+        run: |
+          arch="${{ matrix.arch }}"
+          docker save iperf-workspace:local | gzip > "flowbench-0.1.0-rc.1-linux-${arch}.tar.gz"
+          docker image inspect iperf-workspace:local > "flowbench-0.1.0-rc.1-linux-${arch}.image.json"
+          sha256sum flowbench-0.1.0-rc.1-linux-${arch}.* > "flowbench-0.1.0-rc.1-linux-${arch}.SHA256SUMS"
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
-          name: iperf-workspace-linux-${{ matrix.arch }}
-          path: iperf-workspace-linux-${{ matrix.arch }}.tar.gz
+          name: flowbench-linux-${{ matrix.arch }}
+          path: flowbench-0.1.0-rc.1-linux-${{ matrix.arch }}.*
           retention-days: 14
           compression-level: 0

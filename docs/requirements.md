@@ -1,42 +1,23 @@
-# iPerf workspace requirements
+# FlowBench requirements and acceptance boundaries
 
-The goal is an AdminLTE interface for running iPerf, retaining evidence, comparing changes, and operating in an Ubuntu container on AMD64 or Linux ARM64, including a Raspberry Pi 5.
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
 
-## Application acceptance criteria
+FlowBench's current scope is a portable iPerf3 measurement/evidence workspace with focused Test & export, Incoming capture, History & import, Compare tests, Server presets and Configuration pages. Ubuntu native AMD64/ARM64 containers and SQLite persistence are part of this prerelease. The GitHub repository is now `flowbench`; existing local checkout, image tag and archive paths remain compatible.
 
-- Test & export, History & import, Comparison, Server presets, and Accept incoming test have their own routes and AdminLTE sidebar navigation with submenus. Other pages' forms and tables are not rendered or loaded on the test page.
-- The test page retains live throughput, local/remote report views, timestamped output, editable settings, labels, notes, JSON/XML export, and rerunning saved configurations.
-- Finished tests show colored result cards using reported throughput, measured duration, outcome, and packet-loss detail when available. Missing values are not replaced with zero.
-- History retains its compact dark table, settings/status, interval peaks, final averages, measured time, trends, search, open, import, and export actions.
-- Comparison overlays two or three distinct completed tests on common elapsed-seconds and Mbps axes. Each test has a distinct color, upload is solid, and download is dashed. Remote reports are available when supplied by iPerf. No remote data is fabricated.
-- Comparison retains measurement tables, change from baseline, settings mismatch warnings, and JSON/XML evidence exports. Both the older two-test export and the new three-test envelope can be imported.
-- Public server presets and editable custom targets/settings remain available. Custom presets are saved from the test form. Additional arbitrary iPerf command arguments are outside the current scope.
-- A one-test server session accepts incoming iPerf traffic, records actual peer parameters, and retains its output and measurements. Container port mappings must match the selected listening port.
-- The client form offers route capture after throughput measurement. Capture is bounded to 16 hops and 20 seconds, uses Windows `tracert` or Linux `tracepath`, and records raw output and probe RTTs independently. Timeout, unavailable tools, cancellation, and missing replies are visible. Old imports remain compatible; API calls default to no route capture unless `traceroute: true` is supplied.
+| Area | Current implementation | Acceptance boundary |
+| --- | --- | --- |
+| Client configuration and measurement | TCP/UDP/Both, explicit directions, default bidirectional, bounded validation, logs/local and available remote reports | Peer compatibility, real network conditions and target performance need evaluation |
+| Persistence and portability | SQLite transactions, unchanged evidence formats, additive imports, presets/notes, automatic legacy-file migration, legacy snapshot export | Backups, hardware durability and operator restore validation remain required |
+| History and comparison | Peaks/averages/runtime, search, notes, two/three-test overlays, settings warnings, JSON/XML evidence | Broader chart interaction and accessibility acceptance are not established by this release |
+| Incoming listener | Managed independent process, raw client captures, one incoming at a time, restart/stop/error and overlap metadata | No unlimited concurrency or guaranteed measurement isolation |
+| Route evidence | Post-test bounded tracepath/tracert with raw output, hops and probe RTTs | Not throughput, iPerf RTT or authenticated topology discovery |
+| UI | Supplied FlowBench logo, tagline, gunmetal/navy/crimson, flat measured cards, responsive layouts, visible focus/errors | Targeted browser QA is not a full WCAG certification or full audit closure |
+| R13 profiles/thresholds | Pending | Presets are not automatic threshold evaluation |
+| R14 reports | Pending | Existing JSON/XML evidence exports are not full designed report generation |
+| R15 retention | Pending | No automatic deletion or retention policy |
+| R16 authentication | Pending | Same-origin guards are not login or API authorization |
+| R17 instance coordination | Pending | Managed listener/Both jobs are not authenticated instance-to-instance pairing, coordination or correlation |
 
-## Container acceptance criteria
+Container criteria: Ubuntu 24.04/Python 3.12/checksummed upstream iPerf3 3.22, non-root UID/GID 10001, one Waitress process, read-only root, persistent writable `/data`, signal cleanup and readiness. CI must execute tests and lifecycle checks natively on both architectures at the exact release commit. A successful CI image is not a Raspberry Pi deployment, live access-boundary change or completion of all canonical requirements.
 
-- Retain Ubuntu 24.04 packaging with Python 3.12 and checksummed upstream iPerf3 3.22; build for the target architecture rather than shipping the Windows binary.
-- Run as UID/GID 10001 without privileged mode or added capabilities. Store runs, logs, imports, notes, and custom presets in the persistent `/data` volume.
-- Use one Waitress process, bounded subprocesses, signal cleanup, readiness checks, and the existing Compose hardening.
-- Build, run the regression suite, and verify readiness, real loopback measurement, persistence, and shutdown on native AMD64 and ARM64 CI runners. Inspecting configuration alone does not establish runtime support.
-- Actual Raspberry Pi deployment and access-boundary changes remain separate actions. On Docker versions before 28, review the documented loopback-publication limitation before treating those mappings as private.
-
-## Running the Ubuntu container
-
-On an approved Docker host, from the repository root:
-
-```sh
-docker compose config --quiet
-docker compose build
-docker compose up -d --wait
-curl --fail http://127.0.0.1:5000/api/ready
-```
-
-Native builds on an ARM64 host produce ARM64 images. The CI workflow also produces architecture-specific Docker archives; load the matching archive with `gzip -dc iperf-workspace-linux-arm64.tar.gz | docker load` before using `docker compose up -d --no-build --wait`. Changing hosts requires moving the evidence volume separately. Avoid `docker compose down --volumes` when retaining history.
-
-Web access defaults to host loopback on port 5000. Client tests need no inbound iPerf mapping. Server sessions use the TCP and UDP mappings on port 5201; change `IPERF_PORT` for the host-side port and `IPERF_BIND_ADDRESS` only after deciding the approved reachability. Keep the in-app server port at 5201 for that mapping. No host networking is required.
-
-For traceroute, the image includes Ubuntu's [iputils-tracepath package](https://packages.ubuntu.com/noble/iputils-tracepath), which is available for ARM64. No host package installation is performed by the application.
-
-Requirements are tracked in [GitHub issue #1](https://github.com/Super8Four/iPerfWeb/issues/1). See [Project state](project-state.md) for the verification boundary and [setup and testing guide](setup-and-testing.md) for operator workflows.
+The [public tracking issue](https://github.com/Super8Four/flowbench/issues/1) and [project state](project-state.md) provide context. Private source requirements and visual references are not reproduced in the repository. Unverified findings from other work remain separate; this prerelease does not close them by implication.

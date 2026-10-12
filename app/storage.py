@@ -113,6 +113,15 @@ class SQLiteArchive:
         connection.execute("INSERT INTO metadata VALUES ('presets', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                            (encode(catalog),))
 
+    def listener_config(self):
+        with self.connection() as connection:
+            row = connection.execute("SELECT value FROM metadata WHERE key='listener'").fetchone()
+        return json.loads(row[0]) if row else None
+
+    def save_listener_config(self, config):
+        with self.transaction() as connection:
+            connection.execute("INSERT INTO metadata VALUES ('listener', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (encode(config),))
+
     def ready(self):
         # Exercise writable storage, including locks/full disks; do not scan history.
         with self.transaction() as connection:

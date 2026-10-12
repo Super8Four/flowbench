@@ -62,6 +62,18 @@ def main():
                                       "duration": duration, "streams": 2, "mode": mode,
                                       "label": "Disposable container verification"})["id"]
 
+    def incoming_runs():
+        return [row for row in request('/api/runs')['runs'] if row.get('incoming') and not row.get('imported')]
+
+    def wait_incoming(count):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            rows = incoming_runs()
+            if len(rows) >= count and all(row['finished_at'] for row in rows):
+                return rows
+            time.sleep(.1)
+        raise RuntimeError('Incoming sessions did not finish: ' + str(request('/api/listener')))
+
     docker("volume", "create", volume)
     try:
         # Seed only this disposable volume with the pre-SQLite file layout.
@@ -144,10 +156,37 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         group_import = request("/api/runs/import", {"filename": "both.json", "content": json.dumps(group_export)})
         group_xml = request(f"/api/runs/{job_id}/export?format=xml", raw=True)
         assert request("/api/runs/import", {"filename": "both.xml", "content": group_xml.decode()})["duplicates"] == group_import["imported"]
+        # An independent listener captures ordinary raw clients without a browser/API-created run.
+        request('/api/listener', {'bind': '127.0.0.1', 'port': 5204, 'max_duration': 10})
+        time.sleep(.4)
+        for flags in [[], ['-R'], ['-u', '--bidir']]:
+            native = json.loads(docker('exec', name, 'iperf3', '-c', '127.0.0.1', '-p', '5204', '-t', '1', '-b', '2M', '-J', *flags))
+            assert not native.get('error'), native
+        captures = wait_incoming(3)
+        assert len({row['id'] for row in captures}) == 3
+        assert all(row['status'] == 'completed' for row in captures), captures
+        incoming_export = request('/api/runs/' + captures[0]['id'] + '/export')
+        assert incoming_export['incoming']['remote_host'] == '127.0.0.1'
+        assert incoming_export['events'] and incoming_export['native_result']
+        docker('exec', '--detach', name, 'iperf3', '-c', '127.0.0.1', '-p', '5204', '-t', '4', '-b', '2M', '-J')
+        deadline = time.monotonic() + 5
+        while not request('/api/listener')['active_run'] and time.monotonic() < deadline:
+            time.sleep(.1)
+        overlap_incoming = request('/api/listener')['active_run']
+        assert overlap_incoming
+        overlap_outgoing = test_run(1)
+        wait_incoming(4)
+        assert overlap_outgoing in request('/api/runs/' + overlap_incoming)['concurrency']['overlap_run_ids']
+        assert overlap_incoming in request('/api/runs/' + overlap_outgoing)['concurrency']['overlap_run_ids']
         preset = request("/api/presets", {"name": "Disposable loopback preset", "settings": {"target": "127.0.0.1", "port": 5202}})
         memory = docker("stats", "--no-stream", "--format", "{{.MemUsage}}", name)
         stop_and_remove()
         start()
+        assert request('/api/listener')['state'] == 'listening', 'Enabled listener did not resume'
+        assert len(incoming_runs()) == 4, 'Incoming evidence was duplicated on restart'
+        assert request('/api/runs/' + captures[0]['id'] + '/export') == incoming_export
+        docker('exec', name, 'iperf3', '-c', '127.0.0.1', '-p', '5204', '-t', '1', '-b', '2M', '-J')
+        assert len(wait_incoming(5)) == 5
         assert request(f"/api/runs/{run_id}/export?format=json") == exported, "Evidence changed after replacement"
         assert request(f"/api/runs/{imported}/export") == imported_export, "Import changed after replacement"
         assert request(f"/api/runs/{job_id}/export") == group_export, "Both evidence changed after replacement"
@@ -159,6 +198,7 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
                       "import sqlite3; c=sqlite3.connect('/data/runs/archive.sqlite3'); print(c.execute('PRAGMA integrity_check').fetchone()[0]); c.close()") == "ok"
         assert any(row["id"] == preset["id"] for row in request("/api/presets")["presets"]), "Preset was lost"
         active_id = test_run(30, "upload")
+        docker('exec', '--detach', name, 'iperf3', '-c', '127.0.0.1', '-p', '5204', '-t', '8', '-b', '2M', '-J')
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             if request("/api/runs/" + active_id)["series"]:
@@ -171,8 +211,12 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         stopped = request("/api/runs/" + active_id)
         assert stopped["status"] == "cancelled", stopped["status"]
         assert stopped["series"] and stopped["events"] and stopped["finished_at"]
+        interrupted = [row for row in incoming_runs() if row['status'] == 'cancelled']
+        assert len(interrupted) == 1 and request('/api/runs/' + interrupted[0]['id'])['events']
+        request('/api/listener/stop', {})
+        assert request('/api/listener')['settings']['enabled'] is False
         size = int(docker("image", "inspect", "--format", "{{.Size}}", image)) / (1024 * 1024)
-        result = f"Container checks passed: TCP bidirectional, remote output, JSON/XML import/export and deduplication, non-root/read-only runtime, SQLite integrity, legacy volume migration, volume/preset persistence, graceful active-test stop. Image: {size:.1f} MiB; idle memory: {memory}."
+        result = f"Container checks passed: TCP/UDP Both bidirectional, remote output, JSON/XML import/export and deduplication, managed raw-client listener, independent inbound/outbound overlap, listener resume without duplicate history, graceful incoming/outgoing stop, non-root/read-only runtime, SQLite integrity, legacy migration and volume/preset persistence. Image: {size:.1f} MiB; idle memory: {memory}."
         print(result)
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary_path:

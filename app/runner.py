@@ -120,6 +120,7 @@ class RunManager:
         self.worker = None
         self.record = None
         self.job = None
+        self.listener = None
         self.events = []
         self.capture_errors = []
         self.storage_error = None
@@ -166,6 +167,7 @@ class RunManager:
             info.update(available=True, version=version.stdout.splitlines()[0],
                         json_stream="--json-stream" in help_text,
                         full_json="--json-stream-full-output" in help_text,
+                        server_max_duration="--server-max-duration" in help_text,
                         bidir="--bidir" in help_text)
             # Verified Windows Cygwin build hangs for UDP bidirectional sessions.
             info["udp_bidir"] = info["bidir"] and os.name != "nt"
@@ -180,6 +182,8 @@ class RunManager:
 
     def read(self, run_id):
         with self.lock:
+            if self.listener and self.listener.record and run_id == self.listener.record["id"]:
+                return copy.deepcopy(self.listener.record)
             if self.job and run_id == self.job["id"]:
                 return copy.deepcopy(self.job)
             if self.record and run_id == self.record["id"]:
@@ -211,6 +215,8 @@ class RunManager:
                     row["imported"] = record.get("imported")
                     row["kind"] = record.get("kind")
                     row["protocol_job"] = record.get("protocol_job")
+                    row["incoming"] = record.get("incoming")
+                    row["concurrency"] = record.get("concurrency")
                     records.append(row)
                 except (KeyError, OSError, json.JSONDecodeError):
                     continue
@@ -272,6 +278,8 @@ class RunManager:
         with self.lock:
             if self.active:
                 raise RuntimeError("A session is already running. Stop it before starting another.")
+            if settings["role"] == "server" and self.listener and self.listener.running and settings["port"] == self.listener.config["port"]:
+                raise RuntimeError("The managed listener already owns this port; incoming tests are captured automatically.")
             record = {"schema_version": 1, "id": uuid4().hex, "created_at": now(),
                       "finished_at": None, "status": "starting", "settings": settings,
                       "command": commands[0], "iperf_version": self.capabilities["version"],
@@ -478,6 +486,8 @@ class RunManager:
                                                     stderr=subprocess.PIPE, text=True, encoding="utf-8",
                                                     errors="replace", bufsize=1, creationflags=CREATE_FLAGS)
                     self.record["status"] = "running"
+                    if self.listener:
+                        self.listener.mark_overlap(self.record)
                     self.save(self.record)
                 else:
                     self.record["status"] = "cancelled"
@@ -556,6 +566,8 @@ class RunManager:
 
     def stop(self, run_id):
         with self.lock:
+            if self.listener and self.listener.record and run_id == self.listener.record["id"]:
+                raise ValueError("Use Stop listener to stop an incoming test and its managed listener.")
             if self.active and self.job and run_id in {self.job["id"], *(row["id"] for row in self.job["children"])}:
                 self.cancel_requested = True
                 try:
@@ -578,6 +590,11 @@ class RunManager:
                     self.process.terminate()
 
     def shutdown(self):
+        if self.listener:
+            try:
+                self.listener.stop(disable=False)
+            except OSError as exc:
+                self.storage_error = str(exc)
         if self.active:
             try:
                 self.stop(self.active)
@@ -604,6 +621,8 @@ class RunManager:
                 self.record = record
             if self.job and run_id == self.job["id"]:
                 self.job = record
+            if self.listener and self.listener.record and run_id == self.listener.record["id"]:
+                self.listener.record = record
             return record
 
     def export(self, run_id):

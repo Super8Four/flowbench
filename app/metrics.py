@@ -58,8 +58,11 @@ def series(record):
                 if not value or value.get("omitted") or "bits_per_second" not in value:
                     continue
                 direction = "download" if key.endswith("reverse") or settings["mode"] == "download" else "upload"
-                points.append({"seconds": value["end"], "mbps": value["bits_per_second"] / 1_000_000,
-                               "direction": direction})
+                point = {"seconds": value["end"], "mbps": value["bits_per_second"] / 1_000_000,
+                         "direction": direction}
+                if isinstance(value.get("start"), (int, float)) and not isinstance(value["start"], bool):
+                    point["start"] = value["start"]
+                points.append(point)
         elif "bits_per_second" in interval:
             points.append({"seconds": interval["end"], "mbps": interval["bits_per_second"] / 1_000_000,
                            "direction": interval.get("direction") or settings["mode"], "stream": interval["stream"]})

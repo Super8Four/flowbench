@@ -1,27 +1,13 @@
-# Project state
+# FlowBench project state
 
-## SQLite feature branch
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
 
-The branch also adds [TCP/UDP/Both and bidirectional defaults](protocol-tests.md). Both has sequential, independently saved TCP and UDP children, aggregate job status and compatible child exports. This is not instance-to-instance coordination or a repository rename.
+This prerelease is prepared on **feature/sqlite-storage**, isolated from other work. The branch began at verified remote main `2d8d29c8ea0112543031cc566f3ca0fe847e29ed`. Main used UUID JSON/JSONL evidence directories and an optional unused PostgreSQL starter; this branch replaces archive persistence with SQLite and removes the scaffold without connecting to PostgreSQL.
 
-FlowBench's `feature/sqlite-storage` starts from remote main `2d8d29c8ea0112543031cc566f3ca0fe847e29ed`, retaining the `iPerfWeb` repository and compatibility paths. SQLite now stores runs, logs, notes, imports and presets in `/data/runs/archive.sqlite3`. The unused PostgreSQL scaffold is removed; old files import transactionally without source deletion. [Migration, backup and rollback](sqlite-storage.md) describes recovery. Earlier container results below apply to their original commits. R13–R16 and other acceptance gaps remain outside this storage change.
+SQLite implementation `708a577f2a7599030c15604cff03c749bbae9b70` passed 63 local tests and native AMD64/ARM64 [CI run 38261839934](https://github.com/Super8Four/flowbench/actions/runs/38261839934). TCP/UDP/Both implementation `4b9ccc9c24faf25358f1e8fd5e40a57901bcd54d` passed 78 local tests and native [CI run 38264847645](https://github.com/Super8Four/flowbench/actions/runs/38264847645). These are historical checks of those exact commits, not substitutes for final release validation.
 
-Recorded October 11, 2026. The current implementation extends repository main at `2ade0ccd5dd47d8e0ec3d89486ee39bee3c6e617`. The earlier isolated packaging experiment was based on `03c16a0`; its archive was not transferred and is not the current application package.
+The release adds managed incoming capture, saved listener configuration, independent outgoing execution, overlapping-run labels, failure/restart evidence and FlowBench branding. UI assets are local and the supplied logo is preserved. The project-scoped upstream UI/UX skill is pinned and attributed; it is excluded from the runtime image.
 
-## Implemented behavior
+Current test sources cover transactional migration/retry, rollback export, locks/full disk/denied writes, interrupted recovery, concurrency, imports/exports, protocol jobs and real bounded raw-client listener sessions. The container check exercises disposable-volume replacement, enabled listener resume, no duplicated history and graceful incoming/outgoing stop. [Verification](verification.md) describes browser checks and the exact-commit release gate.
 
-The Flask/AdminLTE application has focused test/export, incoming-server, history/import, comparison, and preset pages with sidebar submenus. Completed runs show colored measured-result cards. Comparison overlays two or three runs and preserves metric changes, settings warnings, local/remote reports, and JSON/XML evidence. Existing persistent output, native/saved import, duplicate detection, labels, notes, public/custom presets, and single-test server sessions are retained.
-
-Client tests can capture a bounded route after throughput measurement. Windows uses `tracert`; Ubuntu uses unprivileged `tracepath`. Raw output, responding hops, and probe RTTs are archived separately. Tests cover missing tools, timeout, cancellation, and import/export preservation without external route probes.
-
-## Container goal and verification boundary
-
-Ubuntu 24.04 packaging retains Python 3.12, checksummed upstream iPerf3 3.22, a non-root runtime, one Waitress process, signal cleanup, read-only root filesystem, persistent `/data`, and `/api/ready`. Compose defaults web and TCP/UDP iPerf mappings to loopback. PostgreSQL is optional. The updated workflow builds and tests native AMD64 and ARM64 images, checks architecture and route-tool availability, runs regression and lifecycle checks, and packages separate image archives.
-
-Local application verification uses the existing Windows Python/iPerf installation and loopback-only throughput. This machine has no Docker or Podman runtime, so it cannot build or execute the image locally. CI results must be inspected for the specific published commit before claiming image verification. Configuration inspection alone does not establish ARM64 execution.
-
-An earlier authorized read-only SSH inventory verified the target Pi's `aarch64` architecture, Docker `26.1.5+dfsg1` daemon on `linux/arm64`, and Compose `2.26.1-4`. No application source transfer, image build, smoke test, or deployment on that Pi started. Buildx and target storage were not checked. Credentials are not part of repository documentation.
-
-Docker documents a [loopback-publication limitation before version 28](https://docs.docker.com/engine/network/port-publishing/), so the target's access boundary needs review before deployment. No host, network, firewall, or authentication settings were changed. Future Pi deployment remains a separately authorized action.
-
-See [requirements](requirements.md), [issue #1](https://github.com/Super8Four/iPerfWeb/issues/1), and [setup and testing guide](setup-and-testing.md).
+No live database, old desktop checkout, main branch, credentials, host firewall or private requirements vault is modified by this work. No Raspberry Pi deployment occurred. R13-R17 and broader acceptance/audit gaps in [requirements](requirements.md) remain open. Authentication, automatic retention and full report generation are not advertised as implemented.

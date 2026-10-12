@@ -13,6 +13,8 @@ from .metrics import comparison, measurements, series, effective_settings, overv
 from .imports import parse_document, import_runs
 from .presets import PresetStore, MAX_CATALOG_BYTES
 from .peer import peer_results
+from .listener import IncomingListener, ListenerConflict
+from .version import __version__
 
 
 def create_app(test_config=None):
@@ -20,12 +22,21 @@ def create_app(test_config=None):
     app = Flask(__name__)
     app.config["RUNS_DIRECTORY"] = os.getenv("RUNS_DIRECTORY", str(Path(app.instance_path) / "runs"))
     app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024
+    app.config["FLOWBENCH_VERSION"] = __version__
     if test_config:
         app.config.update(test_config)
     manager = RunManager(app.config["RUNS_DIRECTORY"], app.config.get("IPERF_PATH"))
     app.extensions["iperf_runs"] = manager
     presets = PresetStore(manager)
     app.extensions["iperf_presets"] = presets
+    listener = IncomingListener(manager)
+    manager.listener = listener
+    app.extensions["iperf_listener"] = listener
+    if listener.config["enabled"] and os.getenv("FLOWBENCH_RESUME_LISTENER", "1") != "0":
+        try:
+            listener.start(persist=False)
+        except (OSError, RuntimeError, ValueError) as exc:
+            listener.state, listener.error = "failed", str(exc)
 
     @app.before_request
     def check_origin():
@@ -76,6 +87,23 @@ def create_app(test_config=None):
                             headers={"Content-Disposition": 'attachment; filename="iperf-server-presets.json"'})
         return jsonify(data)
 
+    @app.get("/api/listener")
+    def listener_status():
+        return jsonify(listener.status())
+
+    @app.post("/api/listener")
+    def start_listener():
+        try:
+            return jsonify(listener.start(request.get_json())), 201
+        except ListenerConflict as exc:
+            return jsonify(error=str(exc)), 409
+        except RuntimeError as exc:
+            return jsonify(error=str(exc)), 503
+
+    @app.post("/api/listener/stop")
+    def stop_listener():
+        return jsonify(listener.stop())
+
     @app.post("/api/presets")
     def save_preset():
         return jsonify(presets.save_custom(request.get_json())), 201
@@ -114,6 +142,7 @@ def create_app(test_config=None):
     @app.get("/comparison")
     @app.get("/servers")
     @app.get("/server")
+    @app.get("/configuration")
     def index():
         page = request.path.strip("/") or "test"
         return render_template("index.html", page=page)
@@ -123,7 +152,7 @@ def create_app(test_config=None):
         return jsonify(iperf=manager.capabilities, active_run=manager.active_id,
                        storage=str(manager.directory), storage_error=manager.storage_error,
                        storage_backend="sqlite", database=str(manager.storage.path),
-                       saved_runs=len(manager.list_runs()))
+                       saved_runs=len(manager.list_runs()), version=__version__, listener=listener.status())
 
     @app.get("/api/runs")
     def list_runs():
@@ -143,7 +172,9 @@ def create_app(test_config=None):
         try:
             record = manager.start(request.get_json())
         except RuntimeError as exc:
-            return jsonify(error=str(exc)), 409 if manager.active else 503
+            data = request.get_json()
+            conflict = manager.active or (listener.running and isinstance(data, dict) and data.get("role") == "server")
+            return jsonify(error=str(exc)), 409 if conflict else 503
         return jsonify(record), 201
 
     @app.get("/api/runs/<run_id>")

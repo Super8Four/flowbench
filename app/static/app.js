@@ -2,7 +2,7 @@ const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
 let engineReady = false, capabilities = {}, selectionVersion = 0, lastHistory = 0, comparisonVersion = 0;
-let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null;
+let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null, listenerState = null;
 const testPage = Boolean($('test-form'));
 const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
@@ -11,15 +11,22 @@ const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': 
 const title = (run) => `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {cache: 'no-store', ...options,
-    headers: {'Content-Type': 'application/json', ...options.headers}});
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
+  let response;
+  try {
+    response = await fetch(path, {cache: 'no-store', ...options, signal: controller.signal,
+      headers: {'Content-Type': 'application/json', ...options.headers}});
+  } catch (error) {
+    throw new Error(error.name === 'AbortError' ? 'Request timed out. Refresh status before retrying; an accepted test may still be running.' : error.message);
+  } finally { clearTimeout(timer); }
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
   return data;
 }
 function message(text, type = 'danger') {
   $('message').className = `alert alert-${type}`;
-  $('message').textContent = text;
+  if ($('message').textContent !== text) $('message').textContent = text;
+  $('message').setAttribute('role', type === 'danger' ? 'alert' : 'status');
 }
 function safe(action) {
   return async (event) => { try { await action(event); } catch (error) { message(error.message); } };
@@ -27,11 +34,61 @@ function safe(action) {
 function controls() {
   if (!testPage) return;
   $('run-button').disabled = !engineReady || Boolean(activeId);
-  $('run-button').textContent = activeId ? 'Session running…' : '▶ Start session';
+  $('run-button').textContent = activeId ? 'Test running' : 'Start test';
   $('stop-button').disabled = !activeId;
+}
+function renderStatus(status) {
+  capabilities = status.iperf;
+  engineReady = status.iperf.available && !status.storage_error;
+  $('engine-badge').textContent = engineReady ? '● iPerf3 connected' : status.storage_error ? 'Archive unavailable' : 'iPerf3 unavailable';
+  $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
+  if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
+  if ($('configuration-engine')) $('configuration-engine').textContent = status.iperf.version || 'Unavailable';
+  if ($('configuration-storage')) $('configuration-storage').textContent = status.database;
+  renderListener(status.listener);
+  if (!engineReady) message(status.storage_error || status.iperf.error);
+  controls();
+}
+function renderListener(state) {
+  listenerState = state;
+  if (!$('listener-form') || !state) return;
+  const fields = {bind: 'listener-bind', port: 'listener-port', max_duration: 'listener-duration', label: 'listener-label', notes: 'listener-notes'};
+  if (!$('listener-form').dataset.loaded) {
+    for (const [key, id] of Object.entries(fields)) $(id).value = state.settings[key];
+    $('listener-form').dataset.loaded = 'true';
+  }
+  const running = state.state === 'listening';
+  for (const id of Object.values(fields)) $(id).disabled = running;
+  $('listener-start').disabled = running || !engineReady;
+  $('listener-stop').disabled = !running && !state.settings.enabled;
+  $('listener-state').className = `badge ms-auto status-badge status-${state.state}`;
+  $('listener-state').textContent = `Listener ${state.state}`;
+  $('listener-active').innerHTML = state.active_run ? `Capturing incoming test. <a href="/?run=${encodeURIComponent(state.active_run)}">Open live evidence</a>` : 'No incoming test is active. Accepted sessions appear in History automatically.';
+  if (!$('listener-form').dataset.localError) {
+    $('listener-error').classList.toggle('d-none', !state.error);
+    if (state.error) $('listener-error').textContent = state.error;
+  }
+}
+function listenerFormError(error) {
+  $('listener-form').dataset.localError = 'true';
+  $('listener-error').classList.remove('d-none');
+  $('listener-error').textContent = error.message;
+  $('listener-error').tabIndex = -1;
+  $('listener-error').focus();
+  const field = /bind/i.test(error.message) ? 'listener-bind' : /port/i.test(error.message) ? 'listener-port' : /duration/i.test(error.message) ? 'listener-duration' : null;
+  if (field) {
+    $(field).setAttribute('aria-invalid', 'true');
+    $(field).setAttribute('aria-describedby', field + '-error');
+    let inline = $(field + '-error');
+    if (!inline) { inline = document.createElement('p'); inline.id = field + '-error'; inline.className = 'field-error mt-2 mb-0'; $(field).parentElement.append(inline); }
+    inline.textContent = error.message;
+    const link = document.createElement('a'); link.href = '#' + field; link.textContent = 'Review this field';
+    $('listener-error').append(document.createElement('br'), link);
+  }
 }
 function fields() {
   const server = $('role').value === 'server';
+  if (server) { location.href = '/configuration'; return; }
   $('target-field').classList.toggle('d-none', server);
   $('target').required = !server;
   $('target').disabled = server;
@@ -145,28 +202,24 @@ async function uploadFile(file, path, maxBytes) {
 function renderLogs() {
   const filter = $('log-filter').value, search = $('log-search').value.toLowerCase();
   const visible = events.filter((row) => (filter === 'all' || row.source === filter) && row.message.toLowerCase().includes(search));
-  $('log-output').textContent = visible.map((row) => `[${date(row.timestamp)}] [${row.source}] ${row.message}`).join('\n') || 'No matching output.';
+  $('log-output').textContent = visible.map((row) => `[${date(row.timestamp)}] [${row.source}] ${row.message}`).join('\n') || (events.length ? 'No output matches these filters.' : selected ? 'No captured output is available for this session.' : 'Select a session to view captured output.');
   if ($('autoscroll').checked) $('log-output').scrollTop = $('log-output').scrollHeight;
 }
 function smoothPath(data, x, y) {
-  const points = data.map((p) => ({x: x(p.seconds), y: y(p.mbps)}));
-  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
-  const slopes = points.slice(1).map((p, i) => (p.y - points[i].y) / (p.x - points[i].x));
-  const tangents = points.map((p, i) => {
-    if (!i) return slopes[0];
-    if (i === points.length - 1) return slopes.at(-1);
-    const left = slopes[i - 1], right = slopes[i];
-    if (left * right <= 0) return 0;
-    return Math.sign(left) * Math.min(Math.abs((left + right) / 2), 3 * Math.min(Math.abs(left), Math.abs(right)));
-  });
-  let path = `M ${points[0].x},${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1], b = points[i], step = (b.x - a.x) / 3;
-    path += ` C ${a.x + step},${a.y + tangents[i - 1] * step} ${b.x - step},${b.y - tangents[i] * step} ${b.x},${b.y}`;
-  }
-  return path;
+  // Draw measured samples directly; never fit a smoothed curve across missing intervals.
+  return data.map((point, index) => {
+    const gap = index && Number.isFinite(point.start) && point.start > data[index - 1].seconds + 0.000001;
+    return `${!index || gap ? 'M' : 'L'} ${x(point.seconds)},${y(point.mbps)}`;
+  }).join(' ');
 }
+function chartWidth(id) {
+  const width = Math.max(220, $(id).getBoundingClientRect().width || 760);
+  $(id).setAttribute('viewBox', `0 0 ${width} 240`);
+  return width;
+}
+
 function chart(localPoints, remotePoints = []) {
+  const width = chartWidth('throughput-chart'), right = width - 15, ticks = width < 600 ? 3 : 6;
   const perspective = $('chart-perspective').value;
   const lines = [];
   for (const [source, input] of [['local', localPoints], ['remote', remotePoints]]) {
@@ -180,34 +233,41 @@ function chart(localPoints, remotePoints = []) {
   const points = lines.flatMap((line) => line.data);
   $('peer-legend').classList.toggle('d-none', perspective !== 'compare');
   if (!points.length) {
-    $('throughput-chart').innerHTML = `<text x="380" y="115" text-anchor="middle" fill="#9da7b0" font-size="13">${perspective === 'remote' ? 'No remote interval measurements are available' : 'Interval measurements will appear here'}</text>`;
+    $('throughput-chart').innerHTML = `<text x="${width / 2}" y="110" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'No remote interval measurements' : 'Interval measurements'}</text><text x="${width / 2}" y="130" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'are available for this session' : 'will appear here'}</text>`;
     return;
   }
   const maxTime = points.reduce((max, p) => Math.max(max, p.seconds), 1);
   const rawMax = points.reduce((max, p) => Math.max(max, p.mbps), 1) * 1.08;
   const step = 10 ** Math.floor(Math.log10(rawMax)) / 2;
   const maxRate = Math.ceil(rawMax / step) * step;
-  const x = (t) => 57 + t / maxTime * 688, y = (n) => 202 - n / maxRate * 177;
+  const x = (t) => 57 + t / maxTime * (width - 72), y = (n) => 202 - n / maxRate * 177;
   let svg = '<defs>';
   for (const line of lines) svg += `<linearGradient id="fill-${line.source}-${line.direction}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${line.color}" stop-opacity="${line.source === 'remote' && perspective === 'compare' ? '.14' : '.32'}"/><stop offset="1" stop-color="${line.color}" stop-opacity=".025"/></linearGradient>`;
   svg += '</defs>';
-  for (let i = 0; i <= 6; i++) {
-    const value = maxRate * i / 6, height = y(value);
-    svg += `<line x1="57" y1="${height}" x2="745" y2="${height}" stroke="#353c41"/><text x="47" y="${height + 3}" text-anchor="end" fill="#aab3bb" font-size="9">${number(value, maxRate < 10 ? 1 : 0)}</text>`;
+  for (let i = 0; i <= ticks; i++) {
+    const value = maxRate * i / ticks, height = y(value);
+    svg += `<line x1="57" y1="${height}" x2="${right}" y2="${height}" stroke="#353c41"/><text x="47" y="${height + 3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(value, maxRate < 10 ? 1 : 0)}</text>`;
   }
-  for (let i = 0; i <= 6; i++) {
-    const seconds = maxTime * i / 6;
-    svg += `<text x="${x(seconds)}" y="222" text-anchor="${i === 0 ? 'start' : i === 6 ? 'end' : 'middle'}" fill="#aab3bb" font-size="9">${number(seconds, 1)}s</text>`;
+  for (let i = 0; i <= ticks; i++) {
+    const seconds = maxTime * i / ticks;
+    svg += `<text x="${x(seconds)}" y="222" text-anchor="${i === 0 ? 'start' : i === ticks ? 'end' : 'middle'}" fill="#aab3bb" font-size="12">${number(seconds, 1)}s</text>`;
   }
   for (const line of lines) {
     const path = smoothPath(line.data, x, y), dashed = line.source === 'remote' && perspective === 'compare';
-    svg += `<path d="${path} L ${x(line.data.at(-1).seconds)},202 L ${x(line.data[0].seconds)},202 Z" fill="url(#fill-${line.source}-${line.direction})"/>`;
     svg += `<path d="${path}" stroke="${line.color}" stroke-width="${dashed ? '1.6' : '1.9'}" ${dashed ? 'stroke-dasharray="6 4"' : ''} fill="none"/>`;
     for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="${line.data.length === 1 ? 3 : 5}" fill="${line.color}" fill-opacity="${line.data.length === 1 ? 1 : 0}"><title>${line.source} ${line.direction}: ${number(p.mbps)} Mbps at ${number(p.seconds, 2)}s</title></circle>`;
   }
   $('throughput-chart').innerHTML = svg;
 }
 function renderPeer() {
+  if (selected?.kind === 'protocol-job') {
+    const width = chartWidth('throughput-chart');
+    $('chart-source-note').textContent = 'TCP and UDP results are separate. Open a protocol test above to view its measured directions, chart and remote output.';
+    $('throughput-chart').innerHTML = `<text x="${width / 2}" y="110" text-anchor="middle" fill="#aab6bf" font-size="12">Open TCP or UDP above</text><text x="${width / 2}" y="130" text-anchor="middle" fill="#aab6bf" font-size="12">for its throughput chart</text>`;
+    $('peer-summary').classList.add('d-none');
+    $('peer-output').textContent = 'Open a protocol test to view its remote output.';
+    return;
+  }
   const peer = selected?.peer;
   $('peer-output').textContent = peer?.raw_output || peer?.note || 'Remote output will appear after the server supplies it.';
   const perspective = $('chart-perspective').value;
@@ -234,7 +294,7 @@ function renderSelected() {
     $(direction + '-rate').textContent = number(metrics[direction + '_mbps'] ?? (!terminal.has(selected.status) ? latest?.mbps : undefined));
     $(direction + '-peak').textContent = `Mbps · Peak ${number(selected.overview?.['max_' + direction + '_mbps'])} Mbps`;
   }
-  $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
+  $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.incoming && selected.finished_at ? `Incoming session captured · ${date(selected.finished_at)}. The listener has a separate lifetime.` : selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
   $('export-button').disabled = false;
   $('rerun-button').disabled = false;
   $('protocol-job-card').classList.toggle('d-none', selected.kind !== 'protocol-job');
@@ -245,8 +305,6 @@ function renderSelected() {
   }
   renderPeer();
   if (selected.kind === 'protocol-job') {
-    $('chart-source-note').textContent = 'TCP and UDP results are separate. Open a protocol test above to view its measured directions, chart and remote output.';
-    $('throughput-chart').innerHTML = '<text x="380" y="115" text-anchor="middle" fill="#9da7b0" font-size="13">Open TCP or UDP above for its throughput chart</text>';
     $('exit-code').textContent = selected.error || `Both job ${selected.status}. Each protocol retains its own logs and process outcome.`;
   }
   renderLogs();
@@ -321,9 +379,11 @@ function comparisonOptions() {
   }
 }
 async function loadHistory() {
+  const status = await api('/api/status');
+  renderStatus(status);
   if (!$('history-body') && !$('baseline')) {
-    const data = await api('/api/status'); activeId = data.active_run; lastHistory = Date.now();
-    $('saved-count').textContent = `${data.saved_runs} saved sessions`; controls(); return;
+    activeId = status.active_run; lastHistory = Date.now();
+    $('saved-count').textContent = `${status.saved_runs} saved sessions`; controls(); return;
   }
   const data = await api('/api/runs');
   runs = data.runs; activeId = data.active_run; lastHistory = Date.now();
@@ -333,6 +393,7 @@ async function loadHistory() {
 function comparisonIds() { return ['baseline', 'candidate', 'third'].map((id) => $(id).value).filter(Boolean); }
 function comparisonPath() { return '/api/comparison?' + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
 function overlay() {
+  const width = chartWidth('comparison-chart'), right = width - 15, ticks = width < 600 ? 3 : 5;
   const colors = ['#1683ff', '#15d3a6', '#ffc857'];
   const remote = $('comparison-perspective').value === 'remote';
   const records = comparisonData?.runs || [];
@@ -347,12 +408,12 @@ function overlay() {
   });
   $('comparison-legend').innerHTML = records.map((run,i) => `<span style="color:${colors[i]}">● ${escape(title(run))} · ${escape(date(run.created_at))}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span>`).join('');
   const points = lines.flatMap((l) => l.data);
-  if (!points.length) { $('comparison-chart').innerHTML = '<text x="380" y="115" text-anchor="middle" fill="#aab3bb">No interval data for this selection</text>'; return; }
+  if (!points.length) { $('comparison-chart').innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab3bb">No interval data for this selection</text>`; return; }
   const maxTime = Math.max(1, ...points.map((p) => p.seconds)), maxRate = Math.max(1, ...points.map((p) => p.mbps)) * 1.1;
-  const x = (t) => 57 + t / maxTime * 688, y = (v) => 202 - v / maxRate * 177;
+  const x = (t) => 57 + t / maxTime * (width - 72), y = (v) => 202 - v / maxRate * 177;
   let svg = '';
-  for (let i=0;i<=5;i++) {
-    svg += `<line x1="57" y1="${y(i*maxRate/5)}" x2="745" y2="${y(i*maxRate/5)}" stroke="#353c41"/><text x="47" y="${y(i*maxRate/5)+3}" text-anchor="end" fill="#aab3bb" font-size="10">${number(i*maxRate/5,1)}</text><text x="${x(i*maxTime/5)}" y="222" text-anchor="middle" fill="#aab3bb" font-size="10">${number(i*maxTime/5,1)}s</text>`;
+  for (let i=0;i<=ticks;i++) {
+    svg += `<line x1="57" y1="${y(i*maxRate/ticks)}" x2="${right}" y2="${y(i*maxRate/ticks)}" stroke="#353c41"/><text x="47" y="${y(i*maxRate/ticks)+3}" text-anchor="end" fill="#aab3bb" font-size="12">${number(i*maxRate/ticks,1)}</text><text x="${x(i*maxTime/ticks)}" y="222" text-anchor="middle" fill="#aab3bb" font-size="12">${number(i*maxTime/ticks,1)}s</text>`;
   }
   for (const line of lines) {
     svg += `<path d="${smoothPath(line.data,x,y)}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.direction === 'download' ? 'stroke-dasharray="7 5"' : ''}/>`;
@@ -475,12 +536,13 @@ $('save-notes')?.addEventListener('click', safe(async () => {
 }));
 for (const id of ['baseline', 'candidate', 'third']) $(id)?.addEventListener('change', safe(compare));
 $('export-comparison')?.addEventListener('click', safe(() => download(`${comparisonPath()}&format=${$('export-format').value}`, 'iperf-comparison')));
-document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => link?.addEventListener('click', () => {
-  document.querySelectorAll('.sidebar-menu .nav-link').forEach((other) => other.classList.toggle('active', other === link));
-}));
+document.querySelectorAll('.sidebar-menu .nav-link').forEach((link) => {
+  if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current', 'page');
+});
 
 async function tick() {
   try {
+    if (document.hidden) return;
     if (Date.now() - lastHistory > 3000) await loadHistory();
     if (selectedId && selected && (activeId === selectedId || !terminal.has(selected.status))) await loadSelected();
   } catch (error) { message(`Connection problem: ${error.message}`); }
@@ -489,16 +551,10 @@ async function tick() {
 async function init() {
   try {
     const status = await api('/api/status');
-    capabilities = status.iperf;
-    engineReady = status.iperf.available && !status.storage_error;
-    $('engine-badge').textContent = engineReady ? '● iPerf3 connected' : 'iPerf3 unavailable';
-    $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
-    if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
-    if (!engineReady) message(status.storage_error || status.iperf.error);
+    renderStatus(status);
     await loadHistory();
     if (testPage || $('preset-body')) await loadPresets();
     if (testPage) {
-      if (document.body.dataset.page === 'server') $('role').value = 'server';
       fields();
       if (query.get('preset')) applyPreset(query.get('preset'));
       if (query.get('run') || activeId) await selectRun(query.get('run') || activeId);
@@ -508,6 +564,30 @@ async function init() {
   tick();
 }
 init();
+
+$('listener-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  $('listener-start').disabled = true;
+  $('listener-start').textContent = 'Enabling…';
+  $('listener-error').classList.add('d-none');
+  delete $('listener-form').dataset.localError;
+  $('listener-form').querySelectorAll('.field-error').forEach((field) => field.remove());
+  $('listener-form').querySelectorAll('[aria-invalid]').forEach((field) => field.removeAttribute('aria-invalid'));
+  try {
+    const state = await api('/api/listener', {method: 'POST', body: JSON.stringify({bind: $('listener-bind').value, port: $('listener-port').value,
+      max_duration: $('listener-duration').value, label: $('listener-label').value, notes: $('listener-notes').value})});
+    renderListener(state);
+    message('Managed listener enabled. Incoming tests will be saved without keeping this page open.', 'success');
+  } catch (error) { listenerFormError(error); }
+  finally { $('listener-start').textContent = 'Enable listener'; if (listenerState?.state !== 'listening') $('listener-start').disabled = !engineReady; }
+});
+$('listener-stop')?.addEventListener('click', async () => {
+  $('listener-stop').disabled = true;
+  $('listener-stop').textContent = 'Stopping…';
+  try { renderListener(await api('/api/listener/stop', {method: 'POST', body: '{}'})); message('Listener stopped and disabled. Saved evidence is retained.', 'success'); }
+  catch (error) { listenerFormError(error); }
+  finally { $('listener-stop').textContent = 'Stop listener'; }
+});
 
 function renderResults() {
   const job = selected.kind === 'protocol-job';
@@ -520,7 +600,7 @@ function renderResults() {
   }
   $('result-runtime').textContent = number(selected.overview?.runtime_seconds);
   $('result-outcome').textContent = selected.status;
-  $('result-outcome-box').className = `small-box text-bg-${selected.status === 'completed' ? 'success' : selected.status === 'failed' ? 'danger' : 'warning'}`;
+  $('result-outcome-box').className = `metric-card outcome-card outcome-${selected.status}`;
   const losses = ['upload','download'].filter((d) => Number.isFinite(metrics[d+'_lost_percent'])).map((d) => `${d} loss ${number(metrics[d+'_lost_percent'])}%`);
   $('result-quality').textContent = losses.join(' · ') || 'No packet-loss measurement reported';
   const route = selected.route;
@@ -528,4 +608,12 @@ function renderResults() {
   $('route-output').textContent = route?.raw_output || '';
   const hops = route?.hops || [];
   $('route-hops').innerHTML = hops.length ? `<table class="table"><thead><tr><th>Hop</th><th>Address</th><th>Probe RTT · ms</th></tr></thead><tbody>${hops.map((h) => `<tr><td>${escape(h.hop)}</td><td>${escape(h.address || 'No reply')}</td><td>${(h.rtt_ms || []).map((v) => number(v)).join(' / ') || '—'}</td></tr>`).join('')}</tbody></table>` : '';
+  if (selected.incoming || selected.concurrency) {
+    const notes = [];
+    if (selected.incoming) notes.push(`Managed incoming capture from ${selected.incoming.remote_host || 'unknown peer'}. Directions use that client's perspective: upload enters this server, download leaves it.`);
+    if (selected.concurrency) notes.push(selected.concurrency.note);
+    $('route-note').textContent = notes.join(' ');
+  }
 }
+
+window.addEventListener('resize', () => { if (testPage && selected) renderPeer(); if ($('comparison-chart')) overlay(); });

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import secrets
 import subprocess
 import tempfile
 import time
@@ -144,12 +145,15 @@ class RealIperfTests(unittest.TestCase):
     def port(self):
         # Windows can reserve a UDP range independently of TCP. iPerf's UDP
         # listener shares the TCP control port, so verify both before selecting it.
-        for _ in range(50):
+        for _ in range(100):
             with socket.socket() as tcp, socket.socket(type=socket.SOCK_DGRAM) as udp:
-                tcp.bind(('127.0.0.1', 0))
-                port = tcp.getsockname()[1]
+                # Windows may repeatedly allocate the same ephemeral UDP port
+                # while TCP still has it in TIME_WAIT. Probe distinct random
+                # candidates without modifying any host port reservations.
+                port = 20000 + secrets.randbelow(45535)
                 try:
                     udp.bind(('127.0.0.1', port))
+                    tcp.bind(('127.0.0.1', port))
                 except OSError:
                     continue
                 return port

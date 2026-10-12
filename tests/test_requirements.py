@@ -16,14 +16,14 @@ class WorkspaceTests(unittest.TestCase):
     tearDown = fixtures.ImportTests.tearDown
     upload = fixtures.ImportTests.upload
     def test_focused_pages_and_tree_navigation(self):
-        for path, section in [('/', 'test-form'), ('/server', 'test-form'), ('/history', 'history-body'),
+        for path, section in [('/', 'test-form'), ('/server', 'listener-form'), ('/configuration', 'listener-form'), ('/history', 'history-body'),
                               ('/comparison', 'comparison-chart'), ('/servers', 'preset-body')]:
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             text = response.get_data(as_text=True)
             self.assertIn('data-lte-toggle="treeview"', text)
             self.assertIn('id="' + section + '"', text)
-            for other in {'test-form', 'history-body', 'comparison-chart', 'preset-body'} - {section}:
+            for other in {'test-form', 'listener-form', 'history-body', 'comparison-chart', 'preset-body'} - {section}:
                 self.assertNotIn('id="' + other + '"', text)
 
     def test_three_run_comparison_roundtrip_and_validation(self):

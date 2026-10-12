@@ -1,12 +1,14 @@
 # FlowBench SQLite storage, migration and rollback
 
+[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](assets/badges/platform.svg)](./setup-and-testing.md) [![Storage](assets/badges/storage.svg)](./sqlite-storage.md)
+
 ## Storage design
 
-FlowBench retains the `Super8Four/iPerfWeb` repository and compatibility paths. Base commit `2d8d29c8ea0112543031cc566f3ca0fe847e29ed` stores evidence in UUID directories containing `run.json` and `events.jsonl`, plus `server-presets.json`. PostgreSQL/SQLAlchemy and `Measurement` are unused starter code. This branch removes that scaffold and its optional Compose service. It never connects to, alters or deletes PostgreSQL data. Old `DATABASE_URL`/`POSTGRES_*` values are ignored. If custom code populated starter tables, retain their separate backup; this branch has no custom PostgreSQL importer.
+FlowBench uses the renamed `Super8Four/flowbench` repository and retains compatibility paths. Base commit `2d8d29c8ea0112543031cc566f3ca0fe847e29ed` stores evidence in UUID directories containing `run.json` and `events.jsonl`, plus `server-presets.json`. PostgreSQL/SQLAlchemy and `Measurement` are unused starter code. This branch removes that scaffold and its optional Compose service. It never connects to, alters or deletes PostgreSQL data. Old `DATABASE_URL`/`POSTGRES_*` values are ignored. If custom code populated starter tables, retain their separate backup; this branch has no custom PostgreSQL importer.
 
 SQLite lives at `RUNS_DIRECTORY/archive.sqlite3`: `instance/runs/archive.sqlite3` locally and `/data/runs/archive.sqlite3` in the existing Compose `iperf_data` volume. Ubuntu 24.04, Python 3.12, non-root execution, the read-only container root and AMD64/ARM64 packaging remain. Python's bundled `sqlite3` driver needs no database server or additional database wheel.
 
-Schema version 1 contains `runs` (original JSON documents keyed by UUID), `events` (JSON events keyed by UUID/sequence with foreign keys) and `metadata` (preset catalog, migration marker and readiness probe). Original evidence fields/types and JSON/XML schemas are retained. The bundled public catalog is used until a catalog is saved. `/api/status` also identifies the backend and database path.
+Schema version 1 contains `runs` (original JSON documents keyed by UUID), `events` (JSON events keyed by UUID/sequence with foreign keys) and `metadata` (preset catalog, listener configuration, migration marker and readiness probe). Original evidence fields/types and JSON/XML schemas are retained. The bundled public catalog is used until a catalog is saved. `/api/status` also identifies the backend and database path.
 
 Each captured event and its corresponding measured state commit before HTTP readers see them. Single/comparison imports use one transaction; notes/presets publish only after commit. SQLite failures return HTTP 503. Capture failures fail the run, disable readiness and block further tests until repair/restart. If saving final evidence fails, the last committed snapshot remains. Unfinished snapshots become interrupted on restart; uncaptured output cannot be reconstructed.
 
@@ -37,14 +39,14 @@ Old legacy files do not include new evidence or edits made after upgrade. Export
 With the app stopped, from this branch's checkout/Python environment (set `RUNS_DIRECTORY` first for a non-default source):
 
 ```sh
-python -m flask --app app export-legacy /absolute/path/to/new-rollback-archive
+FLOWBENCH_RESUME_LISTENER=0 python -m flask --app app export-legacy /absolute/path/to/new-rollback-archive
 ```
 
 For Compose, choose a fresh snapshot name and keep the existing volume:
 
 ```sh
 docker compose stop app
-docker compose run --rm --no-deps app python -m flask --app app export-legacy /data/rollback-snapshot
+docker compose run --rm --no-deps -e FLOWBENCH_RESUME_LISTENER=0 app python -m flask --app app export-legacy /data/rollback-snapshot
 container_id=$(docker compose ps --all --quiet app)
 docker cp "$container_id:/data/rollback-snapshot" ./rollback-snapshot
 ```
@@ -58,3 +60,5 @@ Tests cover migration/idempotence, malformed-source rollback/retry, rollback exp
 Native Ubuntu AMD64/ARM64 CI also builds the image and checks migration in a disposable volume, SQLite under a read-only root, import/export/deduplication, presets, integrity, container replacement and graceful active-test stop. Results apply only to their exact source commit. They do not establish target deployment, physical power-loss/disk-exhaustion recovery, external-client mappings or jRPI-5 performance. These checks use no live database/target host.
 
 This change covers storage portions of R03/R04/R11/R12. It adds none of the R13–R16 profiles/thresholds, reports, retention or authentication features; those acceptance gaps remain open.
+
+A saved enabled listener resumes on normal app startup. Use the maintenance override shown above for exports. Legacy snapshots retain incoming evidence but do not recreate managed listener configuration on an older release; preserve the complete SQLite backup for that metadata. R17 authenticated instance coordination also remains pending.
