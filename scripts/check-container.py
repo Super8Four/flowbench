@@ -123,12 +123,34 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         assert request("/api/runs/import", {"filename": "test.xml", "content": xml_body.decode()})["duplicates"] == [imported]
         imported_export = request(f"/api/runs/{imported}/export")
         assert imported_export["events"] == exported["events"] and imported_export["summary"] == exported["summary"]
+        # Persistent peer: Both creates two sequential connections, not one simultaneous test.
+        docker("exec", "--detach", name, "iperf3", "-s", "-B", "127.0.0.1", "-p", "5203")
+        time.sleep(.4)
+        job_id = request("/api/runs", {"target": "127.0.0.1", "port": 5203, "duration": 1,
+                                     "protocol": "both", "bandwidth": "2M", "label": "Both protocol check"})["id"]
+        deadline = time.monotonic() + 25
+        while time.monotonic() < deadline:
+            job = request(f"/api/runs/{job_id}")
+            if job["status"] in {"completed", "failed", "partial"} and job["finished_at"]:
+                break
+            time.sleep(.2)
+        assert job["status"] == "completed", job
+        assert job["settings"]["mode"] == "bidir" and job["metrics"] == {}
+        group_export = request(f"/api/runs/{job_id}/export")
+        assert [run["settings"]["protocol"] for run in group_export["runs"]] == ["tcp", "udp"]
+        for run in group_export["runs"]:
+            assert run["metrics"]["upload_mbps"] > 0 and run["metrics"]["download_mbps"] > 0
+            assert {point["direction"] for point in run["series"]} == {"upload", "download"}
+        group_import = request("/api/runs/import", {"filename": "both.json", "content": json.dumps(group_export)})
+        group_xml = request(f"/api/runs/{job_id}/export?format=xml", raw=True)
+        assert request("/api/runs/import", {"filename": "both.xml", "content": group_xml.decode()})["duplicates"] == group_import["imported"]
         preset = request("/api/presets", {"name": "Disposable loopback preset", "settings": {"target": "127.0.0.1", "port": 5202}})
         memory = docker("stats", "--no-stream", "--format", "{{.MemUsage}}", name)
         stop_and_remove()
         start()
         assert request(f"/api/runs/{run_id}/export?format=json") == exported, "Evidence changed after replacement"
         assert request(f"/api/runs/{imported}/export") == imported_export, "Import changed after replacement"
+        assert request(f"/api/runs/{job_id}/export") == group_export, "Both evidence changed after replacement"
         assert request(f"/api/runs/{legacy_id}")["settings"]["notes"] == "Updated after SQLite migration"
         original = docker("exec", name, "python", "-c",
                           f"import json; print(json.load(open('/data/runs/{legacy_id}/run.json'))['settings']['notes'])")

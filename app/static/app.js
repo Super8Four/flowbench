@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
+const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
 let engineReady = false, capabilities = {}, selectionVersion = 0, lastHistory = 0, comparisonVersion = 0;
 let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null;
@@ -8,7 +8,7 @@ const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
 const date = (value) => value ? new Date(value).toLocaleString() : '—';
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const title = (run) => run.settings.label || `${run.settings.role === 'server' ? 'Server' : run.settings.target} · ${run.effective_settings?.protocol || run.settings.protocol}`;
+const title = (run) => `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {cache: 'no-store', ...options,
@@ -43,11 +43,13 @@ function fields() {
   $('traceroute').disabled = server;
   $('traceroute').closest('.form-check').classList.toggle('d-none', server);
   $('custom-editor').closest('.card').classList.toggle('d-none', server);
-  $('bandwidth').disabled = server || $('protocol').value !== 'udp';
-  $('bandwidth-field').classList.toggle('d-none', $('protocol').value !== 'udp');
-  const bidir = $('mode').querySelector('[value="bidir"]');
-  bidir.disabled = !capabilities.bidir || ($('protocol').value === 'udp' && !capabilities.udp_bidir);
-  if (bidir.disabled && $('mode').value === 'bidir') $('mode').value = 'upload';
+  const usesUdp = ['udp', 'both'].includes($('protocol').value);
+  $('bandwidth').disabled = server || !usesUdp;
+  $('bandwidth-field').classList.toggle('d-none', !usesUdp);
+  $('both-note').classList.toggle('d-none', $('protocol').value !== 'both');
+  const unavailable = !capabilities.bidir || (usesUdp && !capabilities.udp_bidir);
+  $('protocol-support').textContent = !server && $('mode').value === 'bidir' && unavailable
+    ? 'This iPerf3 build cannot run the selected bidirectional mode. Choose upload/download, or use the Linux container. Saved settings remain selected.' : '';
   presetDetail();
 }
 
@@ -79,7 +81,8 @@ function presetDetail() {
   if ($('target').value !== row.settings.target) notices.push('Host has been changed from this preset.');
   const [low, high] = row.ports.includes('-') ? row.ports.split('-').map(Number) : [Number(row.ports), Number(row.ports)];
   if (Number($('port').value) < low || Number($('port').value) > high) notices.push('Port is outside the listed range.');
-  if (!row.protocols.includes($('protocol').value)) notices.push('This protocol is not listed as supported.');
+  const required = $('protocol').value === 'both' ? ['tcp', 'udp'] : [$('protocol').value];
+  if (required.some((protocol) => !row.protocols.includes(protocol))) notices.push('This protocol is not listed as supported.');
   if (!row.modes.includes($('mode').value)) notices.push('This direction is not listed as supported.');
   if ($('ip_version').value === '6' && !row.ipv6) notices.push('IPv6 support is not listed.');
   const description = `Ports ${row.ports} · ${row.protocols.map((v) => v.toUpperCase()).join('/')} · ${row.modes.join('/')} · ${row.ipv6 ? 'IPv6 listed' : 'IPv6 not listed'}`;
@@ -234,8 +237,20 @@ function renderSelected() {
   $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
   $('export-button').disabled = false;
   $('rerun-button').disabled = false;
+  $('protocol-job-card').classList.toggle('d-none', selected.kind !== 'protocol-job');
+  if (selected.kind === 'protocol-job') {
+    const tests = selected.protocol_runs || [];
+    $('protocol-job-status').textContent = `Job: ${selected.status}. ${tests.filter((test) => test.status === 'completed').length} of 2 protocols completed.`;
+    $('protocol-job-results').innerHTML = `<table class="table"><thead><tr><th>Protocol / direction</th><th>Status</th><th>Upload Mbps</th><th>Download Mbps</th><th>Evidence</th></tr></thead><tbody>${tests.map((test) => `<tr><td>${escape(test.protocol.toUpperCase())} / ${escape(test.mode)}</td><td>${escape(test.status)}${test.error ? `<div class="form-text">${escape(test.error)}</div>` : ''}</td><td>${number(test.metrics.upload_mbps)}</td><td>${number(test.metrics.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(test.id)}">Open ${escape(test.protocol.toUpperCase())}</a></td></tr>`).join('')}</tbody></table>`;
+  }
   renderPeer();
+  if (selected.kind === 'protocol-job') {
+    $('chart-source-note').textContent = 'TCP and UDP results are separate. Open a protocol test above to view its measured directions, chart and remote output.';
+    $('throughput-chart').innerHTML = '<text x="380" y="115" text-anchor="middle" fill="#9da7b0" font-size="13">Open TCP or UDP above for its throughput chart</text>';
+    $('exit-code').textContent = selected.error || `Both job ${selected.status}. Each protocol retains its own logs and process outcome.`;
+  }
   renderLogs();
+  if (selected.kind === 'protocol-job') $('log-output').textContent = 'Open a protocol test above to view its captured output.';
   renderResults();
 }
 async function loadSelected(reset = false) {
@@ -402,7 +417,7 @@ $('stop-button')?.addEventListener('click', safe(async () => {
 $('role')?.addEventListener('change', fields); $('protocol')?.addEventListener('change', fields);
 $('server-preset')?.addEventListener('change', () => applyPreset($('server-preset').value));
 $('preset-search')?.addEventListener('input', renderPresetPicker);
-for (const id of ['target', 'port', 'mode', 'ip_version']) $(id)?.addEventListener('change', presetDetail);
+for (const id of ['target', 'port', 'mode', 'ip_version']) $(id)?.addEventListener('change', fields);
 $('catalog-search')?.addEventListener('input', renderCatalog); $('catalog-kind')?.addEventListener('change', renderCatalog);
 $('save-preset')?.addEventListener('click', safe(() => savePreset(false)));
 $('update-preset')?.addEventListener('click', safe(() => savePreset(true)));
@@ -480,7 +495,6 @@ async function init() {
     $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
     if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
     if (!engineReady) message(status.storage_error || status.iperf.error);
-    if (testPage && !status.iperf.bidir) $('mode').querySelector('[value="bidir"]').disabled = true;
     await loadHistory();
     if (testPage || $('preset-body')) await loadPresets();
     if (testPage) {
@@ -496,8 +510,9 @@ async function init() {
 init();
 
 function renderResults() {
-  $('result-cards').classList.toggle('d-none', !terminal.has(selected.status));
-  $('live-metrics').classList.toggle('d-none', terminal.has(selected.status));
+  const job = selected.kind === 'protocol-job';
+  $('result-cards').classList.toggle('d-none', job || !terminal.has(selected.status));
+  $('live-metrics').classList.toggle('d-none', job || terminal.has(selected.status));
   const metrics = selected.metrics || {};
   for (const direction of ['upload','download']) {
     $('result-' + direction).textContent = number(metrics[direction+'_mbps']);

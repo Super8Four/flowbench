@@ -2,6 +2,8 @@
 
 ## SQLite feature branch
 
+The branch also adds [TCP/UDP/Both and bidirectional defaults](protocol-tests.md). Both has sequential, independently saved TCP and UDP children, aggregate job status and compatible child exports. This is not instance-to-instance coordination or a repository rename.
+
 FlowBench's `feature/sqlite-storage` starts from remote main `2d8d29c8ea0112543031cc566f3ca0fe847e29ed`, retaining the `iPerfWeb` repository and compatibility paths. SQLite now stores runs, logs, notes, imports and presets in `/data/runs/archive.sqlite3`. The unused PostgreSQL scaffold is removed; old files import transactionally without source deletion. [Migration, backup and rollback](sqlite-storage.md) describes recovery. Earlier container results below apply to their original commits. R13–R16 and other acceptance gaps remain outside this storage change.
 
 Recorded October 11, 2026. The current implementation extends repository main at `2ade0ccd5dd47d8e0ec3d89486ee39bee3c6e617`. The earlier isolated packaging experiment was based on `03c16a0`; its archive was not transferred and is not the current application package.

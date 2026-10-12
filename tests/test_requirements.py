@@ -64,7 +64,7 @@ class WorkspaceTests(unittest.TestCase):
         process.wait.return_value = 0
         self.manager.capabilities['available'] = True
         with patch('app.runner.subprocess.Popen', return_value=process), patch('app.runner.capture_route', return_value={'status':'unavailable', 'hops':[], 'note':'Not installed'}) as capture:
-            record = self.manager.start({'target':'127.0.0.1','traceroute':True})
+            record = self.manager.start({'target':'127.0.0.1','mode':'upload','traceroute':True})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())
         result = self.manager.export(record['id'])
@@ -84,7 +84,7 @@ class WorkspaceTests(unittest.TestCase):
             self.assertTrue(cancelled())
             return {'status':'cancelled','hops':[]}
         with patch('app.runner.subprocess.Popen', return_value=process), patch('app.runner.capture_route', side_effect=route):
-            record = self.manager.start({'target':'127.0.0.1','traceroute':True})
+            record = self.manager.start({'target':'127.0.0.1','mode':'upload','traceroute':True})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())
         result = self.manager.export(record['id'])

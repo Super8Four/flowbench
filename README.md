@@ -93,6 +93,8 @@ Imported tests get new local IDs and an **Imported** badge with source filename,
 
 ## Persistent storage and exports
 
+New tests default to bidirectional. The protocol selector offers TCP, UDP and Both; Both runs TCP then UDP as separate saved tests under one job. See [FlowBench protocol tests](docs/protocol-tests.md) for status, cancellation, peer-listener and Windows capability details. Existing saved choices/imports retain their direction.
+
 The authoritative archive is **`instance/runs/archive.sqlite3`**, independent of browser storage. SQLite stores:
 
 - Run JSON documents: settings, notes, UTC timestamps, status, exit code, interval measurements, iPerf version, command arguments and native results.

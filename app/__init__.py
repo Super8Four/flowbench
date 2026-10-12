@@ -120,14 +120,14 @@ def create_app(test_config=None):
 
     @app.get("/api/status")
     def status():
-        return jsonify(iperf=manager.capabilities, active_run=manager.active,
+        return jsonify(iperf=manager.capabilities, active_run=manager.active_id,
                        storage=str(manager.directory), storage_error=manager.storage_error,
                        storage_backend="sqlite", database=str(manager.storage.path),
                        saved_runs=len(manager.list_runs()))
 
     @app.get("/api/runs")
     def list_runs():
-        return jsonify(runs=manager.list_runs(), active_run=manager.active)
+        return jsonify(runs=manager.list_runs(), active_run=manager.active_id)
 
     @app.get("/api/ready")
     def readiness():
@@ -158,6 +158,8 @@ def create_app(test_config=None):
         record["effective_settings"] = effective_settings(record)
         record["peer"] = peer_results(record)
         record["events"] = manager.read_events(run_id, int(after))
+        if record.get("kind") == "protocol-job":
+            record["protocol_runs"] = manager.protocol_runs(record)
         return jsonify(record)
 
     @app.post("/api/runs/<run_id>/stop")

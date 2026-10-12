@@ -91,7 +91,8 @@ def normalize(data):
             raise ValueError("ipv6 must be true or false.")
     if not item["name"]:
         raise ValueError("Give the preset a name.")
-    if settings["protocol"] not in item["protocols"] or settings["mode"] not in item["modes"]:
+    required_protocols = {"tcp", "udp"} if settings["protocol"] == "both" else {settings["protocol"]}
+    if not required_protocols.issubset(item["protocols"]) or settings["mode"] not in item["modes"]:
         raise ValueError("Default protocol/direction must be supported by the preset.")
     identity = [item["kind"], item["name"], settings["target"].lower(), ports]
     item["id"] = hashlib.sha256(json.dumps(identity).encode()).hexdigest()[:32]
@@ -141,6 +142,9 @@ class PresetStore:
     def save_custom(self, data, preset_id=None):
         if not isinstance(data, dict):
             raise ValueError("Send a custom preset object.")
+        settings = data.get("settings")
+        if isinstance(settings, dict) and "mode" not in settings:
+            data = {**data, "settings": {**settings, "mode": "bidir"}}
         item = normalize({**data, "kind": "custom"})
         with self.manager.lock:
             catalog = self.read()

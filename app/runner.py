@@ -20,7 +20,7 @@ from .route import capture_route
 from .storage import SQLiteArchive
 
 
-TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
+TERMINAL = {"completed", "failed", "cancelled", "interrupted", "partial", "skipped"}
 CREATE_FLAGS = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
@@ -47,20 +47,22 @@ def host_value(value, field, optional=False):
     return value
 
 
-def settings_from(data):
+def settings_from(data, default_mode="upload"):
     if not isinstance(data, dict):
         raise ValueError("Send a JSON object with test settings.")
     result = {}
     for key, default, choices in (
         ("role", "client", {"client", "server"}),
-        ("protocol", "tcp", {"tcp", "udp"}),
-        ("mode", "upload", {"upload", "download", "bidir"}),
+        ("protocol", "tcp", {"tcp", "udp", "both"}),
+        ("mode", default_mode, {"upload", "download", "bidir"}),
         ("ip_version", "auto", {"auto", "4", "6"}),
     ):
         value = data.get(key, default)
         if not isinstance(value, str) or value not in choices:
             raise ValueError(f"Invalid {key}.")
         result[key] = value
+    if result["protocol"] == "both" and result["role"] != "client":
+        raise ValueError("Both protocols is a client job. Incoming server tests use the connecting client's protocol.")
     for key, default, low, high in (
         ("port", 5201, 1, 65535), ("duration", 10, 1, 3600),
         ("streams", 1, 1, 32), ("idle_timeout", 300, 1, 3600),
@@ -117,6 +119,7 @@ class RunManager:
         self.cancel_requested = False
         self.worker = None
         self.record = None
+        self.job = None
         self.events = []
         self.capture_errors = []
         self.storage_error = None
@@ -177,6 +180,8 @@ class RunManager:
 
     def read(self, run_id):
         with self.lock:
+            if self.job and run_id == self.job["id"]:
+                return copy.deepcopy(self.job)
             if self.record and run_id == self.record["id"]:
                 return copy.deepcopy(self.record)
             self.path(run_id)  # Validate the public ID before querying storage.
@@ -184,6 +189,8 @@ class RunManager:
 
     def read_events(self, run_id, after=0):
         with self.lock:
+            if self.read(run_id).get("kind") == "protocol-job":
+                return []
             if run_id == self.active:
                 return copy.deepcopy(self.events[after:])
             self.path(run_id)
@@ -202,6 +209,8 @@ class RunManager:
                     row["overview"] = overview(record)
                     row["effective_settings"] = effective_settings(record)
                     row["imported"] = record.get("imported")
+                    row["kind"] = record.get("kind")
+                    row["protocol_job"] = record.get("protocol_job")
                     records.append(row)
                 except (KeyError, OSError, json.JSONDecodeError):
                     continue
@@ -219,6 +228,8 @@ class RunManager:
                 self.save(record)
 
     def command(self, settings):
+        if settings["protocol"] == "both":
+            raise ValueError("Both protocols must run as separate TCP and UDP tests.")
         cmd = [self.executable]
         if settings["role"] == "server":
             cmd += ["-s", "-1", "--idle-timeout", str(settings["idle_timeout"])]
@@ -227,7 +238,7 @@ class RunManager:
                     "-P", str(settings["streams"]), "--connect-timeout", "5000", "--get-server-output"]
             if settings["protocol"] == "udp":
                 if settings["mode"] == "bidir" and not self.capabilities["udp_bidir"]:
-                    raise ValueError("Bidirectional UDP is unavailable on this Windows build. Use UDP upload/download or TCP bidirectional.")
+                    raise ValueError("Bidirectional UDP is unavailable on this iPerf3 build. Use UDP upload/download or TCP bidirectional; Linux supports UDP bidirectional.")
                 cmd += ["-u", "-b", settings["bandwidth"]]
             if settings["mode"] == "download":
                 cmd.append("-R")
@@ -251,28 +262,116 @@ class RunManager:
         return cmd
 
     def start(self, data):
-        settings = settings_from(data)
+        settings = settings_from(data, default_mode="bidir")
         if self.storage_error:
             raise RuntimeError("Archive writes failed. Restore storage access and restart the app: " + self.storage_error)
         if not self.capabilities["available"]:
             raise RuntimeError(self.capabilities["error"])
-        command = self.command(settings)
+        protocols = ["tcp", "udp"] if settings["protocol"] == "both" else [settings["protocol"]]
+        commands = [self.command(dict(settings, protocol=protocol)) for protocol in protocols]
         with self.lock:
             if self.active:
                 raise RuntimeError("A session is already running. Stop it before starting another.")
             record = {"schema_version": 1, "id": uuid4().hex, "created_at": now(),
                       "finished_at": None, "status": "starting", "settings": settings,
-                      "command": command, "iperf_version": self.capabilities["version"],
+                      "command": commands[0], "iperf_version": self.capabilities["version"],
                       "output_format": "json-stream" if self.capabilities["json_stream"] else "text",
                       "exit_code": None, "error": None, "summary": {}, "intervals": [],
                       "native_result": None, "test_parameters": None, "event_count": 0}
-            self.save(record)
+            self.job = None
+            if settings["protocol"] == "both":
+                record.update(kind="protocol-job", command=[], output_format="protocol-job", children=[])
+                children = []
+                for index, protocol in enumerate(protocols):
+                    child = copy.deepcopy(record)
+                    child.pop("kind")
+                    child.pop("children")
+                    child.update(id=uuid4().hex, status="queued", settings=dict(settings, protocol=protocol),
+                                 command=commands[index], output_format="json-stream" if self.capabilities["json_stream"] else "text",
+                                 protocol_job={"id": record["id"], "protocol": protocol, "order": index + 1})
+                    record["children"].append({"id": child["id"], "protocol": protocol})
+                    children.append(child)
+                with self.storage.transaction() as connection:
+                    for row in [record, *children]:
+                        self.storage.save(row, connection)
+                self.job = record
+            else:
+                self.save(record)
             self.active, self.record = record["id"], record
             self.events, self.cancel_requested = [], False
             self.capture_errors = []
-            self.worker = threading.Thread(target=self.run, name=f"iperf-{self.active}", daemon=True)
+            self.worker = threading.Thread(target=self.run_job if self.job else self.run, name=f"iperf-{self.active}", daemon=True)
             self.worker.start()
             return copy.deepcopy(record)
+
+    @property
+    def active_id(self):
+        return self.job["id"] if self.active and self.job else self.active
+
+    def protocol_runs(self, job):
+        with self.lock:
+            result = []
+            for reference in job["children"]:
+                child = self.read(reference["id"])
+                result.append({"id": child["id"], "protocol": child["settings"]["protocol"],
+                               "mode": effective_settings(child)["mode"], "status": child["status"],
+                               "error": child.get("error"), "metrics": measurements(child),
+                               "created_at": child["created_at"], "finished_at": child["finished_at"]})
+            return result
+
+    def run_job(self):
+        try:
+            with self.lock:
+                self.job["status"] = "running"
+                self.save(self.job)
+            for reference in self.job["children"]:
+                with self.lock:
+                    child = self.storage.read(reference["id"])
+                    if self.cancel_requested or self.storage_error:
+                        child.update(status="skipped", finished_at=now(),
+                                     error="Job stopped before this protocol test started.")
+                        self.save(child)
+                        continue
+                    # Keep archive ownership and the active job reserved between tests.
+                    child.update(created_at=now(), status="starting")
+                    self.save(child)
+                    self.record, self.active = child, child["id"]
+                    self.events, self.capture_errors = [], []
+                self.run(grouped=True)
+            with self.lock:
+                statuses = [row["status"] for row in self.protocol_runs(self.job)]
+                self.job["status"] = ("cancelled" if self.cancel_requested else
+                                      "completed" if all(status == "completed" for status in statuses) and not self.storage_error else
+                                      "partial" if "completed" in statuses else "failed")
+                if self.job["status"] == "partial":
+                    self.job["error"] = "Only one protocol completed; inspect each protocol's retained evidence."
+                elif self.job["status"] == "failed":
+                    self.job["error"] = self.storage_error or "Neither protocol completed successfully."
+        except Exception as exc:
+            with self.lock:
+                self.job.update(status="failed", error=str(exc))
+                for reference in self.job["children"]:
+                    try:
+                        child = self.read(reference["id"])
+                        if child["status"] == "queued":
+                            child.update(status="skipped", finished_at=now(), error="Job failed before this protocol started.")
+                            self.save(child)
+                    except OSError:
+                        pass
+                try:
+                    if any(row["status"] == "completed" for row in self.protocol_runs(self.job)):
+                        self.job["status"] = "partial"
+                except OSError:
+                    pass
+        finally:
+            with self.lock:
+                self.job["finished_at"] = now()
+                try:
+                    self.save(self.job)
+                except OSError as exc:
+                    self.storage_error = str(exc)
+                    self.job.update(status="failed", error="Archive write failed: " + str(exc))
+                self.active = None
 
     def log(self, source, message):
         with self.lock:
@@ -369,7 +468,7 @@ class RunManager:
         finally:
             stream.close()
 
-    def run(self):
+    def run(self, grouped=False):
         readers = []
         try:
             self.log("system", "Starting: " + subprocess.list2cmdline(self.record["command"]))
@@ -452,10 +551,22 @@ class RunManager:
                     self.record.update(status="failed", error="Archive write failed: " + str(save_error))
                 finally:
                     self.process = None
-                    self.active = None
+                    if not grouped:
+                        self.active = None
 
     def stop(self, run_id):
         with self.lock:
+            if self.active and self.job and run_id in {self.job["id"], *(row["id"] for row in self.job["children"])}:
+                self.cancel_requested = True
+                try:
+                    self.job["cancel_requested"] = True
+                    self.save(self.job)
+                    if self.record and self.record.get("kind") != "protocol-job" and self.record["status"] not in TERMINAL:
+                        self.log("system", "Both-protocol job stopped by user.")
+                finally:
+                    if self.process and self.process.poll() is None:
+                        self.process.terminate()
+                return
             if run_id != self.active:
                 self.read(run_id)
                 return
@@ -491,11 +602,16 @@ class RunManager:
             self.save(record)
             if self.record and run_id == self.record["id"]:
                 self.record = record
+            if self.job and run_id == self.job["id"]:
+                self.job = record
             return record
 
     def export(self, run_id):
         with self.lock:
             record = self.read(run_id)
+            if record.get("kind") == "protocol-job":
+                record["runs"] = [self.export(child["id"]) for child in record["children"]]
+                return record
             record["metrics"] = measurements(record)
             record["effective_settings"] = effective_settings(record)
             record["series"] = series(record)

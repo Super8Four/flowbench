@@ -152,7 +152,7 @@ class SQLiteArchive:
                     # Old checkpoints could capture a terminal status just before
                     # finally wrote the finish date. Recovery will mark it interrupted.
                     validation_copy["status"] = "running"
-                prepare_run(validation_copy, str(path))  # Validate without changing original evidence.
+                prepare_run(validation_copy, str(path), allow_job=True)  # Validate without changing original evidence.
                 existing = connection.execute("SELECT document FROM runs WHERE id=?", (run_id,)).fetchone()
                 if existing:
                     if json.loads(existing[0]) != record or self.events(run_id, connection=connection) != events:

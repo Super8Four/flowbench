@@ -237,7 +237,7 @@ class StorageTests(unittest.TestCase):
             return original(record)
         self.manager.capabilities['available'] = True
         with patch('app.runner.subprocess.Popen', return_value=process), patch.object(self.manager, 'save', side_effect=fail_running):
-            record = self.manager.start({'target': '127.0.0.1'})
+            record = self.manager.start({'target': '127.0.0.1', 'mode': 'upload'})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())
         process.kill.assert_called_once()

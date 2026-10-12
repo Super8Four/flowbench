@@ -87,7 +87,7 @@ class CoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             manager = RunManager(directory, executable='this-binary-does-not-exist')
             manager.capabilities['available'] = True
-            record = manager.start({'target': '127.0.0.1'})
+            record = manager.start({'target': '127.0.0.1', 'mode': 'upload'})
             manager.worker.join(5)
             self.assertEqual(manager.read(record['id'])['status'], 'failed')
             exported = manager.export(record['id'])
@@ -174,7 +174,7 @@ class RealIperfTests(unittest.TestCase):
         self.fail('iPerf session did not reach a terminal status')
 
     def run_test(self, **settings):
-        data = {'target': '127.0.0.1', 'port': self.server(), 'duration': 2, 'label': 'Loopback verification', **settings}
+        data = {'target': '127.0.0.1', 'port': self.server(), 'duration': 2, 'mode': 'upload', 'label': 'Loopback verification', **settings}
         response = self.client.post('/api/runs', json=data)
         self.assertEqual(response.status_code, 201, response.get_json())
         return response.get_json()['id']

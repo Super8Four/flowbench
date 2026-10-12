@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import math
+import re
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from xml.etree import ElementTree as ET
@@ -141,9 +142,22 @@ def validate_measurement_structure(record):
         raise ValueError("Invalid measurement or interval structure.") from None
 
 
-def prepare_run(data, filename):
+def prepare_run(data, filename, allow_job=False):
     if not isinstance(data, dict):
         raise ValueError("Upload a saved run, comparison export, or native iperf3 -J object.")
+    if data.get("kind") == "protocol-job" and not allow_job:
+        raise ValueError("A Both job must be imported as a complete protocol-job export.")
+    if data.get("kind") == "protocol-job":
+        references = data.get("children")
+        if (not isinstance(data.get("id"), str) or not re.fullmatch(r"[a-f0-9]{32}", data["id"])
+                or not isinstance(references, list) or len(references) != 2
+                or any(not isinstance(row, dict) or row.get("protocol") != protocol
+                       or not isinstance(row.get("id"), str) or not re.fullmatch(r"[a-f0-9]{32}", row["id"])
+                       for row, protocol in zip(references, ["tcp", "udp"]))
+                or len({data["id"], *(row["id"] for row in references)}) != 3):
+            raise ValueError("Invalid Both job identity or child references.")
+    if (data.get("settings") or {}).get("protocol") == "both" and data.get("kind") != "protocol-job":
+        raise ValueError("Both settings require a protocol-job with separate TCP and UDP evidence.")
     digest = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
     source_id = data.get("id")
     if "settings" in data:
@@ -155,7 +169,7 @@ def prepare_run(data, filename):
             record.pop(key, None)
         record["created_at"] = timestamp(data.get("created_at"))
         record["finished_at"] = timestamp(data.get("finished_at"), optional=True)
-        if data.get("status") not in TERMINAL | {"starting", "running"}:
+        if data.get("status") not in TERMINAL | {"starting", "running", "queued"}:
             raise ValueError("Invalid saved run status.")
         if data["status"] not in TERMINAL:
             record.update(status="interrupted", finished_at=record["finished_at"] or record["created_at"],
@@ -249,6 +263,38 @@ def prepare_run(data, filename):
     return record, events
 
 
+def prepare_job(data, filename):
+    sources = data.get("runs")
+    if not isinstance(sources, list) or len(sources) != 2:
+        raise ValueError("A Both export must include exactly two protocol runs: TCP then UDP.")
+    parent, events = prepare_run(data, filename, allow_job=True)
+    if parent["settings"]["protocol"] != "both" or parent["summary"] or parent["intervals"] or events:
+        raise ValueError("A Both job must keep measurements and logs inside its protocol runs.")
+    children = [prepare_run(row, filename) for row in sources]
+    references = data.get("children")
+    if not isinstance(references, list) or len(references) != 2:
+        raise ValueError("Invalid Both child references.")
+    source_ids = set()
+    for index, ((child, _), source, reference, protocol) in enumerate(zip(children, sources, references, ["tcp", "udp"]), 1):
+        source_id = source.get("id")
+        group = source.get("protocol_job")
+        if (not isinstance(source_id, str) or not re.fullmatch(r"[a-f0-9]{32}", source_id)
+                or source_id in source_ids or not isinstance(group, dict) or group.get("id") != data.get("id")
+                or group.get("order") != index or group.get("protocol") != protocol
+                or child["settings"]["protocol"] != protocol or reference != {"id": source_id, "protocol": protocol}):
+            raise ValueError("Invalid or mismatched Both protocol identity.")
+        source_ids.add(source_id)
+        child["protocol_job"] = {"id": parent["id"], "source_id": data["id"], "protocol": protocol, "order": index}
+    statuses = [row["status"] for row, _ in children]
+    if parent["status"] == "completed" and statuses != ["completed", "completed"]:
+        raise ValueError("A completed Both job requires two completed protocol runs.")
+    if parent["status"] == "partial" and statuses.count("completed") != 1:
+        raise ValueError("A partial Both job requires exactly one completed protocol run.")
+    parent.pop("runs", None)
+    parent["children"] = [{"id": child["id"], "protocol": child["settings"]["protocol"]} for child, _ in children]
+    return [(parent, []), *children]
+
+
 def import_runs(manager, data, filename):
     sources = [data]
     if isinstance(data, dict) and data.get("kind") == "multi-comparison":
@@ -258,7 +304,8 @@ def import_runs(manager, data, filename):
     elif isinstance(data, dict) and "before" in data and "after" in data:
         sources = [data["before"], data["after"]]
     try:
-        prepared = [prepare_run(source, filename) for source in sources]
+        prepared = (prepare_job(data, filename) if isinstance(data, dict) and data.get("kind") == "protocol-job"
+                    else [prepare_run(source, filename) for source in sources])
     except (TypeError, AttributeError, OverflowError, RecursionError):
         raise ValueError("Invalid saved test structure.") from None
     imported, duplicates = [], []
@@ -270,10 +317,15 @@ def import_runs(manager, data, filename):
             digest = (record.get("imported") or {}).get("sha256")
             if digest:
                 existing[digest] = record["id"]
+        is_job = isinstance(data, dict) and data.get("kind") == "protocol-job"
+        if is_job and prepared[0][0]["imported"]["sha256"] in existing:
+            parent_id = existing[prepared[0][0]["imported"]["sha256"]]
+            parent = manager.read(parent_id)
+            return {"imported": [], "duplicates": [parent_id, *(row["id"] for row in parent["children"])]}
         with manager.storage.transaction() as connection:
             for record, events in prepared:
                 digest = record["imported"]["sha256"]
-                if digest in existing:
+                if digest in existing and not is_job:
                     duplicates.append(existing[digest])
                     continue
                 manager.storage.save(record, connection)
