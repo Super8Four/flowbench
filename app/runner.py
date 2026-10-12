@@ -839,13 +839,17 @@ class RunManager:
                         if self.cancel_requested or code != 0:
                             evidence["status"] = "partial"
                         self.record["flent"] = evidence
+                        if not self.cancel_requested and code == 0 and not evidence["quality"]["complete"]:
+                            self.record["error"] = "Flent returned incomplete RRUL measurements; inspect missing TCP/RTT series and retained native evidence."
                     except (OSError, ValueError) as exc:
                         self.record["flent"].update(status="cancelled" if self.cancel_requested else "missing", error=str(exc))
                         if not self.cancel_requested:
                             self.record["error"] = self.record["error"] or str(exc)
                     if self.capture_errors:
                         self.record["error"] = "Output capture failed: " + "; ".join(self.capture_errors)
-                    self.record["status"] = "cancelled" if self.cancel_requested else "completed" if code == 0 and not self.record["error"] else "failed"
+                    self.record["status"] = ("cancelled" if self.cancel_requested else
+                                             "partial" if code == 0 and self.record["flent"].get("status") == "partial" and not self.capture_errors else
+                                             "completed" if code == 0 and not self.record["error"] else "failed")
                     self.log("system", "Actual Flent workload " + self.record["status"] + "; native evidence " + self.record["flent"]["status"] + ".")
         except Exception as exc:
             with self.lock:

@@ -14,6 +14,9 @@ import sys
 
 MAX_RESULT_BYTES = 20 * 1024 * 1024
 WORKLOADS = {"rrul"}
+RRUL_TCP = {f"TCP {direction} {marking}" for direction in ("upload", "download")
+            for marking in ("BE", "BK", "CS5", "EF")}
+RRUL_RTT = {"Ping (ms) ICMP", "Ping (ms) UDP BE", "Ping (ms) UDP BK", "Ping (ms) UDP EF"}
 
 
 def unprivileged_icmp():
@@ -124,6 +127,10 @@ def validate_flent(value):
             raise ValueError("Flent summaries require native source data.")
         return value
     parsed = normalize(data, value.get("version"))
+    if value["status"] == "captured" and parsed["status"] != "captured":
+        raise ValueError("A complete Flent RRUL capture requires its expected TCP and RTT measurement series.")
+    if "quality" in value and value["quality"] != parsed["quality"]:
+        raise ValueError("Flent capture quality does not match its native result.")
     for key in ("series", "summaries"):
         if value.get(key) != parsed[key]:
             raise ValueError("Flent derived evidence does not match its native result.")
@@ -154,8 +161,15 @@ def normalize(data, version=None):
         summaries.append({"name": name, "unit": unit, "count": len(present), "missing": len(values) - len(present),
                           "mean": statistics.mean(present) if present else None, "min": min(present) if present else None,
                           "max": max(present) if present else None})
-    return {"tool": "Flent", "version": version, "workload": "rrul", "status": "captured", "data": data,
+    missing_tcp = sorted(name for name in RRUL_TCP if not any(_number(value) and value >= 0 for value in results.get(name, [])))
+    missing_rtt = sorted(name for name in RRUL_RTT if not any(_number(value) and value >= 0 for value in results.get(name, [])))
+    complete = not missing_tcp and not missing_rtt
+    captured = any(row["count"] for row in summaries)
+    quality = {"complete": complete, "missing_tcp_series": missing_tcp, "missing_rtt_series": missing_rtt,
+               "note": "All eight RRUL TCP load flows and four RTT series require actual finite samples for a complete capture. Measured zero values are retained; missing measurements are not invented."}
+    return {"tool": "Flent", "version": version, "workload": "rrul", "status": "captured" if complete else "partial" if captured else "missing", "data": data,
             "series": series, "summaries": summaries,
+            "quality": quality,
             "provenance": "External Flent CLI native RRUL JSON; TCP rates and UDP/ICMP RTT retain their native series identities. RTT is not application latency."}
 
 

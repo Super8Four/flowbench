@@ -20,6 +20,7 @@ LOG_LIMIT = 20000
 MODEL_BYTES = 32 * 1024 * 1024
 CHART_POINTS = 500000
 REPORT_PAGES = 500
+KNOWN_DIRECTIONS = {"upload", "download", "bidir"}
 BRAND = Path(__file__).resolve().parent / "static" / "brand" / "flowbench-logo.png"
 FONT_LOCK = threading.Lock()
 SETTINGS = ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams", "bandwidth", "ip_version")
@@ -126,6 +127,28 @@ def prepare_report(manager, data):
         model["limitations"].append("This report contains endpoint and user context. Review its contents before sharing outside the intended audience.")
     model["limitations"].append("PDF uses embedded Bitstream Vera fonts; characters outside their supported glyph set are replaced with a question mark. Word retains Unicode text.")
     metric_names = {}
+    private_directions = {}
+    def report_direction(value):
+        if not redact or value in KNOWN_DIRECTIONS:
+            return value
+        if value not in private_directions:
+            private_directions[value] = "redacted_direction_" + str(len(private_directions) + 1)
+        return private_directions[value]
+    def report_series(record):
+        captured = series(record)
+        if not redact:
+            return captured
+        # Imported stream/direction labels are arbitrary user text, not enums.
+        return [dict({key: point[key] for key in ("seconds", "mbps", "start") if key in point},
+                     direction=report_direction(point.get("direction"))) for point in captured]
+    def report_window(window):
+        if not redact:
+            return window
+        result = copy.deepcopy(window)
+        for run in result.get("runs", []):
+            for direction in run.get("directions", []):
+                direction["direction"] = report_direction(direction.get("direction"))
+        return result
     for key in sorted({key for record in records for key in measurements(record)}):
         if not redact or re.fullmatch(r"(?:upload|download)_(?:mbps|jitter_ms|lost_percent|lost_packets|packets|retransmits)", key):
             metric_names[key] = key
@@ -144,7 +167,7 @@ def prepare_report(manager, data):
             diagnostics, route = drop_raw(diagnostics), drop_raw(route)
         row = {"id": record["id"], "display_index": index, "color": run_color(record), "label": "Test " + str(index) if redact else record.get("label") or settings.get("label") or "Test " + str(index),
                "created_at": record["created_at"], "finished_at": record["finished_at"], "status": record["status"],
-               "settings": {k: settings.get(k) for k in SETTINGS}, "metrics": {metric_names[k]: v for k, v in measurements(record).items()}, "series": series(record),
+               "settings": {k: settings.get(k) for k in SETTINGS}, "metrics": {metric_names[k]: v for k, v in measurements(record).items()}, "series": report_series(record),
                "project": "[redacted]" if redact and project else copy.deepcopy(project),
                "tags": {} if redact else copy.deepcopy(record.get("tags", settings.get("tags", {}))),
                "notes": "[redacted]" if redact and (record.get("notes") or settings.get("notes")) else record.get("notes", settings.get("notes", "")),
@@ -185,13 +208,15 @@ def prepare_report(manager, data):
             row["raw_evidence"] = {"status": "removed by redaction"} if redact else _bounded_raw(record)
         model["runs"].append(_clean(row))
     from .comparisons import common_window
-    model["common_window"] = common_window(records)
+    model["common_window"] = report_window(common_window(records))
     model["display"] = {"rate_axis": rate_scale([p["mbps"] * 1_000_000 for run in model["runs"] for p in run["series"] if _finite(p.get("mbps"))]
                                                + [p["value"] * 1_000_000 for run in model["runs"] for item in run.get("flent_series", []) if item["unit"] == "Mbits/s" for p in item["points"] if _finite(p.get("value"))])}
     model["limitations"].append("Summary metrics cover each complete captured run. A common elapsed window does not recompute these whole-run averages. Shorter traces stop at their actual last measurement; they are not extended to match longer tests.")
     model["limitations"].append("Saved colors are used consistently. Chart panels and legends paginate; colors can repeat and labels identify traces. Resource limits are 32 MiB of normalized report data, 500000 measured chart points, 500 PDF pages and 32 MiB of Word document content.")
     for after in records[1:]:
         report = comparison(records[0], after)
+        if "common_window" in report:
+            report["common_window"] = report_window(report["common_window"])
         # Packet counts indicate test volume rather than a universal quality gain.
         for item in report["metrics"]:
             item["metric"] = metric_names[item["metric"]]
@@ -290,7 +315,7 @@ def _chart(runs, bounds=None):
                 if point.get("direction") == "download":
                     for pos in range(int(sx), int(x), 15):
                         draw.line((pos, y, min(pos + 8, x), y), fill=color, width=3)
-                else:
+                elif point.get("direction") in {"upload", "bidir"}:
                     draw.line((sx, y, x, y), fill=color, width=3)
             draw.ellipse((x - 3, y - 3, x + 3, y + 3), fill=color)
         draw.text((130, 575), "Trace labels and saved colors are listed below", fill="#41494d", font=font)
@@ -402,8 +427,11 @@ def _charts(runs):
         for offset in range(0, len(runs), 10):
             panel = runs[offset:offset + 10]
             legend = [("Test " + str(run["display_index"]), run["color"], run["label"]) for run in panel]
+            custom_direction = any(point.get("direction") not in KNOWN_DIRECTIONS for run in panel for point in run["series"])
+            caption = ("Known upload intervals are solid; download dashed; other directions are points. Only captured data are drawn, with shared axes across panels. Short traces stop at their last measurement. Saved colors can repeat."
+                       if custom_direction else "Upload solid; download dashed. Only captured spans and points are drawn, with shared axes across panels. Short traces stop at their last measurement. Trace labels identify saved colors, which can repeat.")
             charts.append(("Measured throughput intervals", _chart(panel, bounds),
-                           "Upload solid; download dashed. Only captured spans and points are drawn, with shared axes across panels. Short traces stop at their last measurement. Trace labels identify saved colors, which can repeat.", legend))
+                           caption, legend))
     return charts
 
 

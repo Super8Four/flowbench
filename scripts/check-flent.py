@@ -62,6 +62,15 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         response = client.post("/api/flent", json=payload)
         assert response.status_code == 201, response.get_json()
         record = finish(manager, response.get_json()["id"])
+        evidence = record["flent"]
+        native = evidence.get("data") or {}
+        print("Synthetic loopback RRUL diagnostics: " + json.dumps({
+            "status": record["status"], "error": record["error"], "evidence_status": evidence["status"],
+            "quality": evidence.get("quality"), "summaries": evidence.get("summaries"),
+            "series_metadata": (native.get("metadata") or {}).get("SERIES_META"),
+            "raw_value_counts": {key: len(value) if isinstance(value, list) else None for key, value in native.get("raw_values", {}).items()},
+            "stdout": record["raw_stdout"][-12000:], "stderr": record["raw_stderr"][-16000:]
+        }, ensure_ascii=False), flush=True)
         assert record["status"] == "completed", record
         assert record["flent"]["status"] == "captured", record["flent"]
         assert record["flent"]["data"]["metadata"]["NAME"] == "rrul"

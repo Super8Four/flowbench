@@ -7,17 +7,22 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from app.flent import capabilities, command, normalize, read_result, settings, unprivileged_icmp, validate_flent
+from app.flent import RRUL_TCP, RRUL_RTT, capabilities, command, normalize, read_result, settings, unprivileged_icmp, validate_flent
 from app.imports import import_runs, parse_document
 from app.exports import xml_export
 from app.runner import RunManager
 
 
 def native():
-    return {"version": 4, "metadata": {"NAME": "rrul", "HOST": "127.0.0.1", "LENGTH": 1},
+    data = {"version": 4, "metadata": {"NAME": "rrul", "HOST": "127.0.0.1", "LENGTH": 1},
             "x_values": [0, 1, 2], "results": {"TCP upload BE": [1, None, 3],
             "TCP download BE": [2, 4, 6], "Ping (ms) ICMP": [None, .5, 1.5]},
             "raw_values": {"TCP upload BE": [{"t": 1, "val": 1}]}}
+    for name in sorted(RRUL_TCP):
+        data["results"].setdefault(name, [1, None, 3])
+    for name in sorted(RRUL_RTT):
+        data["results"].setdefault(name, [None, .5, 1.5])
+    return data
 
 
 def payload(**changes):
@@ -30,7 +35,7 @@ class FlentEvidenceTests(unittest.TestCase):
         source = native()
         result = normalize(source, "Flent 2.3.0")
         self.assertEqual(result["data"], source)
-        self.assertEqual([r["unit"] for r in result["series"]], ["Mbits/s", "Mbits/s", "ms"])
+        self.assertEqual([r["unit"] for r in result["series"]][:3], ["Mbits/s", "Mbits/s", "ms"])
         self.assertEqual(result["series"][0]["points"][1], {"seconds": 1, "value": None})
         self.assertEqual(result["summaries"][0], {"name": "TCP upload BE", "unit": "Mbits/s", "count": 2,
                                                    "missing": 1, "mean": 2, "min": 1, "max": 3})
@@ -38,6 +43,23 @@ class FlentEvidenceTests(unittest.TestCase):
         source["results"]["Additional"] = [None, None, None]
         row = normalize(source)["summaries"][-1]
         self.assertEqual((row["unit"], row["count"], row["mean"]), (None, 0, None))
+
+    def test_missing_native_tcp_does_not_claim_complete_and_measured_zero_is_valid(self):
+        source = native()
+        for name in RRUL_TCP:
+            source["results"][name] = [None, None, None]
+        evidence = normalize(source)
+        self.assertEqual(evidence["status"], "partial")
+        self.assertEqual(evidence["quality"]["missing_tcp_series"], sorted(RRUL_TCP))
+        self.assertFalse(evidence["quality"]["complete"])
+        self.assertEqual(evidence["data"], source)
+        evidence["status"] = "captured"
+        with self.assertRaises(ValueError): validate_flent(evidence)
+        for name in RRUL_TCP:
+            source["results"][name] = [0, None, 0]
+        zero = normalize(source)
+        self.assertEqual(zero["status"], "captured")
+        self.assertTrue(zero["quality"]["complete"])
 
     def test_malformed_native_and_fabricated_derived_values_rejected(self):
         for alteration in ("test", "time", "length", "numeric", "decreasing", "infinity"):
@@ -122,11 +144,11 @@ class FlentRunnerTests(unittest.TestCase):
         self.manager.shutdown()
         self.temp.cleanup()
 
-    def fixture(self, code=0, write=True, cancel=False):
+    def fixture(self, code=0, write=True, cancel=False, data=None):
         def launch(*args, **kwargs):
             if write:
                 with gzip.open(Path(kwargs["cwd"]) / "native.flent.gz", "wt", encoding="utf-8") as handle:
-                    json.dump(native(), handle)
+                    json.dump(data or native(), handle)
             process = Mock(pid=123, stdout=io.StringIO("Flent output retained\n"), stderr=io.StringIO())
             process.poll.return_value = None if cancel else code
             if cancel:
@@ -172,6 +194,17 @@ class FlentRunnerTests(unittest.TestCase):
                 self.assertEqual(record["status"], status)
                 self.assertEqual(record["flent"]["status"], evidence)
                 self.assertTrue(any(call.kwargs.get("force") for call in stop.call_args_list))
+
+    def test_zero_cli_exit_with_missing_tcp_is_partial_and_keeps_raw_data(self):
+        source = native()
+        for name in RRUL_TCP:
+            source["results"][name] = [None, None, None]
+        record, _ = self.run_fixture(data=source)
+        self.assertEqual(record["exit_code"], 0)
+        self.assertEqual(record["status"], "partial")
+        self.assertEqual(record["flent"]["status"], "partial")
+        self.assertEqual(record["flent"]["data"], source)
+        self.assertIn("incomplete", record["error"])
 
     def test_unavailable_invalid_and_disk_failure_before_launch(self):
         with patch("app.runner.subprocess.Popen") as launch:

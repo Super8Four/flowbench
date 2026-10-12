@@ -1,11 +1,14 @@
 import copy
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import json
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
+import zlib
 
 from docx import Document
 
@@ -15,6 +18,21 @@ from app.imports import import_runs, parse_document
 from app.projects import ProjectStore
 from app.reports import prepare_report, render_docx, render_pdf, _chart
 from app.runner import RunManager, settings_from
+
+
+def decoded_pdf_streams(payload):
+    result = []
+    for stream in re.findall(rb"stream\r?\n(.*?)endstream", payload, re.S):
+        try:
+            decoded = base64.a85decode(stream.rstrip(b"\r\n"), adobe=True)
+        except (ValueError, OverflowError):
+            decoded = stream
+        try:
+            decoded = zlib.decompress(decoded)
+        except zlib.error:
+            pass
+        result.append(decoded)
+    return b"\n".join(result)
 
 
 def report_fixture():
@@ -227,6 +245,58 @@ class ReportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "normalized-data resource budget"):
                 prepare_report(self.manager, {"ids": [self.before["id"]]})
 
-
+    def test_json_xml_import_cannot_leak_custom_directions_or_streams_in_redacted_reports(self):
+        from app import create_app
+        direction_secret = "private-direction.example"
+        stream_secret = "private-stream.example"
+        for use_xml in (False, True):
+            with self.subTest(xml=use_xml), tempfile.TemporaryDirectory() as archive:
+                app = create_app({"TESTING": True, "RUNS_DIRECTORY": archive, "IPERF_PATH": "missing-iperf"})
+                manager = app.extensions["iperf_runs"]
+                client = app.test_client()
+                try:
+                    before = report_fixture()
+                    before["intervals"] = [{"start": 0, "end": 1, "bits_per_second": 100e6,
+                                             "direction": direction_secret, "stream": stream_secret}]
+                    after = copy.deepcopy(before)
+                    after["id"] = "c" * 32
+                    after["intervals"][0]["direction"] = "upload"
+                    after["summary"]["sum_received"]["bits_per_second"] = 200e6
+                    bundle = {"schema_version": 1, "before": before, "after": after}
+                    content = xml_export(bundle).decode() if use_xml else json.dumps(bundle)
+                    imported = client.post("/api/runs/import", json={"filename": "fixture.xml" if use_xml else "fixture.json", "content": content})
+                    self.assertEqual(imported.status_code, 200, imported.get_json())
+                    ids = imported.get_json()["imported"]
+                    originals = [manager.export(run_id) for run_id in ids]
+                    preview = client.post("/api/reports/preview", json={"ids": ids, "include_raw": True})
+                    self.assertEqual(preview.status_code, 200, preview.get_json())
+                    model = preview.get_json()
+                    for secret in (direction_secret, stream_secret):
+                        self.assertNotIn(secret, json.dumps(model))
+                    self.assertEqual(model["runs"][0]["series"][0]["mbps"], 100)
+                    self.assertEqual(model["runs"][1]["series"][0]["direction"], "upload")
+                    self.assertEqual(model["common_window"]["runs"][0]["directions"][0]["mean_mbps"], 100)
+                    private = client.post("/api/reports/preview", json={"ids": ids, "redact": False}).get_json()
+                    self.assertIn(direction_secret, json.dumps(private))
+                    self.assertIn(stream_secret, json.dumps(private))
+                    # The positive control proves decoded PDF streams catch this text.
+                    self.assertIn(direction_secret.encode(), decoded_pdf_streams(render_pdf(private)))
+                    with ZipFile(BytesIO(render_docx(private))) as package:
+                        self.assertIn(direction_secret.encode(), package.read("word/document.xml"))
+                    for format_name in ("pdf", "docx"):
+                        downloaded = client.post("/api/reports/download?format=" + format_name,
+                                                 json={"ids": ids, "include_raw": True, "fingerprint": model["fingerprint"]})
+                        self.assertEqual(downloaded.status_code, 200)
+                        if format_name == "pdf":
+                            readable = decoded_pdf_streams(downloaded.data)
+                        else:
+                            with ZipFile(BytesIO(downloaded.data)) as package:
+                                readable = b"\n".join(package.read(name) for name in package.namelist() if name.endswith(".xml"))
+                        for secret in (direction_secret, stream_secret):
+                            self.assertNotIn(secret.encode(), readable)
+                    self.assertEqual(originals, [manager.export(run_id) for run_id in ids])
+                    self.assertEqual(manager.export(ids[0])["intervals"][0]["direction"], direction_secret)
+                finally:
+                    manager.shutdown()
 if __name__ == "__main__":
     unittest.main()

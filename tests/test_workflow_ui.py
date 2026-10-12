@@ -1,9 +1,13 @@
 """Semantic UI boundaries that keep optional traffic and reports explicit."""
 from html.parser import HTMLParser
+from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 
 from app import create_app
+import app as application
 
 
 class Controls(HTMLParser):
@@ -77,3 +81,14 @@ class WorkflowUiTests(unittest.TestCase):
                            'result-download-unit', 'live-unit', 'flent-chart-unit'):
             test_page.control(identifier)
         self.assertEqual(test_page.control('saved-color')['type'], 'color')
+
+
+class JavaScriptWorkflowTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('node'), 'Node is absent; the host CI step runs the isolated JavaScript behavior test.')
+    def test_flent_requests_and_reload_preserve_ip_family(self):
+        script = Path(__file__).resolve().with_name('workflows-flent-behavior.mjs')
+        module = Path(application.__file__).resolve().parent / 'static' / 'workflows.js'
+        result = subprocess.run([shutil.which('node'), str(script), str(module)],
+                                text=True, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Flent UI behavior passed:', result.stdout)
