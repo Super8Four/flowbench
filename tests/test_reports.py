@@ -138,9 +138,10 @@ class ReportTests(unittest.TestCase):
         model = prepare_report(self.manager, {"ids": [self.before["id"], after["id"]]})
         document = Document(BytesIO(render_docx(model)))
         heading = next(p for p in document.paragraphs if p.text == "Baseline compared with Test 2")
-        # Inherited Heading 1 keepNext was insufficient in actual AMD64 office
-        # conversion. Require a direct paragraph property, plus the full chain
+        # Both inherited and direct keepNext were insufficient in actual AMD64
+        # office conversion. Require an explicit page start, plus the full chain
         # through both caveats and the table header to its first measured row.
+        self.assertIs(heading.paragraph_format.page_break_before, True)
         self.assertIs(heading.paragraph_format.keep_with_next, True)
         self.assertIs(heading.paragraph_format.keep_together, True)
         following = heading._p.getnext()

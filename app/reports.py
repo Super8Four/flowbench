@@ -907,8 +907,10 @@ def render_docx(model):
     for report in model["comparisons"]:
         selected = next(row["display_index"] for row in model["runs"] if row["id"] == report["after_id"])
         heading = document.add_heading("Baseline compared with Test " + str(selected), 1)
-        # Set this directly: LibreOffice's font substitution can leave a
-        # style-inherited keepNext heading behind when its following block moves.
+        # Native LibreOffice can strand a comparison heading even with direct
+        # keepNext properties. Begin the bounded introductory block on a fresh
+        # page; the table can still paginate after its first measured row.
+        heading.paragraph_format.page_break_before = True
         heading.paragraph_format.keep_with_next = True
         heading.paragraph_format.keep_together = True
         para(report["caveat"])
