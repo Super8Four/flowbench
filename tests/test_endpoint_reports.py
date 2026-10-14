@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
+from docx import Document
+from docx.oxml.ns import qn
 
 from app.endpoints import endpoint_view
 from app.exports import xml_export
@@ -97,6 +99,7 @@ class EndpointReportTests(unittest.TestCase):
         self.assertEqual(model["runs"][0]["endpoints"]["provenance"], "preserved_native")
         self.assertIsNone(model["runs"][0]["endpoints"]["execution_hostname"])
         self.assertEqual(before, self.manager.export(record["id"]))
+
         old = report_fixture()
         old["id"] = "d" * 32
         self.manager.save(old)
@@ -109,6 +112,18 @@ class EndpointReportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare_report(self.manager, {"ids": [record["id"]]})
         self.assertEqual(before, self.manager.export(record["id"]))
+
+    def test_word_final_table_does_not_create_an_empty_spacer_page(self):
+        record = endpoint_fixture()
+        self.manager.save(record)
+        model = prepare_report(self.manager, {"ids": [record["id"]], "redact": False})
+        document = Document(BytesIO(render_docx(model)))
+        body = document._element.body
+        self.assertEqual(body[-1].tag, qn("w:sectPr"))
+        self.assertEqual(body[-2].tag, qn("w:tbl"))
+        # The complete final observation remains, with its measured RTTs.
+        self.assertEqual(document.tables[-1].cell(1, 1).text, "192.0.2.1")
+        self.assertEqual(document.tables[-1].cell(1, 2).text, "1.2, 1.3")
 
 
 if __name__ == "__main__":

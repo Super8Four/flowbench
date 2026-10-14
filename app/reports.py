@@ -1222,6 +1222,12 @@ def render_docx(model):
             para("Raw fields are limited to 20000 characters each. Any truncation is explicitly recorded below.")
             para(display(run["raw_evidence"]))
     output = BytesIO()
+    # Table spacing is useful between sections, but a final empty paragraph can
+    # overflow onto an otherwise blank page in native LibreOffice conversion.
+    # Body-level tables do not require the trailing paragraph that cells do.
+    body = document._element.body
+    while len(body) > 1 and body[-2].tag == qn("w:p") and len(body[-2]) == 0:
+        body.remove(body[-2])
     for border in document._element.xpath(".//w:pBdr"):
         border.getparent().remove(border)
     content_bytes = len(document._element.xml.encode("utf-8")) + sum(len(part.blob) for part in document.part.package.image_parts)
