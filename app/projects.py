@@ -33,6 +33,14 @@ def is_leaf(record):
     return not record.get("children") and record.get("kind") not in {"protocol-job", "matrix-job"}
 
 
+def has_baseline_evidence(record):
+    if record.get("kind") == "diagnostic-check":
+        from .metrics import check_comparison_eligible
+        return (record.get("status") == "completed" and check_comparison_eligible(record)
+                and bool((record.get("result") or {}).get("attempts")))
+    return bool(measurements(record))
+
+
 def catalog_from(data, records):
     """Validate rollback metadata against the same run snapshot before importing."""
     if not isinstance(data, dict) or data.get("schema_version") != 1 or not isinstance(data.get("projects"), list):
@@ -58,7 +66,7 @@ def catalog_from(data, records):
         if baseline_id:
             baseline = by_id.get(baseline_id)
             if (not baseline or baseline["settings"].get("project_id") != project_id or not is_leaf(baseline)
-                    or baseline["status"] != "completed" or not measurements(baseline)):
+                    or baseline["status"] != "completed" or not has_baseline_evidence(baseline)):
                 raise ValueError("Saved project baseline is missing or not a completed measured member.")
         result["projects"].append(copy.deepcopy(source))
     return result
@@ -97,7 +105,7 @@ class ProjectStore:
         except KeyError:
             raise ValueError("Choose a completed measured run in this project as baseline.") from None
         if (baseline.get("settings", {}).get("project_id") != project["id"] or not is_leaf(baseline)
-                or baseline.get("status") != "completed" or not measurements(baseline)):
+                or baseline.get("status") != "completed" or not has_baseline_evidence(baseline)):
             raise ValueError("Choose a completed measured run in this project as baseline.")
 
     def create(self, data):
@@ -143,6 +151,13 @@ class ProjectStore:
                 if not baseline:
                     continue
                 try:
+                    if baseline.get("kind") == "diagnostic-check" or record.get("kind") == "diagnostic-check":
+                        from .metrics import check_comparison
+                        report = check_comparison(baseline, record)
+                        report["result"] = "observations compared"
+                        report["caveat"] = " ".join(report["caveats"])
+                        rows.append(report)
+                        continue
                     report = comparison(baseline, record)
                 except ValueError as exc:
                     excluded.append({"id": record["id"], "reason": str(exc)})
@@ -157,7 +172,8 @@ class ProjectStore:
             # Return evidence for baseline selection, never invent a project average.
             return {"schema_version": 1, "project": project,
                     "runs": [{"id": row["id"], "created_at": row["created_at"], "status": row["status"],
-                              "settings": row["settings"], "metrics": measurements(row)} for row in runs],
+                              "settings": row["settings"], "metrics": measurements(row),
+                              "kind": row.get("kind"), "check_type": row.get("check_type"), "result": row.get("result")} for row in runs],
                     "comparisons": rows, "excluded": excluded,
                     "note": "Choose a completed measured baseline. Differences describe observed tests; matching settings, repeated runs and environmental context are needed to verify a change."}
 
@@ -221,13 +237,15 @@ class ProjectStore:
                 remap[old_id] = record["id"]
                 record["settings"]["project_id"] = project_id
                 prepared.append((record, events))
+        from .imports import finalize_import_lineage
+        finalize_import_lineage(prepared)
         baseline_id = fields["baseline_id"]
         if baseline_id is not None and baseline_id not in remap:
             raise ValueError("The exported baseline is missing from this project.")
         fields["baseline_id"] = remap.get(baseline_id)
         if fields["baseline_id"]:
             baseline = next(row for row, _ in prepared if row["id"] == fields["baseline_id"])
-            if not is_leaf(baseline) or baseline["status"] != "completed" or not measurements(baseline):
+            if not is_leaf(baseline) or baseline["status"] != "completed" or not has_baseline_evidence(baseline):
                 raise ValueError("The exported baseline must be a completed measured leaf run.")
         project = dict(fields, id=project_id, created_at=source_project["created_at"], updated_at=source_project["updated_at"],
                        imported={"source_id": source_id, "sha256": digest, "filename": filename[:255], "at": now()})

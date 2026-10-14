@@ -138,6 +138,12 @@ assert.deepEqual(preflightSummary(outgoing), {route: 'incomplete', clock: 'captu
 assert.deepEqual(preflightSummary({status: 'skipped'}), {route: 'Not recorded', clock: 'Not recorded'});
 assert.deepEqual(preflightSummary({status: 'interrupted', route: {status: 'pending'}, preflight: {time_quality: {status: 'pending'}}}),
   {route: 'Incomplete checkpoint', clock: 'Incomplete checkpoint'});
+renderPreflight({kind: 'diagnostic-check', check_type: 'dns', status: 'completed', result: {status: 'captured', elapsed_seconds: 10, started_at: '2026-10-14T07:00:00Z', time_quality: {...clock, status: 'unavailable'}}}, context);
+assert.match(field('preflight-status').textContent, /Local clock observation: unavailable/);
+assert.equal(field('preflight-elapsed').textContent, 'Unavailable', 'Whole-check duration must never be presented as clock or route preparation duration.');
+assert.equal(field('preflight-started').textContent, 'Unavailable');
+assert.match(field('preflight-phase').textContent, /timing order not recorded/);
+assert.equal(field('clock-query-status').textContent, 'unavailable', 'A captured DNS response does not prove successful clock evidence.');
 // Synthetic offline location fixtures exercise the actual map controller. No
 // database, IP service, browser geolocation or test traffic is involved.
 for (const id of ['route-world-map', 'route-topology-map', 'route-world-panel', 'route-topology-panel',

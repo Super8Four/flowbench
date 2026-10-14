@@ -36,7 +36,7 @@ def comparison_page_issues(root, extracted):
     issues = []
     for index, block in enumerate(blocks):
         label = "".join(node.text or "" for node in block.iter(WORD_TEXT))
-        if block.tag != WORD + "p" or not label.startswith("Baseline compared with Test "):
+        if block.tag != WORD + "p" or not label.startswith(("Baseline compared with Test ", "Baseline compared with Check ")):
             continue
         pieces = [normalize(label)]
         for following in blocks[index + 1:]:

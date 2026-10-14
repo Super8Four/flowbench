@@ -62,8 +62,10 @@ class MatrixTests(unittest.TestCase):
         for index, child in enumerate(job["runs"], 1):
             self.assertEqual(child["matrix_job"], {"id": job["id"], "order": index})
             self.assertTrue(child["events"])
+            self.assertLessEqual(child["created_at"], child["started_at"])
+            self.assertEqual(child["created_at"], job["created_at"])
             if index > 1:
-                self.assertLessEqual(job["runs"][index - 2]["finished_at"], child["created_at"])
+                self.assertLessEqual(job["runs"][index - 2]["finished_at"], child["started_at"])
         self.assertEqual(self.manager.read_events(job["id"]), [])
         self.assertEqual(len(self.manager.list_runs()), 9)
         self.assertIsNone(self.manager.active_id)
@@ -108,14 +110,14 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(self.manager.list_runs(), [])
 
     def test_parent_creation_transaction_rollback(self):
-        original = self.manager.storage.save
+        original = self.manager.storage.create
         calls = []
         def fail(row, connection=None):
             calls.append(row["id"])
             if len(calls) == 4:
                 raise OSError("Fixture disk failure")
             return original(row, connection)
-        with patch.object(self.manager.storage, "save", side_effect=fail), patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
+        with patch.object(self.manager.storage, "create", side_effect=fail), patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
             with self.assertRaises(OSError):
                 self.manager.start_matrix(request())
             launch.assert_not_called()

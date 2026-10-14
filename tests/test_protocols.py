@@ -71,7 +71,7 @@ class ProtocolTests(unittest.TestCase):
             self.assertEqual({p['direction'] for p in run['series']}, {'upload', 'download'})
             self.assertTrue(run['peer']['available'])
             self.assertTrue(run['events'])
-        self.assertLessEqual(job['runs'][0]['finished_at'], job['runs'][1]['created_at'])
+        self.assertLessEqual(job['runs'][0]['finished_at'], job['runs'][1]['started_at'])
         commands = [call.args[0] for call in launch.call_args_list]
         self.assertNotIn('-u', commands[0])
         self.assertIn('-u', commands[1])
@@ -231,14 +231,14 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.manager.list_runs(), [])
 
     def test_initial_job_write_and_group_import_failures_are_atomic(self):
-        original = self.manager.storage.save
+        original = self.manager.storage.create
         writes = []
         def fail_third(record, connection=None):
             writes.append(record['id'])
             if len(writes) == 3:
                 raise OSError('Simulated archive failure')
             return original(record, connection)
-        with patch.object(self.manager.storage, 'save', side_effect=fail_third), patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen') as launch:
+        with patch.object(self.manager.storage, 'create', side_effect=fail_third), patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen') as launch:
             response = self.client.post('/api/runs', json={'target': '127.0.0.1', 'protocol': 'both', 'bandwidth': '2M'})
             self.assertEqual(response.status_code, 503)
             launch.assert_not_called()
@@ -247,6 +247,7 @@ class ProtocolTests(unittest.TestCase):
         job, _ = self.run_job()
         count = len(self.manager.list_runs())
         writes.clear()
+        original = self.manager.storage.save
         with patch.object(self.manager.storage, 'save', side_effect=fail_third):
             response = self.client.post('/api/runs/import', json={'content': json.dumps(job)})
             self.assertEqual(response.status_code, 503)

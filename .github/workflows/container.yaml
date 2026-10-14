@@ -75,7 +75,7 @@ jobs:
           mkdir -p report-qa/docx-pdf report-qa/rendered
           libreoffice -env:UserInstallation=file:///tmp/flowbench-report-qa-profile --headless \
             --convert-to pdf --outdir report-qa/docx-pdf report-qa/*.docx
-          test "$(find report-qa/docx-pdf -name '*.pdf' | wc -l)" -eq 3
+          test "$(find report-qa/docx-pdf -name '*.pdf' | wc -l)" -eq 5
           for source in report-qa/*.pdf report-qa/docx-pdf/*.pdf; do
             name=$(basename "$source" .pdf)
             folder=$(basename "$(dirname "$source")")

@@ -4,6 +4,9 @@
 
 ## Unreleased - measurement workflows
 
+- Add standalone typed DNS queries and ICMP echo observations, terminal-outcome comparisons and PDF/Word reporting with sensitive-context redaction. Keep unknown sends/RTT and failed captures explicit; ICMP nonresponse is not application or UDP packet loss.
+- Add Run again with a new execution identity and source lineage, reviewed saved configuration and duplicate-request protection. Preserve original results and require current tool/peer confirmations.
+- Record STUN and bounded PCAP as planned backlog, TCP port connectivity and Nmap profiles as future possibilities, and Wi-Fi as deferred; none is enabled by the roadmap.
 - Capture one bounded route and read-only local clock-quality observation before each outgoing test, including Both/matrix children and Flent. Retain ordered hop evidence, explicit passive-capture limits, UTC verification limits and portable report/import evidence.
 - Add offline world and ordered connection views with optional operator-supplied DB-IP City Lite data, approximate public-IP markers, internal/unknown-hop fallbacks and location redaction in reports.
 - Keep history and map keyboard focus across polling updates. Expose sidebar/group expanded states and support mobile navigation focus containment, Escape and focus return.

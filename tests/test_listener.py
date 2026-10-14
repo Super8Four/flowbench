@@ -247,6 +247,19 @@ class ListenerTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/runs', json={'role': 'server', 'port': port}).status_code, 409)
         self.assertEqual(self.client.post('/api/listener/stop', json={}, headers={'Origin': 'https://other.example'}).status_code, 403)
 
+    def test_active_diagnostic_settings_do_not_claim_an_iperf_role_or_port(self):
+        # Standalone checks deliberately have no iPerf role/protocol/port keys.
+        # Exercise both listener admission and native accepted-session parsing.
+        check = {'id': 'f' * 32, 'kind': 'diagnostic-check', 'check_type': 'dns',
+                 'settings': {'target': 'fixture.example.test.'}}
+        with patch.object(self.manager, 'active', 'f' * 32), patch.object(self.manager, 'record', check):
+            port = self.start_listener()
+            self.raw_client(port)
+            captured = self.wait_captured(1)[0]
+            self.assertEqual(captured['status'], 'completed', captured.get('error'))
+            self.assertNotIn('concurrency', captured)
+            self.assertEqual(self.client.post('/api/listener/stop', json={}).status_code, 200)
+
     def test_incoming_json_xml_roundtrip_preserves_original_evidence(self):
         port = self.start_listener()
         self.raw_client(port, ['-u', '-R'])

@@ -134,12 +134,104 @@ def _bounded_raw(record):
         result[key] = text[:LOG_LIMIT]
         result[key + "_truncated"] = len(text) > LOG_LIMIT
     # Native tool evidence can include sensitive context, so it shares the raw opt-in.
-    native = record.get("native_result") or record.get("flent")
+    native = record.get("native_result") or record.get("flent") or record.get("result")
     if native:
         text = json.dumps(_clean(native), indent=2, ensure_ascii=False)
         result["native_result"] = text[:LOG_LIMIT]
         result["native_result_truncated"] = len(text) > LOG_LIMIT
     return result
+
+
+def _private_check(value, key=""):
+    """Default-deny standalone check context, including unknown numeric fields."""
+    fields = set("schema_version status started_at finished_at elapsed_seconds time_quality adapter resolver resolution attempts summary error note mode port address_family transport query_index sequence duration_ms resolver_port resolver_family record_type resolver_mode count timeout_ms rcode flags question answers authority additional name type class ttl rdata qtype timing query_elapsed_seconds seconds rtt_ms rtt_upper_bound_ms transmitted echo_replies requested_queries attempted_queries transport_attempts responses outcomes requested attempted unattempted confirmed_transmitted confirmed_nonresponses indeterminate_attempts nonresponse_percent rtt numeric_samples min_ms max_ms mean_ms median_ms stdev_ms stddev_ms p95_ms records_truncated output_truncated".split())
+    states = set("pending running completed captured partial failed interrupted cancelled unavailable blocked permission_blocked error timeout malformed reply no_reply unreachable missing answer nodata nxdomain dns_error truncated refused network_error resolution_error udp tcp system custom ipv4 ipv6 auto 4 6 linux win32 windows ICMP DNS dnspython native_ping A AAAA CNAME MX NS PTR SOA TXT SRV CAA HTTPS SVCB IN NOERROR NXDOMAIN SERVFAIL REFUSED FORMERR NOTIMP YXDOMAIN YXRRSET NXRRSET NOTAUTH NOTZONE QR AA TC RD RA AD CD".split())
+    if key == "time_quality":
+        return (_private_preflight({"time_quality": value}) or {}).get("time_quality")
+    if key == "adapter" and isinstance(value, dict):
+        return {"name": value.get("name") if value.get("name") in {"dnspython", "native_ping"} else "[redacted]",
+                "version": "[redacted]" if value.get("version") else None,
+                "platform": value.get("platform") if value.get("platform") in {"linux", "win32", "darwin"} else "[redacted]"}
+    if isinstance(value, dict):
+        return {name: _private_check(item, name) for name, item in value.items() if name in fields or key == "outcomes" and name in states}
+    if isinstance(value, list):
+        return [_private_check(item, key) for item in value]
+    if isinstance(value, str):
+        if key in {"started_at", "finished_at"}:
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return parsed.astimezone(timezone.utc).isoformat() if parsed.tzinfo else None
+            except ValueError:
+                return None
+        return value if value in states and key in {"status", "mode", "resolver_mode", "address_family", "transport", "rcode", "flags", "record_type", "qtype", "type", "class"} else "[redacted]"
+    return _clean(value)
+
+
+def _check_report(manager, records, projects, redact, include_raw, expected_fingerprint):
+    """Build standalone diagnostic evidence without iPerf settings or metrics."""
+    if any(record.get("kind") != "diagnostic-check" for record in records):
+        raise ValueError("Choose diagnostic checks separately from throughput tests.")
+    if len({record["check_type"] for record in records}) != 1:
+        raise ValueError("Compare DNS checks and ICMP checks separately.")
+    model = {"schema_version": 1, "kind": "flowbench-report", "report_type": "diagnostic-check",
+             "generated_at": datetime.now(timezone.utc).isoformat(), "version": __version__,
+             "title": "Network diagnostic report", "redacted": redact, "include_raw": include_raw,
+             "runs": [], "comparisons": [], "common_window": None,
+             "limitations": ["This report records standalone diagnostic observations. Failed, partial, cancelled and interrupted captures retain their actual outcomes; unavailable measurements are not zero.",
+                             "DNS responses describe the selected resolver and transport at capture time. Negative or error responses are observations, not proof that every resolver or network path behaves the same way.",
+                             "ICMP echo nonresponse is not UDP or application packet loss. Filtering, rate limits, local permissions and unknown sends can prevent a reply. Bounds such as <1 ms are not numeric zero RTT.",
+                             "UTC timestamps use the host system clock and are not independently NTP verified. Local provider synchronization and root dispersion are not guaranteed clock accuracy.",
+                             "No throughput series or automatic route capture is inferred from these checks.",
+                             "PDF embeds offline Bitstream Vera fonts; unsupported characters become a question mark. Word retains Unicode text using its font fallback.",
+                             "Redaction removes names, DNS answers, resolver and endpoint addresses, project text, notes, raw output and time-source context." if redact else "Endpoint, resolver, DNS answer and user context may be sensitive. Review before sharing."]}
+    def drop_raw(value):
+        if isinstance(value, dict):
+            return {k: drop_raw(v) for k, v in value.items() if k not in {"raw", "raw_output", "raw_stdout", "raw_stderr", "command", "executable"}}
+        return [drop_raw(v) for v in value] if isinstance(value, list) else value
+    for index, record in enumerate(records, 1):
+        settings = copy.deepcopy(record["settings"])
+        project = projects.get(settings.get("project_id"))
+        result = copy.deepcopy(record["result"])
+        row = {"id": record["id"], "kind": "diagnostic-check", "check_type": record["check_type"],
+               "display_index": index, "color": run_color(record), "label": "Check " + str(index) if redact else record.get("label") or settings.get("label") or "Check " + str(index),
+               "created_at": record["created_at"], "finished_at": record["finished_at"], "status": record["status"],
+               "settings": _private_check(settings) if redact else settings,
+               "result": _private_check(result) if redact else drop_raw(result), "metrics": {}, "series": [],
+               "project": "[redacted]" if redact and project else copy.deepcopy(project),
+               "tags": {} if redact else copy.deepcopy(settings.get("tags", {})),
+               "notes": "[redacted]" if redact and settings.get("notes") else settings.get("notes", ""),
+               "annotations": [{"timestamp": n.get("timestamp"), "seconds": n.get("seconds"), "text": "[redacted]"} for n in record.get("annotations", [])] if redact else copy.deepcopy(record.get("annotations", [])),
+               "provenance": {"engine": "DNS query" if record["check_type"] == "dns" else "ICMP echo",
+                              "imported": bool(record.get("imported")), "output_format": "typed diagnostic evidence",
+                              "lineage": copy.deepcopy(record.get("lineage"))}}
+        if include_raw:
+            row["raw_evidence"] = {"status": "removed by redaction"} if redact else _bounded_raw(record)
+        model["runs"].append(_clean(row))
+    # The shared check comparison adapter is supplied by the typed check module.
+    if len(records) > 1:
+        from .metrics import check_comparison as compare_checks
+        for after in records[1:]:
+            captured = compare_checks(records[0], after)
+            metrics = [{"metric": item["label"] + " (" + item["unit"] + ")", "unit": item["unit"], "before": item["before"], "after": item["after"], "delta": item["delta"]} for item in captured["rows"]]
+            if captured.get("outcomes"):
+                for state in sorted(captured["outcomes"]["before"]):
+                    metrics.append({"metric": "DNS " + state + " (count)", "before": captured["outcomes"]["before"][state],
+                                    "after": captured["outcomes"]["after"][state], "unit": "count", "delta": captured["outcomes"]["after"][state] - captured["outcomes"]["before"][state]})
+            details = [("Baseline capture", captured["before"]["status"] + " / " + captured["before"]["result_status"]),
+                       ("Selected capture", captured["after"]["status"] + " / " + captured["after"]["result_status"])]
+            if not redact and captured.get("answer_sets"):
+                details.extend(("DNS answer sets " + key, _summary(value)) for key, value in captured["answer_sets"].items())
+            model["comparisons"].append({"before_id": captured["before_id"], "after_id": captured["after_id"],
+                                        "caveat": " ".join(captured["caveats"]), "settings_differences": captured["settings_differences"],
+                                        "metrics": metrics, "details": details})
+    content = {key: value for key, value in model.items() if key != "generated_at"}
+    serialized = json.dumps(content, ensure_ascii=False, sort_keys=True, allow_nan=False).encode()
+    if len(serialized) > MODEL_BYTES:
+        raise ValueError("Report exceeds the 32 MiB normalized-data resource budget. Split the selection into smaller reports.")
+    model["fingerprint"] = hashlib.sha256(serialized).hexdigest()
+    if expected_fingerprint is not None and expected_fingerprint != model["fingerprint"]:
+        raise ValueError("Saved evidence changed; preview the report again before downloading.")
+    return model
 
 
 def prepare_report(manager, data):
@@ -160,8 +252,18 @@ def prepare_report(manager, data):
         records, point_count = [], 0
         for run_id in ids:
             record = manager.read(run_id)
+            if "lineage" in record:
+                from .reruns import validate_lineage
+                validate_lineage(record["lineage"])
             if record.get("children") or record.get("kind") in {"protocol-job", "matrix-job"}:
                 raise ValueError("Choose individual tests within a protocol or matrix batch.")
+            if record.get("kind") == "diagnostic-check":
+                from .checks import validate_check_record
+                validate_check_record(record)
+                if record.get("status") not in {"completed", "partial", "failed", "cancelled", "interrupted"} or not record.get("finished_at"):
+                    raise ValueError("Reports require terminal diagnostic checks.")
+                records.append(manager.export(run_id) if include_raw and not redact else record)
+                continue
             if record.get("status") != "completed" or not record.get("finished_at"):
                 raise ValueError("Reports require completed tests.")
             if "preflight" in record:
@@ -191,6 +293,8 @@ def prepare_report(manager, data):
             records.append(manager.export(run_id) if include_raw and not redact else record)
         catalog = manager.storage.metadata("projects") or {"projects": []}
         projects = {item["id"]: item for item in catalog.get("projects", [])}
+    if any(record.get("kind") == "diagnostic-check" for record in records):
+        return _check_report(manager, records, projects, redact, include_raw, expected_fingerprint)
     model = {"schema_version": 1, "kind": "flowbench-report", "generated_at": datetime.now(timezone.utc).isoformat(),
              "version": __version__, "title": "Network performance report", "redacted": redact,
              "include_raw": include_raw, "runs": [], "comparisons": [], "limitations": list(LIMITATIONS)}
@@ -253,6 +357,7 @@ def prepare_report(manager, data):
                "preflight": _private_preflight(preflight) if redact else preflight,
                "provenance": {"engine": record.get("engine", "iperf3"), "engine_version": record.get("iperf_version"),
                               "output_format": record.get("output_format"), "imported": bool(record.get("imported")),
+                              "lineage": copy.deepcopy(record.get("lineage")),
                               "concurrency": _private_diagnostics(record.get("concurrency")) if redact else copy.deepcopy(record.get("concurrency"))}}
         if record.get("kind") == "flent-run":
             flent = record.get("flent") or {}
@@ -325,7 +430,11 @@ def metric_label(key):
 
 
 def metric_value(key, value):
-    return format_mbps(value) if key.endswith("_mbps") and _finite(value) else display(value)
+    if key.endswith("_mbps") and _finite(value):
+        return format_mbps(value)
+    if key.endswith("(ms)") and _finite(value):
+        return format(value, ".9g")
+    return display(value)
 
 
 def _clock_seconds(value, signed=False):
@@ -406,8 +515,59 @@ def _chart(runs, bounds=None):
     return output.getvalue()
 
 
+def _check_sections(run):
+    result, settings = run["result"], run["settings"]
+    def value(item):
+        return format(item, ".9g") if _finite(item) else _summary(item)
+    kind = "DNS query" if run["check_type"] == "dns" else "ICMP echo nonresponse"
+    context = [("Check type", kind), ("Saved capture status", run["status"]),
+               ("Diagnostic outcome", result.get("status")),
+               ("Saved check ID", run["id"]), ("Recorded UTC", run["created_at"] + " to " + run["finished_at"]),
+               ("Capture UTC", display(result.get("started_at")) + " to " + display(result.get("finished_at"))),
+               ("Elapsed seconds", value(result.get("elapsed_seconds"))),
+               ("Adapter", _summary(result.get("adapter"))), ("Imported evidence", run["provenance"]["imported"])]
+    if run["provenance"].get("lineage"):
+        context.append(("Execution source lineage", _summary(run["provenance"]["lineage"])))
+    sections = [("Check settings and provenance", ["Setting", "Recorded value"], context + [(key.replace("_", " "), value(item)) for key, item in settings.items() if key not in {"label", "notes", "tags", "project_id", "color"}]),
+                ("Captured diagnostic summary", ["Metric", "Value"], [(key.replace("_", " "), value(item)) for key, item in result.get("summary", {}).items()])]
+    quality = result.get("time_quality") or {}
+    sections.append(("Clock quality", ["Evidence", "Recorded value"],
+                     [("Verification", "Host system UTC; not independently NTP verified. Local synchronization is a provider report, not guaranteed clock accuracy."),
+                      ("Status and observation UTC", display(quality.get("status")) + " | " + display(quality.get("observed_at"))),
+                      ("Provider and source", display(quality.get("provider")) + " | " + display(quality.get("source"))),
+                      ("Provider synchronized", quality.get("synchronized")),
+                      ("Reported correction seconds", _clock_seconds(quality.get("offset_seconds"), signed=True)),
+                      ("Root dispersion proxy seconds", _clock_seconds(quality.get("uncertainty_seconds")) + "; not guaranteed accuracy"),
+                      ("Last synchronization UTC", quality.get("last_sync_at"))]))
+    if run["check_type"] == "dns":
+        sections.append(("Resolver observation", ["Evidence", "Recorded value"], [(key.replace("_", " "), value(item)) for key, item in (result.get("resolver") or {}).items()]))
+        for ordinal, attempt in enumerate(result.get("attempts", []), 1):
+            keys = ("sequence", "query_index", "transport", "status", "rcode", "flags", "question", "resolver_address", "resolver_port", "resolver_family", "started_at", "finished_at", "duration_ms", "records_truncated", "output_truncated", "error")
+            sections.append((f"DNS transport attempt {ordinal}", ["Evidence", "Recorded value"],
+                             [(key.replace("_", " "), value(attempt[key])) for key in keys if key in attempt]))
+            records = []
+            for group in ("answers", "authority", "additional"):
+                for item in attempt.get(group, []):
+                    records.append((group, item.get("name"), display(item.get("type")) + " / " + display(item.get("class")), item.get("ttl"), _summary(item.get("rdata"))))
+            if records:
+                sections.append((f"DNS response records {ordinal}", ["Section", "Name", "Type / class", "TTL", "Data"], records))
+    else:
+        sections.append(("Selected endpoint resolution", ["Evidence", "Recorded value"], [(key.replace("_", " "), value(item)) for key, item in (result.get("resolution") or {}).items()]))
+        probes = []
+        for ordinal, attempt in enumerate(result.get("attempts", []), 1):
+            rtt = (_clock_seconds(attempt.get("rtt_ms")) if _finite(attempt.get("rtt_ms")) else
+                   "<" + _clock_seconds(attempt["rtt_upper_bound_ms"]) if _finite(attempt.get("rtt_upper_bound_ms")) else "Unavailable")
+            probes.append((ordinal, attempt.get("status"), rtt, attempt.get("transmitted"), attempt.get("echo_replies")))
+        sections.append(("ICMP echo observations", ["Attempt", "Status", "RTT ms", "Transmitted", "Echo replies"], probes))
+    if result.get("error") or result.get("note"):
+        sections.append(("Capture notes", ["Evidence", "Recorded value"], [(key, _summary(result.get(key))) for key in ("error", "note") if result.get(key)]))
+    return sections
+
+
 def _sections(run):
     """One shared narrative/table definition prevents PDF and Word drift."""
+    if run.get("kind") == "diagnostic-check":
+        return _check_sections(run)
     s = run["settings"]
     settings = [("Role and endpoint", f"{s.get('role')} | {display(s.get('target'))}:{display(s.get('port'))}\nBind: {s.get('bind') or 'Automatic'}"),
                 ("Protocol and direction", f"{s.get('protocol')} | {s.get('mode')}"),
@@ -419,6 +579,8 @@ def _sections(run):
                 ("Engine and evidence", f"{display(run['provenance'].get('engine'))} | {display(run['provenance'].get('engine_version'))}\nOutput {display(run['provenance'].get('output_format'))} | Imported {display(run['provenance'].get('imported'))}")]
     if run["provenance"].get("concurrency"):
         settings.append(("Overlapping traffic", _summary(run["provenance"]["concurrency"])))
+    if run["provenance"].get("lineage"):
+        settings.append(("Execution source lineage", _summary(run["provenance"]["lineage"])))
     if run.get("workload"):
         settings.append(("Workload", run["workload"]))
     sections = [("Test settings and provenance", ["Setting", "Recorded value"], settings),
@@ -626,6 +788,8 @@ def _native_chart(runs, unit, bounds=None):
 
 
 def _charts(runs):
+    if any(run.get("kind") == "diagnostic-check" for run in runs):
+        return []
     native = [run for run in runs if run.get("flent_series")]
     charts = []
     if len(native) == len(runs):
@@ -717,7 +881,7 @@ def render_pdf(model):
         return Image(BytesIO(payload), width=495, height=height)
     styles.add(ParagraphStyle("FBHeaderCell", parent=styles["FBCell"], textColor=colors.white, fontName="FlowBenchVeraBold"))
     def table(head, rows, widths=None):
-        widths = widths or ((45, 120, 140, 90, 100) if len(head) == 5 else (210, 140, 145) if len(head) == 3 else (170, 325))
+        widths = widths or ((60, 145, 70, 45, 175) if len(head) == 5 and head[0] == "Section" else (60, 130, 100, 105, 100) if len(head) == 5 and head[0] == "Attempt" else (45, 120, 140, 90, 100) if len(head) == 5 else (210, 140, 145) if len(head) == 3 else (170, 325))
         content = [[p(item, "FBHeaderCell") for item in head]] + [[p(display(item), "FBCell") for item in row] for row in rows]
         result = Table(content, colWidths=widths, repeatRows=1, hAlign="LEFT")
         result.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#183b50")),
@@ -728,22 +892,24 @@ def render_pdf(model):
                                    ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
         return result
     flow = [Image(str(BRAND), width=180, height=60, hAlign="LEFT"), Spacer(1, 14), p(model["title"], "FBTitle"),
-            p(f"{len(model['runs'])} completed test(s) | Generated {model['generated_at']} | FlowBench {model['version']}"),
+            p(f"{len(model['runs'])} {'terminal check(s)' if model.get('report_type') == 'diagnostic-check' else 'completed test(s)'} | Generated {model['generated_at']} | FlowBench {model['version']}"),
             p("This report records captured performance and diagnostic evidence. The first selected test is the baseline for any comparisons."),
             p("Redaction " + ("enabled" if model["redacted"] else "disabled") + "; raw evidence " + ("requested" if model["include_raw"] else "excluded") + ".")]
-    if len(model["runs"]) > 1:
+    if len(model["runs"]) > 1 and model.get("common_window"):
         flow.extend([p("Compared elapsed window", "FBHeading"), p(model["common_window"]["note"]),
                      p("Common captured window: " + display(model["common_window"].get("seconds")) + " seconds. Summary comparisons below retain whole-run aggregates."),
                      table(["Test", "Measured end", "Common window mean"], _window_rows(model), (65, 95, 335))])
     for report in model["comparisons"]:
         selected = next(row["display_index"] for row in model["runs"] if row["id"] == report["after_id"])
-        flow.append(KeepTogether([p("Baseline compared with Test " + str(selected), "FBHeading"), p(report["caveat"]),
+        flow.append(KeepTogether([p("Baseline compared with " + ("Check " if model.get("report_type") == "diagnostic-check" else "Test ") + str(selected), "FBHeading"), p(report["caveat"]),
                      p("Different settings: " + (", ".join(report["settings_differences"]) or "None detected")),
-                     table(["Metric", "Baseline", "Selected", "Change %"],
-                           [[metric_label(row["metric"]), metric_value(row["metric"], row["before"]), metric_value(row["metric"], row["after"]), display(row["percent_change"])] for row in report["metrics"]], (210, 95, 95, 95))]))
+                     table(["Metric", "Baseline", "Selected", "Change" if model.get("report_type") == "diagnostic-check" else "Change %"],
+                           [[metric_label(row["metric"]), metric_value(row["metric"], row["before"]), metric_value(row["metric"], row["after"]), metric_value(row["metric"], row.get("delta")) if model.get("report_type") == "diagnostic-check" else display(row["percent_change"])] for row in report["metrics"]], (210, 95, 95, 95))]))
+        if report.get("details"):
+            flow.append(table(["Evidence", "Recorded value"], report["details"]))
     flow.append(p("Interpretation and limitations", "FBHeading"))
     flow.extend(p(text) for text in model["limitations"])
-    if len(model["runs"]) > 1:
+    if len(model["runs"]) > 1 and model.get("report_type") != "diagnostic-check":
         flow.append(PageBreak())
         charts = _charts(model["runs"])
         for title, chart, caption, legend in charts:
@@ -752,7 +918,7 @@ def render_pdf(model):
         if not charts:
             flow.append(p("These workloads have different measurement series; inspect their individual charts and comparison caveats below."))
     for index, run in enumerate(model["runs"], 1):
-        flow.extend([PageBreak(), p(f"Test {index}", "FBTitle"), p(run["label"])])
+        flow.extend([PageBreak(), p(f"{'Check' if run.get('kind') == 'diagnostic-check' else 'Test'} {index}", "FBTitle"), p(run["label"])])
         for heading, head, rows in _sections(run):
             flow.extend([p(heading, "FBHeading"), table(head, rows)])
             if heading == "Route capture context":
@@ -846,7 +1012,7 @@ def render_docx(model):
     def table(head, rows):
         result = document.add_table(rows=1, cols=len(head))
         result.autofit = False
-        widths = [.6, 1.65, 1.85, 1.3, 1.4] if len(head) == 5 else [3.25, 1.2, 1.2, 1.15] if len(head) == 4 else [.8, 4.4, 1.6] if len(head) == 3 and head[0] == "Hop" else [0.8, 1.2, 4.8] if len(head) == 3 and head[0] in {"Test", "Trace"} else [2.8, 2, 2] if len(head) == 3 else [2.2, 4.6]
+        widths = [.8, 1.8, .9, .5, 2.8] if len(head) == 5 and head[0] == "Section" else [.8, 1.9, 1.3, 1.4, 1.4] if len(head) == 5 and head[0] == "Attempt" else [.6, 1.65, 1.85, 1.3, 1.4] if len(head) == 5 else [3.25, 1.2, 1.2, 1.15] if len(head) == 4 else [.8, 4.4, 1.6] if len(head) == 3 and head[0] == "Hop" else [0.8, 1.2, 4.8] if len(head) == 3 and head[0] in {"Test", "Trace"} else [2.8, 2, 2] if len(head) == 3 else [2.2, 4.6]
         for column, width in zip(result.columns, widths):
             column.width = Inches(width)
         for cell, title in zip(result.rows[0].cells, head):
@@ -896,17 +1062,17 @@ def render_docx(model):
         para("")
     document.add_picture(str(BRAND), width=Inches(2.4))
     document.add_paragraph(model["title"], "Title")
-    para(f"{len(model['runs'])} completed test(s) | Generated {model['generated_at']} | FlowBench {model['version']}")
+    para(f"{len(model['runs'])} {'terminal check(s)' if model.get('report_type') == 'diagnostic-check' else 'completed test(s)'} | Generated {model['generated_at']} | FlowBench {model['version']}")
     para("This report records captured performance and diagnostic evidence. The first selected test is the baseline for any comparisons.")
     para("Redaction " + ("enabled" if model["redacted"] else "disabled") + "; raw evidence " + ("requested" if model["include_raw"] else "excluded") + ".")
-    if len(model["runs"]) > 1:
+    if len(model["runs"]) > 1 and model.get("common_window"):
         document.add_heading("Compared elapsed window", 1)
         para(model["common_window"]["note"])
         para("Common captured window: " + display(model["common_window"].get("seconds")) + " seconds. Summary comparisons below retain whole-run aggregates.")
         table(["Test", "Measured end", "Common window mean"], _window_rows(model))
     for report in model["comparisons"]:
         selected = next(row["display_index"] for row in model["runs"] if row["id"] == report["after_id"])
-        heading = document.add_heading("Baseline compared with Test " + str(selected), 1)
+        heading = document.add_heading("Baseline compared with " + ("Check " if model.get("report_type") == "diagnostic-check" else "Test ") + str(selected), 1)
         # Native LibreOffice can strand a comparison heading even with direct
         # keepNext properties. Begin the bounded introductory block on a fresh
         # page; the table can still paginate after its first measured row.
@@ -917,11 +1083,13 @@ def render_docx(model):
         document.paragraphs[-1].paragraph_format.keep_with_next = True
         para("Different settings: " + (", ".join(report["settings_differences"]) or "None detected"))
         document.paragraphs[-1].paragraph_format.keep_with_next = True
-        table(["Metric", "Baseline", "Selected", "Change %"], [[metric_label(r["metric"]), metric_value(r["metric"], r["before"]), metric_value(r["metric"], r["after"]), r["percent_change"]] for r in report["metrics"]])
+        table(["Metric", "Baseline", "Selected", "Change" if model.get("report_type") == "diagnostic-check" else "Change %"], [[metric_label(r["metric"]), metric_value(r["metric"], r["before"]), metric_value(r["metric"], r["after"]), metric_value(r["metric"], r.get("delta")) if model.get("report_type") == "diagnostic-check" else r["percent_change"]] for r in report["metrics"]])
+        if report.get("details"):
+            table(["Evidence", "Recorded value"], report["details"])
     document.add_heading("Interpretation and limitations", 1)
     for text in model["limitations"]:
         para(text)
-    if len(model["runs"]) > 1:
+    if len(model["runs"]) > 1 and model.get("report_type") != "diagnostic-check":
         document.add_page_break()
         charts = _charts(model["runs"])
         for title, chart, caption, legend in charts:
@@ -933,7 +1101,7 @@ def render_docx(model):
             para("These workloads have different measurement series; inspect their individual charts and comparison caveats below.")
     for index, run in enumerate(model["runs"], 1):
         document.add_page_break()
-        document.add_heading(f"Test {index}", 1)
+        document.add_heading(f"{'Check' if run.get('kind') == 'diagnostic-check' else 'Test'} {index}", 1)
         para(run["label"])
         for heading, head, rows in _sections(run):
             document.add_heading(heading, 2)
