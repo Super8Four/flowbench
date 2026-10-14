@@ -8,6 +8,9 @@ from .metrics import effective_settings, measurements, series
 
 
 def peer_results(record):
+    if record.get("kind") == "diagnostic-check":
+        return {"available": False, "format": None, "metrics": {}, "series": [],
+                "raw_output": "", "note": "Diagnostic checks retain their typed DNS or ICMP evidence; no remote iPerf output applies."}
     native = record.get("native_result") or {}
     if not isinstance(native, dict):
         native = {}

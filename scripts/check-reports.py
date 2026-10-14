@@ -26,6 +26,55 @@ from app.projects import ProjectStore
 from app.reports import prepare_report, render_pdf, render_docx
 from app.runner import RunManager, settings_from
 from app.time_quality import time_quality_result
+from app.checks import prepare_check, initial_result, summarize_check, check_run_status, validate_check_record
+
+
+def check_fixture(check_type, run_id="e" * 32, partial=False):
+    """Synthetic typed observations only; never call a resolver or native tool."""
+    _, settings = prepare_check({"check_type": check_type, "settings": {
+        "target": "report-fixture.example" if check_type == "dns" else "192.0.2.25",
+        "count": 3 if check_type == "dns" else 4,
+        "label": "Synthetic " + check_type + " observations", "notes": "Disposable report fixture"}})
+    result = initial_result(check_type, settings)
+    result.update(status="partial" if partial else "captured", started_at="2026-01-01T10:00:00+00:00",
+                  finished_at="2026-01-01T10:00:04+00:00", elapsed_seconds=4,
+                  time_quality=time_quality_result("unavailable", "Synthetic fixture; local clock provider not queried."))
+    result["time_quality"]["observed_at"] = "2026-01-01T10:00:00+00:00"
+    def timing(sequence):
+        return {"sequence": sequence, "started_at": "2026-01-01T10:00:00+00:00", "finished_at": "2026-01-01T10:00:00.002500+00:00", "duration_ms": 2.5}
+    if check_type == "dns":
+        result["resolver"] = {"mode": "system", "configured_addresses": ["192.0.2.53"], "selected_address": "192.0.2.53", "port": 53, "address_family": 4}
+        plan = [(1, "udp", "truncated", "NOERROR"), (1, "tcp", "answer", "NOERROR"), (2, "udp", "nodata", "NOERROR"), (3, "udp", "nxdomain", "NXDOMAIN")]
+        if partial:
+            plan = [(1, "udp", "timeout", None)]
+        for sequence, (query, transport, status, rcode) in enumerate(plan, 1):
+            row = dict(timing(sequence), query_index=query, transport=transport, resolver_address="192.0.2.53", resolver_port=53, resolver_family=4,
+                       status=status, rcode=rcode, flags=["QR", "TC"] if status == "truncated" else ["QR", "RD", "RA"] if rcode else [],
+                       question={"name": settings["target"], "type": "A", "class": "IN"}, answers=[], authority=[], additional=[],
+                       records_truncated=False, raw_output="Synthetic resolver report-fixture.example 192.0.2.53", output_truncated=False,
+                       error="Synthetic query timed out" if status == "timeout" else None)
+            if status == "answer":
+                row["answers"] = [{"name": settings["target"], "type": "A", "class": "IN", "ttl": 60, "rdata": "192.0.2.25"},
+                                  {"name": settings["target"], "type": "TXT", "class": "IN", "ttl": 0, "rdata": '"Synthetic <literal>& record"'}]
+            if status in {"nodata", "nxdomain"}:
+                row["authority"] = [{"name": "example.", "type": "SOA", "class": "IN", "ttl": 120, "rdata": "ns.example. hostmaster.example. 1 60 60 60 60"}]
+            result["attempts"].append(row)
+    else:
+        result["resolution"] = {"status": "captured", "started_at": "2026-01-01T10:00:00+00:00", "finished_at": "2026-01-01T10:00:00.001000+00:00", "duration_ms": 1,
+                                "source": "numeric", "candidates": [{"address": settings["target"], "address_family": 4}], "selected_address": settings["target"], "address_family": 4, "error": None}
+        for sequence, (status, rtt, bound) in enumerate((("reply", 2.5, None), ("reply", None, 1), ("no_reply", None, None), ("unreachable", None, None)), 1):
+            row = dict(timing(sequence), address=settings["target"], address_family=4, status=status, rtt_ms=rtt, rtt_upper_bound_ms=bound,
+                       transmitted=1, echo_replies=1 if status == "reply" else 0, exit_code=0 if status == "reply" else 1,
+                       raw_output="Synthetic ICMP 192.0.2.25", output_truncated=False, error=None)
+            if partial and sequence == 4:
+                row.update(status="permission_blocked", transmitted=None, echo_replies=None, error="Synthetic permission unavailable")
+            result["attempts"].append(row)
+    result["summary"] = summarize_check(check_type, result, settings)
+    record = {"schema_version": 1, "kind": "diagnostic-check", "check_type": check_type, "id": run_id,
+              "created_at": result["started_at"], "finished_at": result["finished_at"], "status": check_run_status(result),
+              "settings": settings, "result": result, "annotations": [], "summary": {}, "intervals": [], "command": []}
+    validate_check_record(record)
+    return record
 
 
 def fixture():
@@ -117,7 +166,13 @@ def main():
                                   for index, name in enumerate(sorted(RRUL_TCP | RRUL_RTT))}}
             flent["flent"] = normalize_flent(native, "Synthetic fixture")
             manager.save(flent)
-            for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", comparison_ids, True), ("flent", [flent["id"]], False)):
+            for check_type, run_id in (("dns", "e" * 32), ("loss", "f" * 32)):
+                manager.save(check_fixture(check_type, run_id))
+                rerun = check_fixture(check_type, ("8" if check_type == "dns" else "9") * 32, partial=True)
+                rerun["lineage"] = {"schema_version": 1, "action": "run_again", "source_run_id": run_id, "external_source_id": None}
+                manager.save(rerun)
+            for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", comparison_ids, True), ("flent", [flent["id"]], False),
+                                      ("dns-check", ["e" * 32, "8" * 32], False), ("loss-check", ["f" * 32, "9" * 32], True)):
                 model = prepare_report(manager, {"ids": ids, "redact": redact})
                 (args.output_dir / (name + ".json")).write_text(json.dumps(model, indent=2), encoding="utf-8")
                 for extension, renderer in (("pdf", render_pdf), ("docx", render_docx)):
@@ -128,13 +183,13 @@ def main():
                         assert payload.startswith(b"%PDF-"), path
                     else:
                         with ZipFile(BytesIO(payload)) as package:
-                            assert b"Network performance report" in package.read("word/document.xml"), path
+                            assert model["title"].encode() in package.read("word/document.xml"), path
                             assert package.testzip() is None, path
                     manifest["files"].append({"name": path.name, "bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
         finally:
             manager.shutdown()
     (args.output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print("Generated and validated six PDF/DOCX fixtures. Visual rendering is a separate required check.")
+    print("Generated and validated ten PDF/DOCX fixtures. Visual rendering is a separate required check.")
 
 
 if __name__ == "__main__":

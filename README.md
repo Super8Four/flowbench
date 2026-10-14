@@ -2,6 +2,8 @@
 
 The current main source (`0.2.0-dev`) includes [measurement workflows](docs/measurement-workflows.md), [optional native Flent RRUL](docs/flent.md), and [PDF/Word reports](docs/reports.md). The latest published prerelease remains **0.1.0-rc.2**; its source tag and downloads are unchanged.
 
+The `feature/network-checks-reruns` branch adds [standalone DNS/ICMP checks and Run again](docs/network-checks.md). Other proposed diagnostics remain on the [roadmap](docs/roadmap.md).
+
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](docs/assets/badges/container.svg)](docs/setup-and-testing.md) [![Architecture](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Python](docs/assets/badges/python.svg)](docs/setup-and-testing.md) [![SQLite](docs/assets/badges/storage.svg)](docs/sqlite-storage.md) [![iPerf3](docs/assets/badges/engine.svg)](docs/protocol-tests.md)
 
 <picture>
@@ -57,6 +59,7 @@ The Windows engine does not support UDP bidirectional; use a Linux image or sele
 - [Setup and troubleshooting](docs/setup-and-testing.md)
 - [TCP, UDP and Both](docs/protocol-tests.md)
 - [Route and clock preparation](docs/preflight.md)
+- [DNS, ICMP and Run again](docs/network-checks.md), [planned diagnostics](docs/roadmap.md)
 - [Incoming capture](docs/incoming-listener.md)
 - [Backup and rollback](docs/sqlite-storage.md)
 - [Brand assets](docs/brand-assets.md), [verification](docs/verification.md) and [remaining requirements](docs/requirements.md)

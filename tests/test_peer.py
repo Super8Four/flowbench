@@ -5,6 +5,17 @@ from app.runner import settings_from
 
 
 class PeerTests(unittest.TestCase):
+    def test_diagnostic_checks_never_parse_copied_native_iperf_output(self):
+        for check_type in ('dns', 'loss'):
+            record = {'kind': 'diagnostic-check', 'check_type': check_type,
+                      'settings': {'target': 'example.test'},
+                      'native_result': {'server_output_text': '[SUM] 0.00-1.00 sec 12 MBytes 100 Mbits/sec receiver'}}
+            peer = peer_results(record)
+            self.assertFalse(peer['available'])
+            self.assertEqual(peer['metrics'], {})
+            self.assertEqual(peer['series'], [])
+            self.assertEqual(peer['raw_output'], '')
+
     def record(self, mode='upload', **native):
         return {'settings': settings_from({'target': 'remote.example', 'mode': mode}), 'native_result': native}
 

@@ -1,4 +1,5 @@
 import {rateScale, formatRate, formatMbps, runColor} from './units.js';
+import {isCheck, checkSummary, renderCheckComparison, renderCheckReportChanges} from './checks.js';
 
 export function preflightSummary(run) {
   const terminal = ['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped'].includes(run.status);
@@ -131,6 +132,10 @@ export function renderConnectionMaps(run, context) {
 export function renderPreflight(run, context) {
   const $ = (id) => document.getElementById(id), {escape: esc, number: num} = context;
   if (!$('preflight-evidence')) return;
+  const check = isCheck(run);
+  if ($('preflight-heading')) $('preflight-heading').textContent = check ? 'Read-only clock evidence' : 'Route & clock evidence';
+  if ($('route-evidence-section')) $('route-evidence-section').hidden = check;
+  if (check) run = {...run, preflight: {status: run.result?.time_quality?.status || 'unavailable', phase: 'clock_observation', time_quality: run.result?.time_quality}, route: null};
   renderConnectionMaps(run, context);
   const text = (id, value) => { const element = $(id); if (element && element.textContent !== value) element.textContent = value; };
   const phrase = (value) => typeof value === 'string' && value ? value.replaceAll('_', ' ') : 'Not recorded';
@@ -147,12 +152,13 @@ export function renderPreflight(run, context) {
   const statuses = preflightSummary(run);
   const incoming = preflight?.phase === 'observed_after_start';
   const noRoute = route?.status === 'not_applicable';
-  const summary = group ? 'Open an individual test for its route preflight and clock evidence.'
+  const summary = check ? `Local clock observation: ${statuses.clock}. This evidence is separate from the check's outcome and elapsed duration.`
+    : group ? 'Open an individual test for its route preflight and clock evidence.'
     : incomplete ? `Incomplete preflight checkpoint retained · test ${run.status}. No preparation is running.`
       : !preflight ? 'Preflight not recorded for this saved test. Existing route evidence is retained below.'
       : `Evidence ${phrase(preflight.status)} · ${incoming ? 'local clock observed after incoming traffic started' : run.settings?.role === 'server' ? 'before local test traffic' : 'before outgoing traffic'}.`;
   text('preflight-status', summary);
-  text('preflight-phase', group ? 'Per individual test' : !preflight ? 'Not recorded' : incoming ? 'Observed after incoming start' : 'Before traffic');
+  text('preflight-phase', check ? 'Local clock observation; timing order not recorded' : group ? 'Per individual test' : !preflight ? 'Not recorded' : incoming ? 'Observed after incoming start' : 'Before traffic');
   text('preflight-started', utc(preflight?.started_at));
   text('preflight-finished', utc(preflight?.finished_at));
   text('preflight-elapsed', seconds(preflight?.elapsed_seconds));
@@ -217,7 +223,7 @@ export function createWorkflows(context) {
   let annotationTimestamp = null;
   let reportSourceState = '';
   const leaf = (run) => !['protocol-job', 'matrix-job'].includes(run.kind);
-  const complete = (run) => run.status === 'completed' && leaf(run) && Object.keys(run.metrics || {}).length;
+  const complete = (run) => run.status === 'completed' && leaf(run) && (isCheck(run) ? run.check_comparable === true || run.check_comparable === undefined && Boolean(run.result?.attempts?.length) : Object.keys(run.metrics || {}).length);
   const tagValues = (prefix) => Object.fromEntries(keys.map((key) => [key, $(prefix + key)?.value.trim() || '']));
   const guard = (action) => async (event) => { try { await action(event); } catch (error) { message(error.message); } };
   const busy = async (id, action) => {
@@ -283,7 +289,7 @@ export function createWorkflows(context) {
     return !project || (project === 'unassigned' ? !run.settings.project_id : run.settings.project_id === project);
   }
   function history(runs) {
-    fill($('live-baseline'), runs.filter((run) => complete(run) && run.kind !== 'flent-run'), 'Choose a completed test', (run) => `${title(run)} · ${date(run.created_at)}`);
+    fill($('live-baseline'), runs.filter((run) => complete(run) && run.kind !== 'flent-run' && !isCheck(run)), 'Choose a completed test', (run) => `${title(run)} · ${date(run.created_at)}`);
     if ($('live-baseline') && !initialized) {
       $('live-baseline').value = localStorage.getItem('flowbench-live-baseline') || '';
       initialized = true;
@@ -318,11 +324,15 @@ export function createWorkflows(context) {
     const rows = report.comparisons || [];
     $('project-report').innerHTML = rows.length ? `<div class="workflow-report">${rows.map((row) => {
       const after = report.runs.find((run) => run.id === row.after_id);
+      if (row.kind === 'diagnostic-check-comparison') {
+        const before = report.runs.find((run) => run.id === row.before_id);
+        return renderCheckComparison({check_type: row.check_type, runs: [before, after].filter(Boolean), comparisons: [row]}, {escape: esc, number: num, title, date});
+      }
       return `<article><h3 class="fs-6">${esc(after ? title(after) : row.after_id)}</h3><p><strong>${row.comparable ? esc(row.result) : 'Settings differ — comparison needs review'}</strong></p><p class="form-text">${esc(row.caveat || '')}${row.settings_differences?.length ? ` Different settings: ${esc(row.settings_differences.join(', '))}.` : ''}</p><div class="table-responsive"><table class="table"><thead><tr><th>Metric</th><th>Baseline</th><th>After</th><th>Change</th></tr></thead><tbody>${metricRows(row.metrics)}</tbody></table></div></article>`;
     }).join('')}</div>` : '<p class="form-text">No comparable completed candidates yet. Add tests to this project and save a baseline.</p>';
     const excluded = report.excluded || [];
     if (excluded.length) $('project-report').innerHTML += `<details><summary>${excluded.length} test(s) excluded from change summary</summary><ul>${excluded.map((row) => `<li>${esc(row.id)}: ${esc(row.reason)}</li>`).join('')}</ul></details>`;
-    $('project-runs').innerHTML = `<table class="table mt-3"><thead><tr><th>Test</th><th>Status</th><th>Settings</th><th>Evidence</th></tr></thead><tbody>${report.runs.map((run) => `<tr><td>${esc(title(run))}${tags(run)}</td><td>${esc(run.status)}</td><td>${run.settings.flent_workload ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${esc(run.settings.protocol)} / ${esc(run.settings.mode)} / ${run.settings.streams} streams`}</td><td><a href="/?run=${encodeURIComponent(run.id)}">Open test</a></td></tr>`).join('') || '<tr><td colspan="4">No tests assigned yet.</td></tr>'}</tbody></table>`;
+    $('project-runs').innerHTML = `<table class="table mt-3"><thead><tr><th>Test</th><th>Status</th><th>Settings</th><th>Evidence</th></tr></thead><tbody>${report.runs.map((run) => `<tr><td>${esc(title(run))}${tags(run)}</td><td>${esc(run.status)}</td><td>${isCheck(run) ? (run.check_type === 'dns' ? 'DNS lookup' : 'ICMP echo check') : run.settings.flent_workload ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${esc(run.settings.protocol)} / ${esc(run.settings.mode)} / ${run.settings.streams} streams`}</td><td><a href="/?run=${encodeURIComponent(run.id)}">Open test</a></td></tr>`).join('') || '<tr><td colspan="4">No tests assigned yet.</td></tr>'}</tbody></table>`;
     await loadProjects();
   }
   function metricRows(metrics) {
@@ -356,8 +366,9 @@ export function createWorkflows(context) {
     if (plan.problems.length) { error.focus(); return; }
     matrixStarting = true; $('matrix-start').disabled = true; $('matrix-start').textContent = 'Starting batch…';
     try {
-      const run = await api('/api/matrices', {method: 'POST', body: JSON.stringify(plan.data)});
-      await context.start(run); error.classList.add('d-none');
+      if (context.startRequest) await context.startRequest('/api/matrices', plan.data);
+      else await context.start(await api('/api/matrices', {method: 'POST', body: JSON.stringify(plan.data)}));
+      error.classList.add('d-none');
     } catch (problem) { error.textContent = problem.message; error.classList.remove('d-none'); error.focus(); }
     finally { matrixStarting = false; $('matrix-start').textContent = 'Start sequential batch'; controls(); }
   }
@@ -449,9 +460,9 @@ export function createWorkflows(context) {
   async function updateLive(force = false) {
     if (!$('live-baseline')) return;
     const baseline = $('live-baseline').value, run = context.state().selected;
-    if (!baseline || !run || !leaf(run) || run.kind === 'flent-run' || baseline === run.id) {
+    if (!baseline || !run || !leaf(run) || run.kind === 'flent-run' || isCheck(run) || baseline === run.id) {
       liveVersion++; liveData = null; drawLive();
-      $('live-note').textContent = run?.kind === 'flent-run' ? 'Flent native units are shown in its own evidence chart. This live overlay compares individual iPerf tests.' : baseline === run?.id ? 'Choose a different baseline test.' : 'Choose a completed baseline and open an individual test. Batch parents have no combined throughput curve.';
+      $('live-note').textContent = isCheck(run) ? 'DNS and ICMP checks use typed outcome comparisons; this overlay is for iPerf throughput.' : run?.kind === 'flent-run' ? 'Flent native units are shown in its own evidence chart. This live overlay compares individual iPerf tests.' : baseline === run?.id ? 'Choose a different baseline test.' : 'Choose a completed baseline and open an individual test. Batch parents have no combined throughput curve.';
       return;
     }
     const key = `${baseline}:${run.id}:${run.status}:${run.series?.length}`;
@@ -467,6 +478,9 @@ export function createWorkflows(context) {
     finally { liveBusy = false; }
   }
   function reportOptions() { return {ids: context.reportIds(), redact: $('report-redact').checked, include_raw: $('report-raw').checked && !$('report-redact').checked}; }
+  function renderReportPreview(result) {
+      $('report-preview').innerHTML = `<h3 class="fs-5">${esc(result.title)}</h3><p class="form-text">Generated ${esc(date(result.generated_at))} · FlowBench ${esc(result.version)}</p>${(result.runs || []).map((run, index) => `<article class="workflow-annotation"><h4 class="fs-6"><span class="comparison-color-swatch" style="background:${runColor(run)}"></span>${index + 1}. ${esc(run.label)}</h4><p>${esc(date(run.created_at))}</p>${run.check_type ? `<p>${esc(run.status || run.result?.status || "")} · ${esc(checkSummary(run, {number:num}))}</p>` : ""}<div class="table-responsive"><table class="table"><tbody>${Object.entries(run.metrics || {}).map(([key, value]) => `<tr><th>${esc(metricLabel(key))}</th><td>${metricValue(key,value)}</td></tr>`).join('')}</tbody></table></div></article>`).join('')}${renderCheckReportChanges(result, {escape:esc,number:num})}<ul>${(result.limitations || []).map((text) => `<li>${esc(text)}</li>`).join('')}</ul><details><summary>Complete report content preview</summary><pre class="peer-output mt-3" tabindex="0">${esc(JSON.stringify(result, null, 2))}</pre></details>`;
+  }
   async function previewReport() {
     if (reportPending) return;
     reportPending = true;
@@ -478,7 +492,7 @@ export function createWorkflows(context) {
       if (signature !== JSON.stringify(reportOptions())) return;
       reportPreview = result; reportSignature = signature;
       $('report-status').textContent = `Preview ready. ${result.redacted ? 'Sensitive context redacted.' : 'Captured user and endpoint context included.'} ${result.include_raw ? 'Raw evidence included.' : 'Raw evidence excluded.'}`;
-      $('report-preview').innerHTML = `<h3 class="fs-5">${esc(result.title)}</h3><p class="form-text">Generated ${esc(date(result.generated_at))} · FlowBench ${esc(result.version)}</p>${(result.runs || []).map((run, index) => `<article class="workflow-annotation"><h4 class="fs-6"><span class="comparison-color-swatch" style="background:${runColor(run)}"></span>${index + 1}. ${esc(run.label)}</h4><p>${esc(date(run.created_at))}</p><div class="table-responsive"><table class="table"><tbody>${Object.entries(run.metrics || {}).map(([key, value]) => `<tr><th>${esc(metricLabel(key))}</th><td>${metricValue(key,value)}</td></tr>`).join('')}</tbody></table></div></article>`).join('')}<ul>${(result.limitations || []).map((text) => `<li>${esc(text)}</li>`).join('')}</ul><details><summary>Complete report content preview</summary><pre class="peer-output mt-3" tabindex="0">${esc(JSON.stringify(result, null, 2))}</pre></details>`;
+      renderReportPreview(result);
     } catch (error) { reportPreview = null; $('report-status').textContent = error.message; message(error.message); }
     finally { reportPending = false; controls(); }
   }
@@ -507,7 +521,7 @@ export function createWorkflows(context) {
     const data = {target: values.target, duration, netserver_port: Number($('flent-port').value), workload: 'rrul', confirm_netserver: true,
       label: values.label, notes: values.notes, project_id: values.project_id, tags: values.tags, ip_version: values.ip_version || 'auto', bind: values.bind || ''};
     flentStarting = true; $('flent-start').disabled = true; $('flent-start').textContent = 'Starting Flent…';
-    try { await context.start(await api('/api/flent', {method: 'POST', body: JSON.stringify(data)})); }
+    try { if (context.startRequest) await context.startRequest('/api/flent', data); else await context.start(await api('/api/flent', {method: 'POST', body: JSON.stringify(data)})); }
     catch (problem) { error.textContent = problem.message; error.classList.remove('d-none'); error.focus(); }
     finally { flentStarting = false; $('flent-start').textContent = 'Start Flent RRUL'; controls(); }
   }
@@ -626,5 +640,6 @@ export function createWorkflows(context) {
     await context.refresh();
     drawLive(); controls();
   }
-  return {init, settings, loadSettings, loadFlentSettings, controls, status, history, selected, edit, annotationSettings, matches, tags};
+  function refreshDates() { const run = context.state().selected; if (run) renderTimeline(run); history(context.state().runs || []); if (reportPreview) renderReportPreview(reportPreview); }
+  return {init, settings, loadSettings, loadFlentSettings, controls, status, history, selected, edit, annotationSettings, matches, tags, refreshDates};
 }

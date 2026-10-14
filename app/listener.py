@@ -78,7 +78,7 @@ class IncomingListener:
                 raise RuntimeError("Restore archive access and restart before enabling the listener.")
             if self.running or (self.worker and self.worker.is_alive()):
                 raise ListenerConflict("The managed listener is already running. Stop it before changing settings.")
-            if self.manager.active and self.manager.record["settings"]["role"] == "server" and self.manager.record["settings"]["port"] == settings["port"]:
+            if self.manager.active and self.manager.record["settings"].get("role") == "server" and self.manager.record["settings"]["port"] == settings["port"]:
                 raise ListenerConflict("A one-test server already uses this port.")
             self.command = [self.manager.executable, "-s", "-B", settings["bind"], "-p", str(settings["port"]),
                             "-i", "1", "--forceflush", "--json-stream", "--json-stream-full-output",
@@ -151,7 +151,7 @@ class IncomingListener:
         self.events, self.full_lines, self.end_seen = [], [], False
         self.manager.save(self.record)
         self.start_time_quality(self.record["id"])
-        if self.manager.active and self.manager.record["settings"]["role"] == "client" and self.manager.process and self.manager.process.poll() is None:
+        if self.manager.active and self.manager.record["settings"].get("role") == "client" and self.manager.process and self.manager.process.poll() is None:
             self.mark_overlap(self.manager.record)
 
     def start_time_quality(self, run_id):

@@ -173,24 +173,53 @@ def prepare_run(data, filename, allow_job=False):
         raise ValueError("Both settings require a protocol-job with separate TCP and UDP evidence.")
     digest = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
     source_id = data.get("id")
+    is_check = data.get("kind") == "diagnostic-check"
+    if is_check and (type(data.get("schema_version")) is not int or data["schema_version"] != 1
+                     or not isinstance(source_id, str) or not re.fullmatch(r"[a-f0-9]{32}", source_id)):
+        raise ValueError("A diagnostic check requires schema 1 and a valid source identity.")
+    if "lineage" in data:
+        from .reruns import validate_lineage
+        validate_lineage(data["lineage"])
+        if not isinstance(source_id, str) or not re.fullmatch(r"[a-f0-9]{32}", source_id):
+            raise ValueError("Run lineage requires a valid source run identity.")
     if "settings" in data:
         if data.get("schema_version") != 1:
             raise ValueError("Unsupported run schema version.")
         record = copy.deepcopy(data)
-        record["settings"] = settings_from(data["settings"])
+        if is_check:
+            from .checks import validate_check_settings, validate_check_result, validate_check_record
+            validate_check_settings(data.get("check_type"), data["settings"])
+            validate_check_result(data.get("check_type"), data.get("result"), data["settings"])
+            if data.get("status") in TERMINAL:
+                validate_check_record(data)
+            elif ((data.get("result", {}).get("status") == "pending" and data.get("status") not in {"pending", "starting"})
+                  or (data.get("result", {}).get("status") == "running" and data.get("status") != "running")
+                  or data.get("result", {}).get("status") not in {"pending", "running"}):
+                raise ValueError("An active check snapshot must retain an active check result.")
+            record["settings"] = copy.deepcopy(data["settings"])
+        else:
+            record["settings"] = settings_from(data["settings"])
         if data.get("kind") == "flent-run":
             if data["settings"].get("flent_workload") != "rrul":
                 raise ValueError("Flent runs must retain their native RRUL workload settings.")
             record["settings"]["flent_workload"] = "rrul"
-        for key in ("metrics", "effective_settings", "series", "peer", "raw_stdout", "raw_stderr", "events"):
+        for key in ("metrics", "effective_settings", "series", "peer", "raw_stdout", "raw_stderr", "events", "request_id", "execution_request"):
             record.pop(key, None)
         record["created_at"] = timestamp(data.get("created_at"))
         record["finished_at"] = timestamp(data.get("finished_at"), optional=True)
-        if data.get("status") not in TERMINAL | {"starting", "running", "queued"}:
+        if data.get("status") not in TERMINAL | {"starting", "running", "queued"} | ({"pending"} if is_check else set()):
             raise ValueError("Invalid saved run status.")
         if data["status"] not in TERMINAL:
             record.update(status="interrupted", finished_at=record["finished_at"] or record["created_at"],
                           error="Imported snapshot of an unfinished session.")
+            if is_check:
+                record["result"].update(status="interrupted", finished_at=record["finished_at"],
+                                        error="Imported snapshot of an unfinished check; no execution was resumed.")
+                if record["result"]["time_quality"]["status"] == "pending":
+                    from .time_quality import time_quality_result
+                    record["result"]["time_quality"] = time_quality_result("unavailable", note="Imported before a clock observation was retained; no query was performed.")
+                if "time_quality" in record:
+                    record["time_quality"] = copy.deepcopy(record["result"]["time_quality"])
         elif record["finished_at"] is None:
             raise ValueError("A finished run must contain its finish timestamp.")
         events = data.get("events", [])
@@ -259,7 +288,12 @@ def prepare_run(data, filename, allow_job=False):
     code = record.get("exit_code")
     if code is not None and (isinstance(code, bool) or not isinstance(code, int)):
         raise ValueError("Saved exit code must be a number or null.")
-    validate_measurement_structure(record)
+    if is_check:
+        if record["summary"] or record["intervals"] or record.get("test_parameters") is not None or record.get("native_result") is not None or record.get("iperf_version") is not None:
+            raise ValueError("Diagnostic checks must not contain iPerf throughput evidence.")
+        validate_check_record(record)
+    else:
+        validate_measurement_structure(record)
     if "annotations" in record:
         record["annotations"] = annotations_from(record["annotations"])
     if "diagnostics" in record:
@@ -373,9 +407,57 @@ def prepare_source_documents(sources, filename):
     return prepared
 
 
+def finalize_import_lineage(prepared, existing_by_digest=None):
+    """Resolve ancestry only against this complete, validated import batch.
+
+    Existing digest matches can supply the local identity of a duplicate source.
+    Arbitrary local IDs are deliberately never used to resolve imported links.
+    This helper performs no storage writes or execution-request registration.
+    """
+    from .reruns import remap_lineage, validate_lineage, validate_lineage_graph
+    existing_by_digest = existing_by_digest or {}
+    source_digests, original, id_map = {}, {}, {}
+    final_ids = dict(existing_by_digest)
+    for record, _ in prepared:
+        provenance = record["imported"]
+        source_id, digest = provenance.get("source_id"), provenance["sha256"]
+        final_id = final_ids.setdefault(digest, record["id"])
+        if source_id is None:
+            continue
+        if not isinstance(source_id, str):
+            if "lineage" in record:
+                raise ValueError("Run lineage requires a valid source run identity.")
+            continue
+        if source_id in source_digests and source_digests[source_id] != digest:
+            raise ValueError("An import contains conflicting documents for the same source run identity.")
+        source_digests[source_id] = digest
+        id_map[source_id] = final_id
+        row = {"id": source_id}
+        if "lineage" in record:
+            lineage = validate_lineage(record["lineage"])
+            # An external marker is provenance, not a way to evade cycle checks
+            # when its source is included in this same batch.
+            row["lineage"] = dict(lineage, source_run_id=lineage["source_run_id"] or lineage["external_source_id"],
+                                  external_source_id=None)
+        original[source_id] = row
+    validate_lineage_graph(list(original.values()))
+    replacements, final_graph = [], []
+    for record, _ in prepared:
+        row = {"id": final_ids[record["imported"]["sha256"]]}
+        if "lineage" in record:
+            lineage = remap_lineage(record["lineage"], id_map)
+            replacements.append((record, lineage))
+            row["lineage"] = lineage
+        final_graph.append(row)
+    validate_lineage_graph(final_graph)
+    for record, lineage in replacements:
+        record["lineage"] = lineage
+    return id_map
+
+
 def import_runs(manager, data, filename):
     sources = [data]
-    if isinstance(data, dict) and data.get("kind") == "multi-comparison":
+    if isinstance(data, dict) and data.get("kind") in {"multi-comparison", "diagnostic-comparison"}:
         sources = data.get("runs")
         if not isinstance(sources, list) or len(sources) < 2:
             raise ValueError("A comparison export must contain at least two individual runs.")
@@ -401,6 +483,7 @@ def import_runs(manager, data, filename):
             parent_id = existing[prepared[0][0]["imported"]["sha256"]]
             parent = manager.read(parent_id)
             return {"imported": [], "duplicates": [parent_id, *(row["id"] for row in parent["children"])]}
+        finalize_import_lineage(prepared, None if is_job else existing)
         with manager.storage.transaction() as connection:
             for record, events in prepared:
                 digest = record["imported"]["sha256"]

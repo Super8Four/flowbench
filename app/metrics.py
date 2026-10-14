@@ -47,6 +47,8 @@ def identity_issues(record):
 
 def effective_settings(record):
     result = dict(record["settings"])
+    if record.get("kind") == "diagnostic-check":
+        return result
     result.setdefault("ip_version", "auto")
     params = record.get("test_parameters") or {}
     if params:
@@ -59,6 +61,8 @@ def effective_settings(record):
 
 
 def measurements(record):
+    if record.get("kind") == "diagnostic-check":
+        return {}
     if record.get("kind") == "flent-run":
         result = {}
         for row in (record.get("flent") or {}).get("summaries", []):
@@ -104,6 +108,8 @@ def measurements(record):
 
 
 def series(record):
+    if record.get("kind") == "diagnostic-check":
+        return []
     if identity_issues(record):
         return []  # Raw evidence remains in the record; overview explains why.
     settings = effective_settings(record)
@@ -143,6 +149,11 @@ def series(record):
 
 def overview(record):
     """Interval peaks and measured runtime, with a bounded trend for history rows."""
+    if record.get("kind") == "diagnostic-check":
+        elapsed = (record.get("result") or {}).get("elapsed_seconds")
+        return {"runtime_seconds": None, "trend": [], "status": "diagnostic-check",
+                "check_type": record.get("check_type"), "elapsed_seconds": elapsed,
+                "note": "Diagnostic observations have their own outcomes and timing; throughput does not apply."}
     issues = identity_issues(record)
     if issues:
         return {"runtime_seconds": None, "trend": [], "status": "unavailable", "issues": issues,
@@ -185,8 +196,92 @@ def overview(record):
     return result
 
 
+def check_comparison_eligible(record):
+    """Terminal typed observations remain useful even when the check failed."""
+    if not isinstance(record, dict) or record.get("kind") != "diagnostic-check":
+        return False
+    if record.get("status") not in {"completed", "failed", "partial", "cancelled", "interrupted"}:
+        return False
+    try:
+        from .checks import validate_check_record
+        validate_check_record(record)
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        return False
+    return (record.get("result") or {}).get("status") not in {"pending", "running"}
+
+
+def check_comparison(before, after):
+    """Compare typed check evidence, without throughput or improvement rankings."""
+    if before.get("id") == after.get("id"):
+        raise ValueError("Choose two different diagnostic checks.")
+    if not all(check_comparison_eligible(record) for record in (before, after)):
+        raise ValueError("Choose terminal DNS or ICMP checks with valid recorded evidence; active snapshots cannot be compared.")
+    check_type = before["check_type"]
+    if check_type != after["check_type"]:
+        raise ValueError("Compare the same diagnostic check type; DNS and ICMP observations have different meanings.")
+    setting_keys = ("target", "record_type", "resolver_mode", "resolver_address", "resolver_port", "transport", "count", "timeout_ms") if check_type == "dns" else ("target", "address_family", "count")
+    differences = [key for key in setting_keys if before["settings"].get(key) != after["settings"].get(key)]
+    results = [record["result"] for record in (before, after)]
+    context_key = "resolver" if check_type == "dns" else "resolution"
+    for key in ("selected_address", "address_family", "port"):
+        if (results[0].get(context_key) or {}).get(key) != (results[1].get(context_key) or {}).get(key):
+            differences.append(context_key + "." + key)
+    sides = [{"id": record["id"], "status": record["status"], "result_status": record["result"]["status"],
+              "summary": record["result"]["summary"]} for record in (before, after)]
+    rows = []
+    def row(metric, label, unit, left, right):
+        numeric = all(type(value) in (int, float) and math.isfinite(value) for value in (left, right))
+        rows.append({"metric": metric, "label": label, "unit": unit, "before": left, "after": right,
+                     "delta": right - left if numeric else None,
+                     "direction": "unchanged" if left == right else "changed"})
+    report = {"schema_version": 1, "kind": "diagnostic-check-comparison", "check_type": check_type,
+              "before_id": before["id"], "after_id": after["id"], "before": sides[0], "after": sides[1],
+              "comparable": not differences, "settings_differences": differences, "rows": rows,
+              "caveats": ["These are separate observations, not proof of cause. Changed outcomes are not ranked as improvements."]}
+    if differences:
+        report["caveats"].append("Requested or observed conditions differ; review the listed differences before interpreting changes.")
+    if any(result["status"] != "captured" for result in results):
+        report["caveats"].append("At least one check is incomplete or unavailable; retain its capture status and missing evidence.")
+    if check_type == "dns":
+        for metric in ("requested_queries", "attempted_queries", "transport_attempts", "responses"):
+            row(metric, metric.replace("_", " ").capitalize(), "count", results[0]["summary"][metric], results[1]["summary"][metric])
+        report["outcomes"] = {"before": results[0]["summary"]["outcomes"], "after": results[1]["summary"]["outcomes"]}
+        def answers(result):
+            final = {attempt["query_index"]: attempt for attempt in result["attempts"]}
+            # Compare observed RR identity/data. TTL is retained in source
+            # evidence but naturally changes with cache age, so is excluded here.
+            values = {(rr["name"].rstrip(".").lower(), rr["type"], rr["class"], rr["rdata"])
+                      for attempt in final.values() for rr in attempt["answers"]}
+            return values
+        left, right = map(answers, results)
+        def records(values):
+            return [dict(zip(("name", "type", "class", "rdata"), value)) for value in sorted(values)]
+        complete = all(result["status"] == "captured" for result in results)
+        report["answer_sets"] = {
+            "before": records(left) if results[0]["summary"]["responses"] else None,
+            "after": records(right) if results[1]["summary"]["responses"] else None,
+            "before_complete": results[0]["status"] == "captured",
+            "after_complete": results[1]["status"] == "captured",
+            "added": records(right - left) if complete else None,
+            "removed": records(left - right) if complete else None}
+        report["caveats"].append("DNS outcome counts use each logical query's final attempt. Answer-set changes exclude TTL and do not establish DNSSEC validation.")
+    else:
+        for metric in ("requested", "attempted", "unattempted", "transmitted", "confirmed_transmitted", "echo_replies", "confirmed_nonresponses", "indeterminate_attempts", "nonresponse_percent"):
+            row(metric, "ICMP echo nonresponse" if metric == "nonresponse_percent" else metric.replace("_", " ").capitalize(),
+                "%" if metric == "nonresponse_percent" else "count", results[0]["summary"][metric], results[1]["summary"][metric])
+        for metric in ("count", "min_ms", "mean_ms", "max_ms", "stdev_ms"):
+            row("rtt_" + metric, "RTT " + metric.replace("_ms", "").replace("_", " "), "count" if metric == "count" else "ms",
+                results[0]["summary"]["rtt"][metric], results[1]["summary"]["rtt"][metric])
+        report["caveats"].append("ICMP echo nonresponse uses only a validated known-send/reply denominator; it is not UDP or application packet loss. Numeric RTT summaries exclude strict upper bounds.")
+        if any(result["summary"]["unattempted"] for result in results):
+            report["caveats"].append("A stopped check may describe only the launched subset of its requested probes.")
+    return report
+
+
 def settings_differences(before, after):
     """Differences in measured or requested conditions; no causal inference."""
+    if any(record.get("kind") == "diagnostic-check" for record in (before, after)):
+        raise ValueError("Use the diagnostic check comparison for DNS or ICMP evidence.")
     left, right = effective_settings(before), effective_settings(after)
     differences = [key for key in ("role", "target", "port", "bind", "protocol", "mode", "duration", "streams", "ip_version")
                    if left[key] != right[key]]
@@ -204,6 +299,8 @@ def settings_differences(before, after):
 
 
 def live_comparison(baseline, active):
+    if any(record.get("kind") == "diagnostic-check" for record in (baseline, active)):
+        raise ValueError("Diagnostic checks do not have throughput curves; use the diagnostic check comparison.")
     if baseline["id"] == active["id"]:
         raise ValueError("Choose a saved baseline different from the displayed test.")
     if baseline["status"] != "completed" or not measurements(baseline):
@@ -223,6 +320,8 @@ def live_comparison(baseline, active):
 
 
 def comparison(before, after):
+    if any(record.get("kind") == "diagnostic-check" for record in (before, after)):
+        raise ValueError("Use the diagnostic check comparison for DNS or ICMP evidence.")
     if before["id"] == after["id"]:
         raise ValueError("Choose two different completed tests.")
     if before["status"] != "completed" or after["status"] != "completed":

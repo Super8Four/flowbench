@@ -8,7 +8,7 @@ FlowBench uses the renamed `Super8Four/flowbench` repository and retains compati
 
 SQLite lives at `RUNS_DIRECTORY/archive.sqlite3`: `instance/runs/archive.sqlite3` locally and `/data/runs/archive.sqlite3` in the existing Compose `iperf_data` volume. Ubuntu 24.04, Python 3.12, non-root execution, the read-only container root and AMD64/ARM64 packaging remain. Python's bundled `sqlite3` driver needs no database server or additional database wheel.
 
-Schema version 1 contains `runs` (original JSON documents keyed by UUID), `events` (JSON events keyed by UUID/sequence with foreign keys) and `metadata` (preset catalog, listener configuration, migration marker and readiness probe). Original evidence fields/types and JSON/XML schemas are retained. The bundled public catalog is used until a catalog is saved. `/api/status` also identifies the backend and database path.
+Schema version 1 contains `runs` (original JSON documents keyed by UUID), `events` (JSON events keyed by UUID/sequence with foreign keys) and `metadata` (preset catalog, listener configuration, migration marker, local execution-request mappings and readiness probe). Original evidence fields/types and JSON/XML schemas are retained. The bundled public catalog is used until a catalog is saved. `/api/status` also identifies the backend and database path.
 
 Each captured event and its corresponding measured state commit before HTTP readers see them. Single/comparison imports use one transaction; notes/presets publish only after commit. SQLite failures return HTTP 503. Capture failures fail the run, disable readiness and block further tests until repair/restart. If saving final evidence fails, the last committed snapshot remains. Unfinished snapshots become interrupted on restart; uncaptured output cannot be reconstructed.
 
@@ -64,3 +64,13 @@ The original SQLite change covers storage portions of R03/R04/R11/R12. The measu
 R14 PDF/Word reports are implemented on this unmerged feature branch. Profiles/thresholds, retention and authentication remain pending. See [workflows](measurement-workflows.md), [reports](reports.md) and [remaining requirements](requirements.md).
 
 A saved enabled listener resumes on normal app startup. Use the maintenance override shown above for exports. Legacy snapshots retain incoming evidence but do not recreate managed listener configuration on an older release; preserve the complete SQLite backup for that metadata. R17 authenticated instance coordination also remains pending.
+
+## Diagnostic checks and execution retries
+
+DNS and ICMP checks use typed run documents in the same schema 1 archive. No database server, destructive conversion or schema reset is needed. They preserve their own settings, outcomes, bounded raw observations, UTC timestamps and local clock-quality evidence; they do not manufacture iPerf throughput fields. History polling returns compact summaries, while individual JSON/XML exports retain the full observations. See [network checks](network-checks.md).
+
+Run again creates new IDs and creation timestamps, and links the new attempt to its source. Fresh parent/child records and a local `execution_request:<UUID>` mapping commit together before a worker launches. Retrying that same request and intent returns the accepted attempt, including after interruption/restart, without launching it again. A changed intent under the same request ID is rejected. Recovery marks unfinished work interrupted and does not resume traffic.
+
+The complete SQLite backup retains those local retry mappings. Portable run/project/comparison imports preserve evidence and lineage with remapped local IDs; they never reserve execution request IDs or run imported commands. A legacy-file export is an evidence snapshot, not a backup of the local execution ledger. Finish or cancel pending control requests before a manual migration, and use a complete compatible SQLite restore when retry identity must survive. Never use portable imports to reconstruct an in-flight execution ledger.
+
+Schema version 1 alone does not make older application code understand new diagnostic kinds or lineage. Keep the complete new archive and use a compatible version for its restore. Rehearse any rollback on a disposable copy. If an older release cannot read the new evidence, use a fresh archive from its compatible pre-upgrade snapshot and retain the newer archive separately; do not remove diagnostic records or overwrite newer data to make the old app start.

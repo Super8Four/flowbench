@@ -8,4 +8,6 @@ FlowBench supports TCP/UDP/Both tests, incoming capture, saved history, notes/pr
 
 Current main (`0.2.0-dev`) includes projects/baselines, bounded sequential matrices, native ping/route/MTU and local health evidence, live comparisons, tags/timeline notes, optional actual Flent RRUL and PDF/Word report generation. Transparent SVG branding integrates directly with the dark sidebar and mobile header. See [workflows](measurement-workflows.md), [Flent prerequisites](flent.md), [reports](reports.md) and current synthetic [screenshots](verification.md). This does not change rc.1 or rc.2 downloads.
 
+The `feature/network-checks-reruns` branch adds [standalone DNS/ICMP checks and Run again](network-checks.md), with typed evidence, same-type comparisons and PDF/Word output. The [diagnostic roadmap](roadmap.md) keeps STUN, packet capture, TCP port checks and Nmap outside this implementation; Wi-Fi is deferred. Existing published downloads are unchanged.
+
 Profiles/thresholds, retention, authentication and authenticated instance coordination remain pending. Keep the API within a trusted access boundary. Target Pi deployment, hardware power-loss recovery and full requirements/WCAG/audit acceptance remain unverified. See [remaining requirements](requirements.md).

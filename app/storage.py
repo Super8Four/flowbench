@@ -92,6 +92,17 @@ class SQLiteArchive:
         connection.execute("INSERT INTO runs VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET document=excluded.document",
                            (record["id"], encode(record)))
 
+    def create(self, record, connection):
+        """Insert a fresh identity; admission must never overwrite source evidence."""
+        connection.execute("INSERT INTO runs VALUES (?, ?)", (record["id"], encode(record)))
+
+    def execution_request(self, request_id):
+        return self.metadata("execution_request:" + request_id)
+
+    def claim_execution_request(self, request_id, value, connection):
+        connection.execute("INSERT INTO metadata VALUES (?, ?)",
+                           ("execution_request:" + request_id, encode(value)))
+
     def append(self, record, event):
         with self.transaction() as connection:
             self.save(record, connection)

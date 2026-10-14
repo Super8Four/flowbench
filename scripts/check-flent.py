@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from uuid import uuid4
 
 sys.path.insert(0, "/opt/iperf-workspace")
 from app import create_app
@@ -92,7 +93,26 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
             assert imported.status_code == 200, imported.get_json()
             imported_id = (imported.get_json()['imported'] or imported.get_json()['duplicates'])[0]
             assert manager.export(imported_id)['preflight'] == record['preflight']
-        # A second actual RRUL is cancelled while its TCP children are active.
+        source_snapshot = manager.export(record["id"])
+        plan = client.get("/api/runs/" + record["id"] + "/rerun-plan")
+        assert plan.status_code == 200, plan.get_json()
+        intent = {"request_id": uuid4().hex, "source_fingerprint": plan.get_json()["source_fingerprint"],
+                  "confirm_netserver": True}
+        rerun = client.post("/api/runs/" + record["id"] + "/rerun", json=intent)
+        assert rerun.status_code == 201, rerun.get_json()
+        rerun_id = rerun.get_json()["run"]["id"]
+        assert rerun_id != record["id"]
+        retry = client.post("/api/runs/" + record["id"] + "/rerun", json=intent)
+        assert retry.status_code == 200 and retry.get_json()["replayed"], retry.get_json()
+        assert retry.get_json()["run"]["id"] == rerun_id
+        repeated = finish(manager, rerun_id)
+        assert repeated["status"] == "completed" and repeated["flent"]["status"] == "captured", repeated
+        assert repeated["lineage"]["source_run_id"] == record["id"]
+        assert repeated["created_at"] != record["created_at"]
+        assert any(row["unit"] == "Mbits/s" and row["mean"] is not None and row["mean"] > 0
+                   for row in repeated["flent"]["summaries"]), "Native Run again throughput missing"
+        assert manager.export(record["id"]) == source_snapshot, "Run again changed original evidence"
+        # Another actual RRUL is cancelled while its TCP children are active.
         payload["duration"] = 30
         response = client.post("/api/flent", json=payload)
         assert response.status_code == 201, response.get_json()
@@ -120,7 +140,9 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         assert manager.read(cancel_id)["status"] == "cancelled"
         assert manager.active_id is None
         assert not list(Path(directory).glob("flent-*")), "Owned temporary output leaked"
-        print("Actual Flent 2.3.0 RRUL checks passed: native throughput/RTT, JSON/XML imports, active cancellation, no owned child leaks, archive restart.")
+        assert manager.read(rerun_id)["lineage"]["source_run_id"] == record["id"]
+        assert manager.rerun(record["id"], intent)["run"]["id"] == rerun_id, "Restart replay launched another RRUL"
+        print("Actual Flent 2.3.0 RRUL checks passed: native throughput/RTT, immutable Run again and retry/restart identity, JSON/XML imports, active cancellation, no owned child leaks, archive restart.")
     finally:
         manager.shutdown()
         try:

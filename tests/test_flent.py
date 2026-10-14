@@ -242,7 +242,7 @@ class FlentRunnerTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): self.manager.start_flent(payload())
             self.manager.flent_capabilities["available"] = True
             with self.assertRaises(ValueError): self.manager.start_flent(payload(confirm_netserver=False))
-            with patch.object(self.manager, "save", side_effect=OSError("Fixture disk error")):
+            with patch.object(self.manager.storage, "create", side_effect=OSError("Fixture disk error")):
                 with self.assertRaises(OSError): self.manager.start_flent(payload())
             launch.assert_not_called()
         self.assertEqual(self.manager.list_runs(), [])

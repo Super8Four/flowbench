@@ -22,6 +22,24 @@ def normalize(text):
     return re.sub(r"\s+", "", text)
 
 
+def blank_body_pages(extracted):
+    """Find generated report pages containing only the fixed header/footer.
+
+    Charts and maps have body captions, so these fixtures have no legitimate
+    image-only pages. Poppler's final form feed is a terminator, not a page.
+    """
+    pages = extracted.split("\f")
+    if pages and not pages[-1].strip():
+        pages.pop()
+    blank = []
+    for number, page in enumerate(pages, 1):
+        body = re.sub(r"(?m)^\s*FlowBench\s*\|\s*Page\s+\d+\s*$", "", page)
+        body = re.sub(r"(?m)^\s*FlowBench\s*$", "", body)
+        if not body.strip():
+            blank.append(number)
+    return blank
+
+
 def comparison_page_issues(root, extracted):
     """Require each comparison heading, caveats and first metric on one page.
 
@@ -36,7 +54,7 @@ def comparison_page_issues(root, extracted):
     issues = []
     for index, block in enumerate(blocks):
         label = "".join(node.text or "" for node in block.iter(WORD_TEXT))
-        if block.tag != WORD + "p" or not label.startswith("Baseline compared with Test "):
+        if block.tag != WORD + "p" or not label.startswith(("Baseline compared with Test ", "Baseline compared with Check ")):
             continue
         pieces = [normalize(label)]
         for following in blocks[index + 1:]:
@@ -80,7 +98,10 @@ def check(document, converted, tool):
     orphans = comparison_page_issues(root, result.stdout)
     for label in orphans:
         print(f"  Comparison heading/caveats/first metric do not share a page: {label}")
-    return not missing and not orphans
+    blanks = blank_body_pages(result.stdout)
+    for number in blanks:
+        print(f"  Page {number} has no report body content (only header/footer).")
+    return not missing and not orphans and not blanks
 
 
 def main():

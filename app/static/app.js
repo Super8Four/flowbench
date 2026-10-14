@@ -1,28 +1,52 @@
 import {createWorkflows, preflightSummary} from './workflows.js';
 import {rateScale, formatRate, formatMbps, runColor, palette} from './units.js';
+import {displayTimestamp, initTimestamps} from './timestamps.js';
+import {createChecks, isCheck, checkComparable, checkLabel, checkSummary, renderCheckComparison} from './checks.js';
+import {createAttempt, createRunActions, loadSavedDraft, renderLineage, comparisonEligible, comparisonQuery} from './run-actions.js';
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
 let engineReady = false, capabilities = {}, selectionVersion = 0, lastHistory = 0, comparisonVersion = 0;
+let storageReady = true;
 let presets = [], presetCatalog = {}, editingPreset = null, comparisonData = null, listenerState = null;
 let comparisonController = null, comparisonRowsInitialized = false, comparisonRowSequence = 0, comparisonRenderVersion = 0;
 let comparisonPlotVersion = 0;
 let comparisonTableVersion = 0;
+let comparisonLinkError = '';
+let oneOffDraft = false;
 const hiddenComparisonRuns = new Set();
 const knownComparisonRuns = new Set();
 const testPage = Boolean($('test-form'));
 const query = new URLSearchParams(location.search);
 const number = (value, digits = 2) => Number.isFinite(value) ? value.toLocaleString(undefined, {maximumFractionDigits: digits}) : '—';
-const date = (value) => value ? new Date(value).toLocaleString() : '—';
+const date = displayTimestamp;
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const title = (run) => run.kind === 'flent-run' || run.settings.flent_workload ? `${run.settings.label || run.settings.target} · Flent RRUL` : `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'matrix-job' ? 'Matrix batch' : run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol).toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode}`;
+const title = (run) => isCheck(run) ? `${run.settings.label || run.settings.target} · ${checkLabel(run.check_type)}` : run.kind === 'flent-run' || run.settings.flent_workload ? `${run.settings.label || run.settings.target} · Flent RRUL` : `${run.settings.label || (run.settings.role === 'server' ? 'Server' : run.settings.target)} · ${run.kind === 'matrix-job' ? 'Matrix batch' : run.kind === 'protocol-job' ? 'Both job' : (run.effective_settings?.protocol || run.settings.protocol || 'iPerf3').toUpperCase()} · ${run.effective_settings?.mode || run.settings.mode || ''}`;
 const metricLabel = (key) => key.replace(/_mbps$/, ' bitrate').replaceAll('_', ' ');
 const metricValue = (key, value) => key.endsWith('_mbps') ? formatMbps(value) : key.endsWith('bits_per_second') ? formatRate(value) : number(value);
 const workflows = createWorkflows({api, message, escape, number, date, title, smoothPath, download,
-  settings: settingsData, state: () => ({runs, selected, selectedId, activeId, engineReady, capabilities}),
-  reportIds: () => $('comparison') ? comparisonIds() : selected && selected.status === 'completed' && !['protocol-job', 'matrix-job'].includes(selected.kind) ? [selected.id] : [],
+  settings: settingsData, startRequest, state: () => ({runs, selected, selectedId, activeId, engineReady, capabilities}),
+  reportIds: selectedReportIds,
   select: selectRun, refresh: loadHistory, reload: loadSelected,
   start: async (run) => { activeId = run.id; controls(); await selectRun(run.id); await loadHistory(); }});
+const checks = createChecks({escape, number, date, controls, typeChanged: () => { fields(); if (checks.type() !== 'iperf' && storageReady) $('message').classList.add('d-none'); },
+  metadata: () => ({label: $('label').value, notes: $('notes').value, ...$('draft-color')?.value ? {color: $('draft-color').value} : {}, ...workflows.settings()})});
+const startAttempt = createAttempt({api, start: started, status: message, retryButton: $('start-retry')});
+const runActions = createRunActions({api, start: started, selected: () => selected, active: () => activeId, load: loadDraft});
+async function started(run) { activeId = run.id; controls(); await selectRun(run.id); await loadHistory(); }
+function selectedReportIds() {
+  if ($('comparison')) {
+    const ids = comparisonIds(), linked = comparisonQuery(new URLSearchParams(ids.map((id) => ['id', id])), runs);
+    return comparisonLinkError || linked?.error ? [] : ids;
+  }
+  return selected && (checkComparable(selected) || selected.status === 'completed') && !['protocol-job', 'matrix-job'].includes(selected.kind) ? [selected.id] : [];
+}
+async function startRequest(path, data) { return startAttempt.run({path, body: data}); }
+async function loadDraft(draft) {
+  loadSavedDraft(draft, {tool: checks.show, check: checks.load, iperf: loadSettings,
+    metadata: (config) => { for (const key of ['label', 'notes']) $(key).value = config[key] || ''; if ($('draft-color')) $('draft-color').value = config.color || ''; workflows.loadSettings(config); },
+    flent: workflows.loadFlentSettings});
+}
 
 async function api(path, options = {}) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 10000);
@@ -37,10 +61,11 @@ async function api(path, options = {}) {
       if (error.name === 'AbortError') throw error;
       throw new Error(`Server returned ${response.status} without a JSON response. The selected evidence may exceed available request or memory limits; reduce the selection and retry.`);
     }
-    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    if (!response.ok) { const error = new Error(data.error || `Request failed (${response.status})`); error.status = response.status; throw error; }
     return data;
   } catch (error) {
-    throw new Error(error.name === 'AbortError' ? 'Request timed out. Refresh status before retrying; an accepted test may still be running.' : error.message);
+    if (error.name === 'AbortError') throw new Error('Request timed out. Refresh status before retrying; an accepted test may still be running.');
+    throw error;
   } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
 }
 function rateCard(id, value, unitId) {
@@ -58,22 +83,25 @@ function safe(action) {
 }
 function controls() {
   if (!testPage) return;
-  $('run-button').disabled = !engineReady || Boolean(activeId);
-  $('run-button').textContent = activeId ? 'Test running' : 'Start test';
+  $('run-button').disabled = !storageReady || (checks.type() === 'iperf' ? !engineReady : !checks.ready()) || Boolean(activeId) || startAttempt.busy();
+  $('run-button').textContent = activeId ? 'Test running' : checks.type() === 'iperf' ? 'Start test' : 'Start check';
   $('stop-button').disabled = !activeId;
   workflows.controls();
+  runActions.controls();
 }
 function renderStatus(status) {
   capabilities = status.iperf;
   engineReady = status.iperf.available && !status.storage_error;
+  storageReady = !status.storage_error;
   $('engine-badge').textContent = engineReady ? '● iPerf3 connected' : status.storage_error ? 'Archive unavailable' : 'iPerf3 unavailable';
   if ($('engine-version')) $('engine-version').textContent = status.iperf.version || 'iPerf3 not installed';
   if ($('storage-path')) $('storage-path').textContent = `Saved on disk: ${status.storage}`;
   if ($('configuration-engine')) $('configuration-engine').textContent = status.iperf.version || 'Unavailable';
   if ($('configuration-storage')) $('configuration-storage').textContent = status.database;
   renderListener(status.listener);
+  checks.status(status);
   workflows.status(status);
-  if (!engineReady) message(status.storage_error || status.iperf.error);
+  if (!engineReady && (status.storage_error || !testPage || checks.type() === 'iperf')) message(status.storage_error || status.iperf.error);
   controls();
 }
 function renderListener(state) {
@@ -116,8 +144,10 @@ function listenerFormError(error) {
   }
 }
 function fields() {
+  if (checks.type() !== 'iperf') { controls(); return; }
   const server = $('role').value === 'server';
-  if (server) { location.href = '/configuration'; return; }
+  if (server && !oneOffDraft) { location.href = '/configuration'; return; }
+  if (!server) oneOffDraft = false;
   $('target-field').classList.toggle('d-none', server);
   $('target').required = !server;
   $('target').disabled = server;
@@ -142,14 +172,17 @@ function settingsData() {
   data.debug = $('debug').checked;
   // Disabled UDP fields still belong to a reusable configuration.
   data.bandwidth = $('bandwidth').value;
-  return {...data, ...workflows.settings()};
+  return {...data, ...workflows.settings(), ...$('draft-color')?.value ? {color: $('draft-color').value} : {}};
 }
-function loadSettings(settings) {
+function loadSettings(settings, oneOff = false) {
+  if ($('draft-color')) $('draft-color').value = settings.color || '';
+  oneOffDraft = oneOff && settings.role === 'server';
   for (const [key, value] of Object.entries({...settings, ip_version: settings.ip_version || 'auto'})) {
     if (!$(key)) continue;
     if ($(key).type === 'checkbox') $(key).checked = value; else $(key).value = value;
   }
   fields();
+  if (oneOffDraft) message('One-off server settings loaded. Starting waits for one incoming client; it does not enable the persistent listener.', 'warning');
   workflows.loadSettings(settings);
 }
 function presetMatches(row, query) {
@@ -292,6 +325,7 @@ function chart(localPoints, remotePoints = []) {
   $('throughput-chart').innerHTML = svg;
 }
 function renderPeer() {
+  if (isCheck(selected)) { $('throughput-chart').innerHTML = ''; $('peer-summary').classList.add('d-none'); return; }
   if (selected?.kind === 'flent-run') {
     $('throughput-chart').innerHTML = '';
     $('chart-source-note').textContent = 'This test uses Flent. Native throughput and latency measurements are in the Flent evidence panel.';
@@ -335,7 +369,10 @@ function renderSelected() {
   }
   $('exit-code').textContent = selected.error || (selected.imported ? `Imported from ${selected.imported.filename} · ${date(selected.imported.at)}` : (selected.incoming && selected.finished_at ? `Incoming session captured · ${date(selected.finished_at)}. The listener has a separate lifetime.` : selected.exit_code === null ? 'Capturing output to disk…' : `Process exit code: ${selected.exit_code} · ${date(selected.finished_at)}`));
   $('export-button').disabled = false;
-  $('rerun-button').disabled = false;
+  runActions.selected();
+  checks.render(selected);
+  renderLineage(selected, runs, {escape});
+  for (const id of ['iperf-session-chart', 'peer-output-panel', 'live-panel']) if ($(id)) $(id).hidden = isCheck(selected);
   $('protocol-job-card').classList.toggle('d-none', selected.kind !== 'protocol-job');
   if (selected.kind === 'protocol-job') {
     const tests = selected.protocol_runs || [];
@@ -413,10 +450,13 @@ export function replaceHistoryContent(body, markup) {
 function renderHistory() {
   if (!$('history-body')) return;
   const search = $('history-search').value.toLowerCase();
-  const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes} ${Object.values(run.settings.tags || {}).join(' ')}`.toLowerCase().includes(search) && workflows.matches(run));
+  const kind = $('history-type')?.value || '';
+  const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes} ${Object.values(run.settings.tags || {}).join(' ')}`.toLowerCase().includes(search) && workflows.matches(run)
+    && (!kind || (isCheck(run) ? run.check_type === kind : kind === 'iperf' ? !run.kind || run.kind === 'iperf-run' : run.kind === kind)));
   const markup = visible.map((run) => {
     const config = run.effective_settings || run.settings;
     const stats = run.overview || {};
+    if (isCheck(run)) return `<tr data-run-id="${escape(run.id)}"><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))}</div>${workflows.tags(run)}</td><td>${escape(run.settings.target)}<div class="history-date">${escape(checkLabel(run.check_type))}${run.check_type === 'dns' ? ' / ' + escape(run.settings.record_type) : ''}</div></td><td>${escape(run.status)} / ${escape(run.result?.status || 'unavailable')}</td><td colspan="2">${escape(checkSummary(run, {number}))}</td><td>${number(run.result?.elapsed_seconds)}${Number.isFinite(run.result?.elapsed_seconds) ? 's' : ''}</td><td>Typed check evidence</td><td class="text-end"><button class="btn btn-sm btn-outline-primary" data-open="${run.id}">Open</button> <button class="btn btn-sm btn-outline-secondary" data-export="${run.id}">Export</button></td></tr>`;
     const warnings = Array.isArray(run.measurement_warnings) ? run.measurement_warnings : [];
     const warning = stats.status === 'unavailable' || warnings.length
       ? `<div class="history-date text-warning-emphasis mt-2" role="note" aria-label="Stored measurement warning"><strong>Interval measurements unavailable</strong><p class="mb-1">${escape(stats.note || 'Stored interval evidence could not be interpreted. Raw evidence remains available.')}</p>${warnings.length ? `<ul class="mb-0 ps-3">${warnings.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>` : ''}</div>` : '';
@@ -435,16 +475,20 @@ function renderHistory() {
 }
 function comparisonOptions() {
   if (!$('baseline')) return;
+  const complete = runs.filter(comparisonEligible);
   if (!comparisonRowsInitialized) {
     let saved;
-    try { saved = JSON.parse(localStorage.getItem('flowbench-comparison-ids')); } catch { saved = null; }
-    if (!Array.isArray(saved)) saved = ['baseline', 'candidate', 'third'].map((key) => localStorage.getItem(`iperf-${key}`)).filter(Boolean);
+    const linked = comparisonQuery(query, runs);
+    if (linked) { saved = linked.ids; comparisonLinkError = linked.error; }
+    else {
+      try { saved = JSON.parse(localStorage.getItem('flowbench-comparison-ids')); } catch { saved = null; }
+      if (!Array.isArray(saved)) saved = ['baseline', 'candidate', 'third'].map((key) => localStorage.getItem(`iperf-${key}`)).filter(Boolean);
+    }
     const ids = [...new Set(saved.filter((value) => typeof value === 'string'))];
     $('baseline').dataset.chosen = ids[0] || '';
     (ids.length > 1 ? ids.slice(1) : ['']).forEach((id) => addComparisonRow(id, false));
     comparisonRowsInitialized = true;
   }
-  const complete = runs.filter((run) => run.status === 'completed' && !['protocol-job', 'matrix-job'].includes(run.kind) && Object.keys(run.metrics || {}).length);
   const signature = JSON.stringify(complete.map((run) => [run.id, title(run), run.created_at]));
   for (const select of document.querySelectorAll('.comparison-select')) {
     const chosen = select.value || select.dataset.chosen || '';
@@ -469,6 +513,7 @@ function addComparisonRow(chosen = '', focus = true) {
   if (focus) select.focus();
 }
 function comparisonSelectionChanged() {
+  comparisonLinkError = '';
   comparisonVersion++; comparisonController?.abort();
   comparisonData = null; comparisonRenderVersion++; comparisonTableVersion++; comparisonPlotVersion++;
   $('comparison-result').textContent = 'Updating the selected evidence…';
@@ -498,7 +543,7 @@ async function loadHistory() {
   workflows.history(runs);
 }
 function comparisonIds() { return [...document.querySelectorAll('.comparison-select')].map((select) => select.value).filter(Boolean); }
-function comparisonPath() { return '/api/comparison?' + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
+function comparisonPath() { const first = runs.find((run) => run.id === comparisonIds()[0]); return (isCheck(first) ? '/api/check-comparison?' : '/api/comparison?') + new URLSearchParams(comparisonIds().map((id) => ['id', id])); }
 async function overlay(renderLegend = true) {
   const plotGeneration = ++comparisonPlotVersion;
   const width = chartWidth('comparison-chart'), right = width - 15, ticks = width < 600 ? 3 : 5;
@@ -561,6 +606,12 @@ function renderComparisonLegend(records, remote) {
   batch();
 }
 function renderComparison() {
+  if (comparisonData?.kind === 'diagnostic-comparison') {
+    $('comparison-throughput-panel').hidden = true;
+    $('comparison-visible-count').textContent = `${comparisonData.runs.length} typed checks selected. Outcomes are not throughput metrics.`;
+    $('comparison-result').innerHTML = renderCheckComparison(comparisonData, {escape, number, title, date}); return;
+  }
+  if ($('comparison-throughput-panel')) $('comparison-throughput-panel').hidden = false;
   overlay();
   const generation = ++comparisonTableVersion;
   const remote = $('comparison-perspective').value === 'remote';
@@ -601,8 +652,15 @@ async function compare() {
   try { localStorage.setItem('flowbench-comparison-ids', JSON.stringify(comparisonIds())); } catch { /* Optional local preference only. */ }
   comparisonData = null; overlay();
   const ids = comparisonIds();
+  if (comparisonLinkError) { $('comparison-result').textContent = comparisonLinkError; return; }
   if (!$('baseline').value || ids.length < 2) { $('comparison-result').textContent = 'Choose a completed baseline and at least one additional test.'; return; }
   if (new Set(ids).size !== ids.length) { $('comparison-result').textContent = 'Choose different tests in each row.'; return; }
+  const records = ids.map((id) => runs.find((run) => run.id === id));
+  const checked = records.filter(isCheck);
+  if (checked.length && (checked.length !== records.length || checked.some((run) => run.check_type !== checked[0].check_type))) {
+    $('comparison-result').textContent = 'Choose checks of the same type. DNS, ICMP and throughput evidence use separate comparisons.'; return;
+  }
+  if ($('comparison-throughput-panel')) $('comparison-throughput-panel').hidden = Boolean(checked.length);
   $('comparison-result').textContent = `Loading ${ids.length} selected tests…`;
   try {
     for (const id of ids) {
@@ -628,11 +686,10 @@ function exportRun(id) { return download(`/api/runs/${id}/export?format=${$('exp
 $('test-form')?.addEventListener('submit', safe(async (event) => {
   event.preventDefault();
   $('message').classList.add('d-none');
-  const data = settingsData();
+  const data = checks.type() === 'iperf' ? settingsData() : checks.settings();
   $('run-button').disabled = true;
   try {
-    const run = await api('/api/runs', {method: 'POST', body: JSON.stringify(data)});
-    activeId = run.id; controls(); await selectRun(run.id); await loadHistory();
+    await startRequest(checks.type() === 'iperf' ? '/api/runs' : '/api/checks', data);
   } finally { controls(); }
 }));
 $('stop-button')?.addEventListener('click', safe(async () => {
@@ -682,6 +739,7 @@ $('log-filter')?.addEventListener('change', renderLogs); $('log-search')?.addEve
 $('chart-perspective')?.addEventListener('change', renderPeer);
 $('comparison-perspective')?.addEventListener('change', () => comparisonData ? renderComparison() : overlay());
 $('autoscroll')?.addEventListener('change', renderLogs); $('history-search')?.addEventListener('input', renderHistory);
+$('history-type')?.addEventListener('change', renderHistory);
 $('refresh-history')?.addEventListener('click', safe(loadHistory));
 $('history-body')?.addEventListener('click', safe(async (event) => {
   const button = event.target.closest('button');
@@ -689,12 +747,6 @@ $('history-body')?.addEventListener('click', safe(async (event) => {
   if (button?.dataset.export) await exportRun(button.dataset.export);
 }));
 $('export-button')?.addEventListener('click', safe(() => exportRun(selectedId)));
-$('rerun-button')?.addEventListener('click', () => {
-  if (!selected) return;
-  if (workflows.loadFlentSettings(selected)) return;
-  $('server-preset').value = ''; editingPreset = null; $('update-preset').disabled = true;
-  loadSettings(selected.settings); $('target').focus();
-});
 $('save-notes')?.addEventListener('click', async () => {
   if ($('save-notes').disabled) return;
   $('save-notes').disabled = true;
@@ -751,13 +803,16 @@ async function init() {
     renderStatus(status);
     await loadHistory();
     await workflows.init();
+    if (testPage) checks.status({checks: await api('/api/checks')});
     if (testPage || $('preset-body')) await loadPresets();
     if (testPage) {
+      checks.show($('measurement-type')?.value || checks.type());
       fields();
       if (query.get('preset')) applyPreset(query.get('preset'));
       if (query.get('run') || activeId) await selectRun(query.get('run') || activeId);
     }
     await compare();
+    initTimestamps(() => { renderHistory(); comparisonOptions(); if (selected) renderSelected(); if (comparisonData) renderComparison(); workflows.refreshDates(); });
   } catch (error) { message(error.message); }
   tick();
 }
@@ -789,7 +844,7 @@ $('listener-stop')?.addEventListener('click', async () => {
 });
 
 function renderResults() {
-  const job = ['protocol-job', 'matrix-job', 'flent-run'].includes(selected.kind);
+  const job = ['protocol-job', 'matrix-job', 'flent-run', 'diagnostic-check'].includes(selected.kind);
   $('result-cards').classList.toggle('d-none', job || !terminal.has(selected.status));
   $('live-metrics').classList.toggle('d-none', job || terminal.has(selected.status));
   const metrics = selected.metrics || {};
