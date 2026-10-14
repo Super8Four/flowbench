@@ -12,7 +12,7 @@ from app.exports import xml_export
 from app.geolocation import empty_location, geolocation_metadata
 from app.reports import prepare_report, render_pdf, render_docx, _sections, _world_map, _route_rows
 from app.time_quality import time_quality_result
-from tests.test_reports import report_fixture, decoded_pdf_streams
+from test_reports import report_fixture, decoded_pdf_streams
 
 
 def fixture():
