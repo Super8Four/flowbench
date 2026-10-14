@@ -943,7 +943,7 @@ class RunManager:
 
     def run_check(self):
         from .checks import CheckCapture, check_run_status
-        capture = None
+        capture = result = failure = cleanup_error = None
         try:
             with self.lock:
                 self.record["started_at"] = now()
@@ -956,54 +956,61 @@ class RunManager:
                 with self.lock:
                     if self.record["id"] != owner:
                         raise RuntimeError("Check archive ownership changed.")
-                    previous = copy.deepcopy(self.record)
-                    self.record["result"] = copy.deepcopy(result)
-                    self.record["status"] = check_run_status(result)
-                    if self.record["status"] in TERMINAL:
-                        self.record["finished_at"] = now()
-                    self.record["time_quality"] = copy.deepcopy(result.get("time_quality"))
+                    candidate = copy.deepcopy(self.record)
+                    snapshot = copy.deepcopy(result)
+                    # The adapter can finish measuring before its owned workers
+                    # finish cleanup. Persist that evidence as a coherent active
+                    # snapshot until the final terminal transaction commits.
+                    if check_run_status(snapshot) in TERMINAL:
+                        snapshot.update(status="running", finished_at=None)
+                    candidate.update(result=snapshot, status=check_run_status(snapshot), finished_at=None,
+                                     time_quality=copy.deepcopy(snapshot.get("time_quality")))
                     try:
-                        self.save(self.record)
+                        self.save(candidate)
                     except OSError as exc:
-                        self.record = previous
                         self.storage_error = str(exc)
                         raise
+                    self.record = candidate
             result = capture.run(checkpoint)
-            with self.lock:
-                self.record["result"] = copy.deepcopy(result)
-                self.record["time_quality"] = copy.deepcopy(result.get("time_quality"))
-                if self.cancel_requested:
-                    result = copy.deepcopy(result)
-                    result.update(status="cancelled", finished_at=now())
-                    self.record["result"] = result
-                self.record["status"] = check_run_status(result)
-                self.record["error"] = result.get("error")
         except Exception as exc:
-            with self.lock:
-                self.record.update(status="cancelled" if self.cancel_requested else "failed", error=str(exc))
-                self.record["result"].update(status="cancelled" if self.cancel_requested else "error", error=str(exc)[:2048], finished_at=now())
+            failure = str(exc)
         finally:
             if capture:
-                capture.cancel()
-            with self.lock:
-                owned_child = self._check_children_alive()
-                if owned_child:
-                    self.storage_error = "Check child cleanup did not finish; archive writer ownership is retained until the child exits."
-                    self.record.update(status="failed", error=self.storage_error)
-                    self.record["result"].update(status="error", error=self.storage_error, finished_at=now())
-                self.record["finished_at"] = now()
-                if self.record["result"].get("time_quality", {}).get("status") == "pending":
-                    from .time_quality import time_quality_result
-                    self.record["result"]["time_quality"] = time_quality_result("unavailable", note="The check stopped before a clock observation was retained.")
-                self.record["time_quality"] = copy.deepcopy(self.record["result"].get("time_quality"))
                 try:
-                    self.save(self.record)
+                    capture.cancel()
+                except Exception as exc:
+                    cleanup_error = "Check child cleanup failed: " + str(exc)
+            with self.lock:
+                candidate = copy.deepcopy(self.record)
+                final_result = copy.deepcopy(result if result is not None else candidate["result"])
+                stamp = now()
+                if failure is not None:
+                    final_result.update(status="cancelled" if self.cancel_requested else "error",
+                                        error=failure[:2048], finished_at=stamp)
+                elif self.cancel_requested:
+                    final_result.update(status="cancelled", finished_at=stamp)
+                elif check_run_status(final_result) not in TERMINAL:
+                    final_result.update(status="error", error="Check capture ended without a terminal result.", finished_at=stamp)
+                owned_child = self._check_children_alive()
+                if owned_child or cleanup_error:
+                    self.storage_error = cleanup_error or "Check child cleanup did not finish; archive writer ownership is retained until the child exits."
+                    final_result.update(status="error", error=self.storage_error[:2048], finished_at=stamp)
+                if final_result.get("time_quality", {}).get("status") == "pending":
+                    from .time_quality import time_quality_result
+                    final_result["time_quality"] = time_quality_result("unavailable", note="The check stopped before a clock observation was retained.")
+                candidate.update(result=final_result, status=check_run_status(final_result), finished_at=stamp,
+                                 error=final_result.get("error"), time_quality=copy.deepcopy(final_result.get("time_quality")))
+                try:
+                    self.save(candidate)
                 except OSError as exc:
                     self.storage_error = str(exc)
-                    self.record.update(status="failed", error="Archive write failed: " + str(exc))
-                if not owned_child:
-                    self.check_capture = None
-                    self.active = None
+                    # Do not publish an uncommitted terminal result or admit a
+                    # new test over the last durable active checkpoint.
+                else:
+                    self.record = candidate
+                    if not owned_child and not cleanup_error:
+                        self.check_capture = None
+                        self.active = None
 
     def run_flent(self):
         from .flent import command, read_result, stop_process

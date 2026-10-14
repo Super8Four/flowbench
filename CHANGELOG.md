@@ -7,6 +7,7 @@
 These changes are merged into current main (`0.2.0-dev`). Published rc.1 and rc.2 tags and downloads remain immutable; build current main for the additions below.
 
 - Add standalone typed DNS queries and ICMP echo observations, terminal-outcome comparisons and PDF/Word reporting with sensitive-context redaction. Keep unknown sends/RTT and failed captures explicit; ICMP nonresponse is not application or UDP packet loss.
+- Publish diagnostic completion after owned work is cleaned up, keeping captured terminal evidence and its completion time stable.
 - Add Run again with a new execution identity and source lineage, validated saved configuration and duplicate-request protection. Preserve original results and require current tool/peer confirmations.
 - Record STUN and bounded PCAP as planned backlog, TCP port connectivity and Nmap profiles as future possibilities, and Wi-Fi as deferred; none is enabled by the roadmap.
 - Capture one bounded route and read-only local clock-quality observation before each outgoing test, including Both/matrix children and Flent. Retain ordered hop evidence, explicit passive-capture limits, UTC verification limits and portable report/import evidence.
