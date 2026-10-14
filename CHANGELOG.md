@@ -4,6 +4,8 @@
 
 ## Unreleased - measurement workflows
 
+- Expose sidebar/group expanded states and support mobile navigation focus containment, Escape and focus return.
+
 - Integrate transparent outlined branding into the dark sidebar and mobile header, preserving original logo shapes and assets. Refresh current-app documentation and synthetic desktop/mobile screenshots.
 - Add independent review regressions for report redaction, Flent IP-family preservation and incomplete RRUL evidence. Keep native Word legends together across page boundaries.
 - Reject malformed interval identities atomically during JSON/XML imports. Preserve historical raw evidence while keeping affected rows visible with explicit unavailable-derived-measurement warnings.

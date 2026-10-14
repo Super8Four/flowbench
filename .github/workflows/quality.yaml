@@ -34,6 +34,8 @@ jobs:
         run: node tests/workflows-flent-behavior.mjs
       - name: Exercise malformed-history warning with the controlled DOM/API fixture
         run: node tests/history-warning-behavior.mjs
+      - name: Exercise navigation keyboard and drawer behavior with the controlled DOM fixture
+        run: node tests/navigation-behavior.mjs
       - name: Record source check summary
         if: always()
         run: |
