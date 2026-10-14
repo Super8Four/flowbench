@@ -130,6 +130,26 @@ class ReportTests(unittest.TestCase):
         self.assertIn("do not establish", report["caveat"])
         self.assertIsNone(next(item for item in report["metrics"] if item["metric"] == "upload_retransmits")["percent_change"])
 
+    def test_word_comparison_heading_explicitly_stays_with_first_metric(self):
+        after = copy.deepcopy(self.before)
+        after["id"] = "c" * 32
+        after["settings"]["streams"] = 2
+        self.manager.save(after)
+        model = prepare_report(self.manager, {"ids": [self.before["id"], after["id"]]})
+        document = Document(BytesIO(render_docx(model)))
+        heading = next(p for p in document.paragraphs if p.text == "Baseline compared with Test 2")
+        # Inherited Heading 1 keepNext was insufficient in actual AMD64 office
+        # conversion. Require a direct paragraph property, plus the full chain
+        # through both caveats and the table header to its first measured row.
+        self.assertIs(heading.paragraph_format.keep_with_next, True)
+        self.assertIs(heading.paragraph_format.keep_together, True)
+        following = heading._p.getnext()
+        for _ in range(2):
+            self.assertTrue(following.xpath("./w:pPr/w:keepNext"))
+            following = following.getnext()
+        self.assertTrue(following.tag.endswith("}tbl"))
+        self.assertTrue(following.xpath("./w:tr[1]/w:tc/w:p/w:pPr/w:keepNext"))
+
     def test_rendered_formats_escape_text_and_are_repeatable_without_archive_writes(self):
         original = self.manager.export(self.before["id"])
         model = prepare_report(self.manager, {"ids": [self.before["id"]], "redact": False})

@@ -15,10 +15,51 @@ from zipfile import ZipFile
 
 
 WORD_TEXT = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+WORD = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 def normalize(text):
     return re.sub(r"\s+", "", text)
+
+
+def comparison_page_issues(root, extracted):
+    """Require each comparison heading, caveats and first metric on one page.
+
+    Full-document retention alone misses a heading stranded on the preceding
+    page. Keep table continuation legal by requiring only its first body row.
+    """
+    body = root.find(WORD + "body")
+    if body is None:
+        return []
+    blocks = list(body)
+    pages = [normalize(page) for page in extracted.split("\f")]
+    issues = []
+    for index, block in enumerate(blocks):
+        label = "".join(node.text or "" for node in block.iter(WORD_TEXT))
+        if block.tag != WORD + "p" or not label.startswith("Baseline compared with Test "):
+            continue
+        pieces = [normalize(label)]
+        for following in blocks[index + 1:]:
+            if following.tag == WORD + "tbl":
+                for row in following.findall(WORD + "tr")[:2]:
+                    for cell in row.findall(WORD + "tc"):
+                        pieces.append(normalize("".join(node.text or "" for node in cell.iter(WORD_TEXT))))
+                break
+            if following.tag == WORD + "p":
+                text = normalize("".join(node.text or "" for node in following.iter(WORD_TEXT)))
+                if text:
+                    pieces.append(text)
+        def contains_group(page):
+            cursor = 0
+            for piece in pieces:
+                found = page.find(piece, cursor)
+                if found < 0:
+                    return False
+                cursor = found + len(piece)
+            return True
+        if not any(contains_group(page) for page in pages):
+            issues.append(label)
+    return issues
 
 
 def check(document, converted, tool):
@@ -36,7 +77,10 @@ def check(document, converted, tool):
     print(f"{document.name}: {len(expected)} distinct text items checked; {len(missing)} missing or under-counted.")
     for text, count, found in missing:
         print(f"  Expected {count}, found {found}: {text}")
-    return not missing
+    orphans = comparison_page_issues(root, result.stdout)
+    for label in orphans:
+        print(f"  Comparison heading/caveats/first metric do not share a page: {label}")
+    return not missing and not orphans
 
 
 def main():

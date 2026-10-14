@@ -47,6 +47,7 @@ jobs:
         run: >-
           docker run --rm --entrypoint python
           --mount type=bind,source="${{ github.workspace }}/tests",target=/tests,readonly
+          --mount type=bind,source="${{ github.workspace }}/scripts",target=/scripts,readonly
           iperf-workspace:local -m unittest discover -s /tests -v
       - name: Test container lifecycle and persistent evidence
         id: lifecycle
