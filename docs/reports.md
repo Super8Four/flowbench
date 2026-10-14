@@ -34,9 +34,9 @@ Native CI renders the synthetic Word fixtures with LibreOffice, then runs `scrip
 
 The PDF renderer is [ReportLab 4.4.9](https://pypi.org/project/reportlab/4.4.9/) under its BSD license. Word generation uses [python-docx 1.2.0](https://pypi.org/project/python-docx/1.2.0/) under the MIT license. Their installed distributions preserve the upstream notices, including the bundled font license. Report generation does not provide authentication; use FlowBench on loopback or the intended trusted network.
 
-## Endpoint/context privacy (branch preview)
+## Endpoint/context privacy
 
-The separate `feature/test-endpoints` branch extends report snapshots with captured endpoint and initiating-context evidence; implementation/review and changed PDF/Word rendering are pending. Current main and published rc.2 downloads do not include this addition yet.
+Current main extends report snapshots with captured endpoint and initiating-context evidence. PDF/Word regressions and rendered-page review are recorded in [verification](verification.md). Published rc.2 downloads do not include this addition.
 
 On that branch, default redaction removes execution hostnames, local/remote/control/destination addresses, ports, IPv6 scopes, socket IDs and initiating web-peer fields, including nested or arbitrary future copies. Selecting raw evidence does not bypass redaction. Only safe availability/count/family/protocol categories remain. Full JSON/XML exports remain sensitive unredacted evidence.
 

@@ -32,6 +32,6 @@ Automated tests cover new defaults, explicit/legacy direction choices, bounded T
 
 See [managed incoming capture](incoming-listener.md) for persistent listener settings, ordinary-client evidence, independent outgoing execution and interference labels.
 
-## Captured sockets (branch preview)
+## Captured sockets
 
-The `feature/test-endpoints` branch, still under implementation/review, retains numeric iPerf local/remote pairs with the reporting process's perspective. Reverse or bidirectional traffic does not swap these labels. A local client can see its container/interface address while a peer sees a translated address; neither establishes a public egress address or NAT mapping. Accepted control connections remain separate from data-stream ports, and parallel streams can have separate socket rows. Missing/text-only evidence stays unavailable. See [Test endpoints](test-endpoints.md) for source/import/privacy limits; this addition is not in current main or rc.2.
+Current main retains numeric iPerf local/remote pairs with the reporting process's perspective. Reverse or bidirectional traffic does not swap these labels. A local client can see its container/interface address while a peer sees a translated address; neither establishes a public egress address or NAT mapping. Accepted control connections remain separate from data-stream ports, and parallel streams can have separate socket rows. Missing/text-only evidence stays unavailable. See [Test endpoints](test-endpoints.md) for source/import/privacy limits; existing rc.2 downloads do not contain this addition.

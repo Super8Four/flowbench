@@ -2,7 +2,7 @@
 
 The current **main source (`0.2.0-dev`)** includes [DNS/ICMP checks and Run again](docs/network-checks.md), [route and clock evidence](docs/preflight.md), [measurement workflows](docs/measurement-workflows.md), [optional native Flent RRUL](docs/flent.md), and [PDF/Word reports](docs/reports.md). Build main to use these features. Published **0.1.0-rc.2** source and image downloads remain unchanged and do not contain these additions. Other proposed diagnostics remain on the [roadmap](docs/roadmap.md).
 
-The separate **`feature/test-endpoints` branch** is adding [captured test endpoints and execution context](docs/test-endpoints.md). It is under implementation/review; main and published rc.2 downloads do not include that addition yet.
+Current main also includes [captured test endpoints and execution context](docs/test-endpoints.md): measured sockets, execution hostname and separate web-control context. Published rc.2 downloads retain their original feature set.
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](docs/assets/badges/container.svg)](docs/setup-and-testing.md) [![Architecture](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Python](docs/assets/badges/python.svg)](docs/setup-and-testing.md) [![SQLite](docs/assets/badges/storage.svg)](docs/sqlite-storage.md) [![iPerf3](docs/assets/badges/engine.svg)](docs/protocol-tests.md)
 
@@ -15,9 +15,9 @@ The separate **`feature/test-endpoints` branch** is adding [captured test endpoi
 
 Run iPerf3 tests, query DNS, observe ICMP echoes, capture incoming sessions and compare saved results. FlowBench keeps settings, measurements, logs and notes in a portable SQLite archive. Run again creates a new execution linked to its saved source.
 
-![FlowBench current test page](docs/assets/merged-test-desktop.jpg)
+![FlowBench test endpoints with synthetic evidence](docs/assets/endpoints-desktop.jpg)
 
-*Current-main screen with disposable synthetic evidence. [More screenshots](docs/verification.md).*
+*Endpoint feature screen with disposable synthetic evidence; screenshot provenance and earlier screens are in [verification](docs/verification.md).*
 
 ## Start on Ubuntu
 
@@ -79,7 +79,7 @@ These development features require current main; downloading rc.2 does not upgra
 - [Route and clock preparation](docs/preflight.md)
 - [DNS, ICMP and Run again](docs/network-checks.md), [planned diagnostics](docs/roadmap.md)
 - [Incoming capture](docs/incoming-listener.md)
-- [Test endpoints and context](docs/test-endpoints.md) - branch preview, review pending
+- [Test endpoints and context](docs/test-endpoints.md) - measured sockets, execution hostname and web-control context
 - [Backup and rollback](docs/sqlite-storage.md)
 - [Brand assets](docs/brand-assets.md), [verification](docs/verification.md) and [remaining requirements](docs/requirements.md)
 - [Changelog](CHANGELOG.md), [release notes](docs/release-0.1.0-rc.2.md) and [third-party notices](THIRD_PARTY_NOTICES.md)

@@ -1,6 +1,6 @@
 # Test endpoints and execution context
 
-This guide covers the **`feature/test-endpoints` branch**, based on main `7d6b3f7`, for review. Endpoint panels and metadata are not part of main or the published rc.2 downloads. The pull request records exact-source CI, browser checks and rendered-report evidence; the existing [verification record](verification.md) describes the earlier merged features.
+This guide describes Test endpoints in current main (`0.2.0-dev`), delivered through [PR24](https://github.com/Super8Four/flowbench/pull/24). Published rc.2 downloads remain unchanged and do not contain this addition. The [verification record](verification.md) identifies exact-source CI, browser checks, screenshot provenance and rendered-report evidence; the PR records integration and post-merge checks.
 
 ## Read the selected test's evidence
 

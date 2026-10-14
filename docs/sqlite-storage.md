@@ -75,9 +75,9 @@ The complete SQLite backup retains those local retry mappings. Portable run/proj
 
 Schema version 1 alone does not make older application code understand new diagnostic kinds or lineage. Keep the complete new archive and use a compatible version for its restore. Rehearse any rollback on a disposable copy. If an older release cannot read the new evidence, use a fresh archive from its compatible pre-upgrade snapshot and retain the newer archive separately; do not remove diagnostic records or overwrite newer data to make the old app start.
 
-## Optional endpoint fields (branch preview)
+## Optional endpoint fields
 
-The `feature/test-endpoints` branch is adding optional versioned `endpoints` and `initiator_context` fields to existing run documents. It is under implementation/review and is not part of current main or rc.2. SQLite remains schema 1 in the same persistent writable volume; no database-server migration, new volume or historical backfill is required.
+Current main stores optional versioned `endpoints` and `initiator_context` fields in existing run documents. Existing rc.2 downloads do not contain this addition. SQLite remains schema 1 in the same persistent writable volume; no database-server migration, new volume or historical backfill is required.
 
 Streaming observations commit with their events. Historical/imported fallback is a computed view of retained structured sources, with no current-host substitution or archive rewrite. Portable exports keep stored evidence/native sources but do not store the computed detail `endpoint_view`. Structured metadata and context are validated before an import transaction; malformed values or direct normalized/native contradictions reject the whole import without partial writes. No import, report or view resolves names or starts traffic.
 
