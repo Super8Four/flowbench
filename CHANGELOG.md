@@ -1,11 +1,13 @@
 # FlowBench changelog
 
-[![Branch CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=feature%2Fsqlite-storage)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Afeature%2Fsqlite-storage) [![Prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.1) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
+[![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
-## Unreleased - measurement workflows
+## Unreleased - checks, route evidence and measurement workflows
+
+These changes are merged into current main (`0.2.0-dev`). Published rc.1 and rc.2 tags and downloads remain immutable; build current main for the additions below.
 
 - Add standalone typed DNS queries and ICMP echo observations, terminal-outcome comparisons and PDF/Word reporting with sensitive-context redaction. Keep unknown sends/RTT and failed captures explicit; ICMP nonresponse is not application or UDP packet loss.
-- Add Run again with a new execution identity and source lineage, reviewed saved configuration and duplicate-request protection. Preserve original results and require current tool/peer confirmations.
+- Add Run again with a new execution identity and source lineage, validated saved configuration and duplicate-request protection. Preserve original results and require current tool/peer confirmations.
 - Record STUN and bounded PCAP as planned backlog, TCP port connectivity and Nmap profiles as future possibilities, and Wi-Fi as deferred; none is enabled by the roadmap.
 - Capture one bounded route and read-only local clock-quality observation before each outgoing test, including Both/matrix children and Flent. Retain ordered hop evidence, explicit passive-capture limits, UTC verification limits and portable report/import evidence.
 - Add offline world and ordered connection views with optional operator-supplied DB-IP City Lite data, approximate public-IP markers, internal/unknown-hop fallbacks and location redaction in reports.
@@ -22,7 +24,8 @@
 - Remove the three-run comparison/report cap; retain actual mixed-duration endpoints, save editable colors and use decimal SI rate displays while keeping numeric archive units unchanged.
 - Integrate optional actual Linux Flent RRUL through local tools, preserving native result data and stopping owned child processes.
 - Generate branded PDF/Word reports for completed tests and comparisons, with default redaction, an evidence preview and stale-preview checks.
-- Keep rc.1 and rc.2 immutable. This feature branch does not deploy the app or complete authentication, retention, scenario thresholds or instance coordination.
+- Refresh installation guides and synthetic desktop/mobile screenshots for the merged main features, distinguishing source builds from existing prerelease downloads.
+- Keep rc.1 and rc.2 immutable. Merging these changes does not publish a release, deploy the app or complete authentication, retention, scenario thresholds or instance coordination.
 
 ## 0.1.0-rc.2 - vector logo update
 

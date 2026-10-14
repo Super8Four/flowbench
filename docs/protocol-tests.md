@@ -4,6 +4,8 @@
 
 New client tests default to **Bidirectional**. An explicit upload/download/bidirectional selection in a saved preset, run or import is retained. Legacy imports/preset catalogs that omit direction keep their earlier upload default. Loading or saving settings never starts traffic.
 
+On **Test & export**, choose **iPerf3 throughput** under **Measurement type** for these TCP/UDP tests. **DNS lookup** and **ICMP echo check** are separate [standalone checks](network-checks.md). ICMP nonresponse cannot substitute for the receiver's directional UDP loss measurements.
+
 Choose TCP, UDP or **Both (TCP then UDP)**. Both is one job containing two independently saved protocol runs, TCP first and UDP second, each using the selected duration, streams, direction and endpoint. They never overlap. Keep the peer listening for two connections, for example with `iperf3 -s`; `iperf3 -s -1` accepts only the first test. FlowBench-to-FlowBench coordination is not implemented by this feature. The managed incoming listener (and legacy one-test server API) follows its connecting client's actual protocol/direction and does not accept a Both client-job setting.
 
 UDP uses the selected bandwidth per stream; its default remains `10M`. Validation tests use bounded `2M`/`5M` traffic on localhost. Changing direction or protocol does not silently change a saved choice. The pinned Windows iPerf3 build cannot run UDP bidirectional: UDP/Both bidirectional requests are rejected before any test/artifact starts, with an explicit explanation. Use a supported Linux container for that mode, or explicitly select upload/download on Windows. Unsupported `--bidir` builds also reject bidirectional before starting.

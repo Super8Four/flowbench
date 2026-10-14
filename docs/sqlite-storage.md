@@ -4,7 +4,7 @@
 
 ## Storage design
 
-FlowBench uses the renamed `Super8Four/flowbench` repository and retains compatibility paths. Base commit `2d8d29c8ea0112543031cc566f3ca0fe847e29ed` stores evidence in UUID directories containing `run.json` and `events.jsonl`, plus `server-presets.json`. PostgreSQL/SQLAlchemy and `Measurement` are unused starter code. This branch removes that scaffold and its optional Compose service. It never connects to, alters or deletes PostgreSQL data. Old `DATABASE_URL`/`POSTGRES_*` values are ignored. If custom code populated starter tables, retain their separate backup; this branch has no custom PostgreSQL importer.
+FlowBench uses the renamed `Super8Four/flowbench` repository and retains compatibility paths. Base commit `2d8d29c8ea0112543031cc566f3ca0fe847e29ed` stored evidence in UUID directories containing `run.json` and `events.jsonl`, plus `server-presets.json`. PostgreSQL/SQLAlchemy and `Measurement` were unused starter code. The merged SQLite implementation removed that scaffold and its optional Compose service. It never connects to, alters or deletes PostgreSQL data. Old `DATABASE_URL`/`POSTGRES_*` values are ignored. If custom code populated starter tables, retain their separate backup; FlowBench has no custom PostgreSQL importer.
 
 SQLite lives at `RUNS_DIRECTORY/archive.sqlite3`: `instance/runs/archive.sqlite3` locally and `/data/runs/archive.sqlite3` in the existing Compose `iperf_data` volume. Ubuntu 24.04, Python 3.12, non-root execution, the read-only container root and AMD64/ARM64 packaging remain. Python's bundled `sqlite3` driver needs no database server or additional database wheel.
 
@@ -17,7 +17,7 @@ Connections use foreign keys, a five-second lock timeout, WAL and `synchronous=F
 ## Upgrade and import
 
 1. Finish/stop active tests and stop the old app. Back up the entire archive outside its volume. Keep the old checkout/image identity and Compose project name.
-2. Build this branch and start against the same directory/volume. Schema creation and a one-time legacy import run before readiness; no `init-db` step is needed.
+2. Build the intended current source or compatible release and start against the same directory/volume. Schema creation and a one-time legacy import run before readiness; no `init-db` step is needed.
 3. Verify `/api/health`, `/api/ready`, older IDs/dates/notes/measurements/logs, presets and JSON/XML exports against the backup.
 
 Migration validates all legacy records/events/presets and imports them in one transaction. IDs, dates, evidence fields and provenance survive. Event counts reflect complete retained events. A torn final JSONL event is unavailable, as with the old reader; earlier malformed lines fail migration. Unfinished runs become interrupted during recovery. No source file is modified or removed. The migration marker commits with the import, preventing old files from reverting later SQLite changes.
@@ -36,7 +36,7 @@ Restore into a fresh archive/volume with the same ownership and verify evidence 
 
 Old legacy files do not include new evidence or edits made after upgrade. Export a fresh legacy snapshot first. Export uses one read transaction, refuses an existing destination and never overwrites/deletes source data. If it fails, retain the partial destination for diagnosis and retry into another new directory. Use only an export that reported success.
 
-With the app stopped, from this branch's checkout/Python environment (set `RUNS_DIRECTORY` first for a non-default source):
+With the app stopped, from the current compatible checkout/Python environment (set `RUNS_DIRECTORY` first for a non-default source):
 
 ```sh
 FLOWBENCH_RESUME_LISTENER=0 python -m flask --app app export-legacy /absolute/path/to/new-rollback-archive
@@ -59,9 +59,9 @@ Tests cover migration/idempotence, malformed-source rollback/retry, rollback exp
 
 Native Ubuntu AMD64/ARM64 CI also builds the image and checks migration in a disposable volume, SQLite under a read-only root, import/export/deduplication, presets, integrity, container replacement and graceful active-test stop. Results apply only to their exact source commit. They do not establish target deployment, physical power-loss/disk-exhaustion recovery, external-client mappings or jRPI-5 performance. These checks use no live database/target host.
 
-The original SQLite change covers storage portions of R03/R04/R11/R12. The measurement-workflows feature branch additionally stores diagnostic/native Flent evidence, project metadata, tags and timeline notes in the existing schema 1 JSON documents/metadata table. Legacy snapshot export includes `projects.json` to retain project catalogs and baselines; old applications may ignore that extra file. Keep the full SQLite backup for a complete restore.
+The original SQLite change covers storage portions of R03/R04/R11/R12. Current main also stores diagnostic/native Flent evidence, route and clock context, project metadata, tags and timeline notes in the existing schema 1 JSON documents/metadata table. Legacy snapshot export includes `projects.json` to retain project catalogs and baselines; old applications may ignore that extra file. Keep the full SQLite backup for a complete restore.
 
-R14 PDF/Word reports are implemented on this unmerged feature branch. Profiles/thresholds, retention and authentication remain pending. See [workflows](measurement-workflows.md), [reports](reports.md) and [remaining requirements](requirements.md).
+R14 PDF/Word reports are implemented in current main. Profiles/thresholds, retention and authentication remain pending. See [workflows](measurement-workflows.md), [reports](reports.md) and [remaining requirements](requirements.md).
 
 A saved enabled listener resumes on normal app startup. Use the maintenance override shown above for exports. Legacy snapshots retain incoming evidence but do not recreate managed listener configuration on an older release; preserve the complete SQLite backup for that metadata. R17 authenticated instance coordination also remains pending.
 
