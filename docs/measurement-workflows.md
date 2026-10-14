@@ -54,8 +54,14 @@ Run, job and project exports use versioned JSON or the app's typed XML format. B
 
 A legacy snapshot can preserve additive records and `projects.json` for a compatible newer build. Older releases can ignore unfamiliar fields and cannot offer these new workflows; rollback is not a claim of feature compatibility. Keep the complete SQLite backup and the exact newer source/image identity. Never overwrite an existing archive to test an import or rollback.
 
+## Standalone checks and repeated executions
+
+Use **Test & export → Measurement type** for a standalone DNS lookup or ICMP echo check. These save typed attempts and outcomes without throughput values, and can be filtered in history, compared with the same check type and included in PDF/Word reports. A failed or partial check can still contain useful evidence; missing sends, replies and RTTs remain unavailable. See the [check workflows and interpretation limits](network-checks.md).
+
+**Run again** starts a new execution from saved configuration, with a new identity and immutable source link. Ordinary outgoing iPerf, Both/matrix and DNS/ICMP records start immediately after validation; Flent and incoming records first require their review panel and a fresh confirmation. **Load settings** fills the editable form for review or changes before a normal new start and does not promise lineage. Neither action rewrites the saved source; opening, exporting or importing evidence starts no traffic.
+
 ## Verification boundaries
 
 The workflow tests use disposable SQLite archives and synthetic records to check direct database contents, reopen persistence, JSON/XML interchange, project ID remapping, failed-import rollback, legacy compatibility and sparse live comparisons. Container lifecycle checks use bounded, disposable loopback iPerf peers and a fresh volume, verify native diagnostic status honestly under dropped capabilities, then replace the container and compare saved exports.
 
-Passing those checks does not establish a physical Pi deployment, external network performance, remote health access, full accessibility acceptance or resilience to physical storage failure. Consult the CI result for the exact feature-branch commit; existing prerelease tags and assets remain immutable.
+Passing those checks does not establish a physical Pi deployment, external network performance, remote health access, full accessibility acceptance or resilience to physical storage failure. Consult the CI result for the exact source commit; existing prerelease tags and assets remain immutable.

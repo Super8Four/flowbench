@@ -1,6 +1,6 @@
 # Planned network diagnostics
 
-These entries record future scope. They do not enable scans, capture packets, install tools or authorize traffic. Standalone DNS, ICMP observations and Run again belong to the current [network-check implementation](network-checks.md); the items below remain separate backlog decisions.
+These entries record future scope. They do not enable scans, capture packets, install tools or authorize traffic. Standalone DNS, ICMP observations and Run again are merged into current main; see the [network-check guide](network-checks.md). The items below remain separate backlog decisions and are not available controls.
 
 | Item | State | Intended evidence and limits |
 | --- | --- | --- |

@@ -30,7 +30,7 @@ A prerelease requires an explicit publication instruction, an identified scope a
 
 Stable promotion is a separate decision. Recommended gates are repeatable native results, reviewed Windows/browser/report evidence, a successful backup/restore rehearsal on disposable data, and explicit acceptance of remaining scope and platform limits. List open requirements and security boundaries; do not equate a version label with complete canonical acceptance. Authentication, retention, scenario thresholds and authenticated instance coordination remain tracked separately in [requirements](requirements.md).
 
-Use [Semantic Versioning](https://semver.org/) for release identities: after a stable public API is declared, incompatible changes increase the major version, compatible features the minor version, and compatible fixes the patch version. Development versions in `0.y.z` do not promise a stable API. The branch currently uses `0.2.0-dev`; an authorized candidate may use an `-rc.N` suffix. Change the app version, changelog and package identity together for a release, and publish corrections as a new version rather than replacing released contents.
+Use [Semantic Versioning](https://semver.org/) for release identities: after a stable public API is declared, incompatible changes increase the major version, compatible features the minor version, and compatible fixes the patch version. Development versions in `0.y.z` do not promise a stable API. Current main uses `0.2.0-dev`; an authorized candidate may use an `-rc.N` suffix. Change the app version, changelog and package identity together for a release, and publish corrections as a new version rather than replacing released contents.
 
 ## Data and dependencies
 

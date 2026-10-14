@@ -4,14 +4,14 @@
 
 These commands target **Ubuntu 24.04** with Python 3.12. The container build exercises the same iPerf source/checksum and packages on AMD64/ARM64; a standalone native-host install has not been separately verified. Use the [container method](containers.md) for the fully checked package.
 
-Install prerequisites:
+The commands use current main. For an immutable older prerelease, use the alternative in [version selection](README.md#choose-a-source-version). Install prerequisites:
 
 ```sh
 sudo apt-get update
 sudo apt-get install -y git python3-venv build-essential ca-certificates curl libssl-dev iputils-tracepath iputils-ping
 git clone https://github.com/Super8Four/flowbench.git
 cd flowbench
-git switch --detach v0.1.0-rc.2
+git switch main
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
@@ -41,3 +41,5 @@ Set an absolute writable `RUNS_DIRECTORY` in `.env` if desired, then start on lo
 ```
 
 Open **http://127.0.0.1:5000** and check `curl --fail http://127.0.0.1:5000/api/ready` from another terminal. Stop with **Ctrl+C**. Run one app process per archive without a debugger/reloader. No systemd unit, firewall or TLS setup is installed by these commands.
+
+The installed requirements include DNS query support and the optional local geographic database reader. Native ICMP and route probes still depend on host tools and permissions; the app does not add capabilities or change network/clock configuration. A missing local time service leaves clock evidence unavailable. No geographic dataset or optional Flent CLI tools are installed by these commands. See [configuration](configuration.md), [route/clock setup](../preflight.md) and [optional Flent](../flent.md).

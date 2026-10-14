@@ -1,6 +1,6 @@
 # Route and clock evidence before a test
 
-This unreleased feature branch adds one bounded route capture and one read-only local clock-quality observation before each outgoing test. The preparation results are committed to SQLite before traffic begins. Missing tools, denied access, timeouts and incomplete replies remain evidence; they do not become zero values or prevent an otherwise valid throughput test. Stop during preparation cancels the owned probes and prevents traffic from starting. An archive write failure blocks the test.
+Current main captures one bounded route and one read-only local clock-quality observation before each outgoing throughput test. The preparation results are committed to SQLite before traffic begins. Missing tools, denied access, timeouts and incomplete replies remain evidence; they do not become zero values or prevent an otherwise valid throughput test. Stop during preparation cancels the owned probes and prevents traffic from starting. An archive write failure blocks the test. Standalone [DNS and ICMP checks](network-checks.md) record clock context but do not run a route probe.
 
 ## Which tests receive evidence
 
@@ -33,7 +33,7 @@ Each captured route retains the provider, licence, database type and build times
 
 ### Synthetic browser examples
 
-These captures use disposable saved records and invented approximate locations. They do not demonstrate licensed-dataset accuracy or an actual Internet route: [desktop world view](assets/preflight-world-desktop.jpg), [mobile overlapping markers](assets/preflight-world-mobile.jpg), [internal-only topology](assets/preflight-internal-mobile.jpg) and [mobile navigation](assets/preflight-navigation-mobile.jpg).
+These historical examples were captured from source `9d00701`, using disposable saved records and invented approximate locations: [desktop world view](assets/preflight-world-desktop.jpg), [mobile overlapping markers](assets/preflight-world-mobile.jpg), [internal-only topology](assets/preflight-internal-mobile.jpg) and [mobile navigation](assets/preflight-navigation-mobile.jpg). They do not demonstrate licensed-dataset accuracy, an actual Internet route or the latest UI. See [verification](verification.md) for current merged-source screenshots and their provenance.
 
 ## Reading clock quality
 

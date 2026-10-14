@@ -21,6 +21,8 @@ SQLite commits streamed measured state with each event. The merged listener stdo
 
 One outgoing client/job can run concurrently in its own process. Both protocol children remain sequential. Overlapping incoming/outbound records retain mutual run IDs and a measurement-interference note. Rates are never combined. FlowBench does not promise unaffected measurements or unlimited concurrent clients. A legacy one-test server cannot share the managed listener port.
 
+**Run again** on a saved incoming test prepares a fresh one-test server execution; it does not re-enable or replay the persistent managed listener. Review the bind/port and confirmation before starting, and keep it separate from the managed listener's occupied port. Its initial client wait is bounded to 60 seconds; an accepted session retains the normal server hard limit. See [Run again](network-checks.md#run-again) for source lineage and retry behavior.
+
 Stopping during a session preserves a `cancelled` partial run. Unexpected listener death preserves `interrupted` evidence; storage capture failures surface as `failed` and disable readiness. Startup recovery marks unfinished records interrupted and never replays completed sessions. Graceful app shutdown stops active incoming/outgoing traffic and retains saved enable state for later resume. Abrupt power loss and hardware durability remain separate operational concerns.
 
 ## API and maintenance
