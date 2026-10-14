@@ -65,6 +65,7 @@ class EndpointModelTests(unittest.TestCase):
         self.assertEqual(len(record["endpoints"]["sockets"]), 1)
         self.assertEqual(record["endpoints"]["sockets"][0]["protocol"], "tcp")
         self.assertEqual(record["endpoints"]["sockets"][0]["local"]["port"], 41001)
+        self.assertEqual(record["endpoints"]["status"], "captured")
         self.assertIsNone(old["endpoints"]["sockets"][0]["local"]["port"])
         captured = copy.deepcopy(record["endpoints"])
         record["native_result"] = {"event": "end", "data": {}}
@@ -87,6 +88,55 @@ class EndpointModelTests(unittest.TestCase):
                 value["sockets"][0]["local"].update(address=wildcard, family=4 if "." in wildcard else 6)
                 with self.assertRaises(ValueError):
                     validate_endpoints(value)
+
+    def test_malformed_start_stays_partial_without_reconciling_socket_evidence(self):
+        source = start()
+        source["connected"].append(None)
+        record = sample_record(status="running", native_result=None)
+        record["endpoints"] = observe_iperf_start(record, source)
+        saved = copy.deepcopy(record["endpoints"])
+        self.assertEqual(saved["status"], "partial")
+        self.assertEqual(len(saved["sockets"]), 1)
+        for status in ("running", "completed", "cancelled", "failed", "interrupted"):
+            for native in (None, {"event": "end", "data": {}}, {"end": {}}, {"start": {"connected": []}}):
+                with self.subTest(status=status, native=native):
+                    record.update(status=status, native_result=native)
+                    before = copy.deepcopy(record)
+                    self.assertEqual(derive_endpoints(record), saved)
+                    self.assertEqual(record, before)
+
+    def test_partial_requires_fresh_matching_reporter_sockets_to_reconcile(self):
+        empty = sample_record(status="running", native_result=None)
+        empty["endpoints"] = observe_iperf_start(empty, {"connected": [None]})
+        self.assertEqual(observe_iperf_start(empty, start(), reporter="peer")["status"], "partial")
+        source = start()
+        source["connected"].append(None)
+        record = sample_record(status="running", native_result=None)
+        record["endpoints"] = observe_iperf_start(record, source)
+        for fresh in ({}, {"connected": []}, {"accepted_connection": {"host": "192.0.2.10", "port": 41000}}):
+            with self.subTest(fresh=fresh):
+                self.assertEqual(observe_iperf_start(record, fresh)["status"], "partial")
+        record["endpoints"] = observe_iperf_start(record, start(), reporter="peer")
+        self.assertEqual(record["endpoints"]["status"], "partial")
+        record["native_result"] = {"server_output_json": {"start": start()}}
+        self.assertEqual(derive_endpoints(record)["status"], "partial")
+        record["native_result"]["start"] = start()
+        value = derive_endpoints(record)
+        self.assertEqual(value["status"], "captured")
+        self.assertEqual({row["reporter"] for row in value["sockets"]}, {"local", "peer"})
+
+    def test_clean_matching_start_can_reconcile_without_mutating_prior_evidence(self):
+        source = start()
+        source["connected"].append(None)
+        record = sample_record(status="running", native_result=None)
+        record["endpoints"] = observe_iperf_start(record, source)
+        before = copy.deepcopy(record)
+        fresh = start()
+        value = observe_iperf_start(record, fresh)
+        self.assertEqual(value["status"], "captured")
+        self.assertEqual(value["sockets"], before["endpoints"]["sockets"])
+        self.assertEqual(record, before)
+        self.assertIs(validate_endpoints(value, record), value)
 
     def test_malformed_native_and_surrogate_peer_never_mutate_archive(self):
         sources = [{"connected": {}}, {"connected": [None, {"local_host": [], "remote_port": True}]},
@@ -226,6 +276,34 @@ class EndpointArchiveTests(unittest.TestCase):
         self.assertIsNone(self.manager.storage.execution_request(body["request_id"]))
         with self.assertRaises(ValueError):
             self.manager.start({"target": "127.0.0.1"}, initiator_context={"source": "forged"})
+
+    def test_malformed_stream_partial_persists_with_events_and_terminal_reopen(self):
+        record = sample_record(status="running", native_result=None, finished_at=None)
+        record["endpoints"] = initial_endpoints(record, "capture-container")
+        self.manager.record, self.manager.active = record, record["id"]
+        self.manager.save(record)
+        source = start()
+        source["connected"].append(None)
+        line = json.dumps({"event": "start", "data": source})
+        self.manager.log("stdout", line)
+        saved = self.manager.storage.read(record["id"])
+        self.assertEqual(saved["endpoints"]["status"], "partial")
+        self.assertEqual(saved["event_count"], 1)
+        self.assertEqual(self.manager.storage.events(record["id"])[0]["message"], line)
+        self.manager.log("stdout", json.dumps({"event": "end", "data": record["summary"]}))
+        self.assertEqual(self.manager.storage.read(record["id"])["endpoints"], saved["endpoints"])
+        record.update(status="cancelled", finished_at="2026-01-01T10:00:10+00:00")
+        record["endpoints"] = derive_endpoints(record)
+        self.manager.save(record)
+        self.manager.active = None
+        self.manager.shutdown()
+        self.manager = RunManager(self.temp.name, "missing-iperf")
+        reopened = self.manager.export(record["id"])
+        self.assertEqual(reopened["endpoints"], saved["endpoints"])
+        self.assertEqual(reopened["status"], "cancelled")
+        self.assertEqual(reopened["events"][0]["message"], line)
+        self.assertEqual(endpoint_view(reopened)["status"], "partial")
+        self.assertEqual(self.manager.list_runs()[0]["endpoints_summary"]["status"], "partial")
 
     def test_streaming_checkpoint_persists_and_end_only_preserves_evidence(self):
         record = sample_record(status="running", native_result=None, finished_at=None)

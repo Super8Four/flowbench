@@ -2,6 +2,10 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
+## Proposed correction - partial endpoint evidence
+
+The `fix/endpoint-partial-evidence` branch is under review and is not merged into main. It preserves known partial endpoint availability through end-only updates and finalization. Only fresh matching socket observations can reconcile the warning; an empty start or a different reporter cannot. It keeps normal unknown-field enrichment, existing row limits, SQLite schema and JSON/XML formats unchanged, without rewriting historical archives.
+
 ## Unreleased - Test endpoints
 
 Current main adds optional captured execution hostname, reporter-local/remote socket pairs, typed destinations and initiating web-peer context, with separate current viewing context. These additions are delivered through PR24 and are not included in existing rc.2 downloads. See [endpoint interpretation and privacy](docs/test-endpoints.md).
