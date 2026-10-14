@@ -1,13 +1,110 @@
 import json
 import os
 import subprocess
+import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from app import create_app
 from app.runner import RunManager, CREATE_FLAGS
 import test_app as existing
+
+
+def wait_for_incoming_capture(manager, listener, count, *, idle_timeout=10, total_timeout=40, clock=None, sleep=None):
+    """Allow active report persistence, but bound both stalls and total waiting.
+
+    A controlled slow-archive reproduction retained all 176 native events after
+    28.531 seconds following client exit. Every pretty-report line commits its
+    own durable transaction. Only new capture evidence refreshes the unchanged
+    ten-second stall budget; clock-worker updates and polling do not count.
+    """
+    clock, sleep = clock or time.monotonic, sleep or time.sleep
+    began = last_progress_at = clock()
+    previous = None
+    while True:
+        with listener.lock:
+            runs = [row for row in manager.list_runs() if row.get('incoming') and row['finished_at']]
+            record = listener.record or {}
+            progress = (len(runs), record.get('id'), record.get('event_count', 0),
+                        len(listener.full_lines), listener.end_seen)
+            state = {'listener': listener.status(), 'completed_count': len(runs), 'expected_count': count,
+                     'current': {key: record.get(key) for key in ('id', 'status', 'event_count', 'finished_at', 'error')},
+                     'protocol': record.get('settings', {}).get('protocol'), 'mode': record.get('settings', {}).get('mode'),
+                     'interval_count': len(record.get('intervals', [])), 'summary_keys': sorted(record.get('summary', {})),
+                     'end_seen': listener.end_seen, 'buffered_report_lines': len(listener.full_lines),
+                     'last_report_line': listener.full_lines[-1][:160] if listener.full_lines else None,
+                     'monitor_alive': bool(listener.worker and listener.worker.is_alive()),
+                     'clock_worker_alive': bool(listener.time_worker and listener.time_worker.is_alive()),
+                     'process_exit_code': listener.process.poll() if listener.process else None,
+                     'storage_error': manager.storage_error}
+        observed = clock()
+        # The overall cap remains effective even if progress never stops.
+        if observed - began >= total_timeout:
+            reason = 'overall_deadline'
+        elif len(runs) >= count:
+            return [manager.export(row['id']) for row in runs]
+        else:
+            if progress != previous:
+                previous, last_progress_at = progress, observed
+            if observed - last_progress_at < idle_timeout:
+                sleep(min(.05, total_timeout - (observed - began), idle_timeout - (observed - last_progress_at)))
+                continue
+            reason = 'no_capture_progress'
+        state.update(reason=reason, elapsed_seconds=round(observed - began, 3),
+                     idle_seconds=round(observed - last_progress_at, 3),
+                     idle_timeout=idle_timeout, total_timeout=total_timeout)
+        raise AssertionError('Incoming evidence did not finish: ' + json.dumps(state, sort_keys=True))
+
+
+class IncomingCaptureWaitTests(unittest.TestCase):
+    def fixture(self, evolve):
+        class Clock:
+            value = 0.0
+            def now(self):
+                return self.value
+            def sleep(self, seconds):
+                self.value += max(seconds, .000001)
+        clock = Clock()
+        listener = Mock(lock=threading.RLock(), record={'id': 'fixture', 'event_count': 1, 'status': 'running'},
+                        full_lines=[], end_seen=True, worker=None, time_worker=None, process=None)
+        listener.status.return_value = {'state': 'listening', 'error': None}
+        manager = Mock(storage_error=None)
+        manager.list_runs.side_effect = lambda: evolve(clock.value, listener)
+        manager.export.side_effect = lambda run_id: {'id': run_id, 'status': 'completed', 'native_result': {'end': {}}}
+        return manager, listener, clock
+
+    def test_continuing_archive_events_allow_slow_completion_beyond_ten_seconds(self):
+        def evolve(seconds, listener):
+            listener.record['event_count'] = 1 + int(seconds / 3)
+            return [{'id': 'fixture', 'incoming': {'fixture': True}, 'finished_at': 'UTC'}] if seconds >= 12 else []
+        manager, listener, clock = self.fixture(evolve)
+        rows = wait_for_incoming_capture(manager, listener, 1, clock=clock.now, sleep=clock.sleep)
+        self.assertEqual(rows[0]['status'], 'completed')
+        self.assertGreaterEqual(clock.value, 12)
+        self.assertLess(clock.value, 13)
+
+    def test_stalled_report_fails_without_extending_for_a_live_clock_worker(self):
+        manager, listener, clock = self.fixture(lambda *_: [])
+        listener.time_worker = Mock()
+        listener.time_worker.is_alive.return_value = True
+        with self.assertRaises(AssertionError) as raised:
+            wait_for_incoming_capture(manager, listener, 1, clock=clock.now, sleep=clock.sleep)
+        self.assertIn('"reason": "no_capture_progress"', str(raised.exception))
+        self.assertIn('"end_seen": true', str(raised.exception))
+        self.assertGreaterEqual(clock.value, 10)
+        self.assertLess(clock.value, 11)
+
+    def test_report_buffer_progress_is_bounded_by_overall_deadline(self):
+        def evolve(seconds, listener):
+            listener.full_lines = ['fixture line'] * int(seconds)
+            return []
+        manager, listener, clock = self.fixture(evolve)
+        with self.assertRaises(AssertionError) as raised:
+            wait_for_incoming_capture(manager, listener, 1, total_timeout=20, clock=clock.now, sleep=clock.sleep)
+        self.assertIn('"reason": "overall_deadline"', str(raised.exception))
+        self.assertGreaterEqual(clock.value, 20)
+        self.assertLess(clock.value, 21)
 
 
 @unittest.skipUnless(RunManager.find_executable(), 'Install iPerf3 for managed listener integration checks.')
@@ -33,13 +130,7 @@ class ListenerTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     def wait_captured(self, count):
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            runs = [row for row in self.manager.list_runs() if row.get('incoming') and row['finished_at']]
-            if len(runs) >= count:
-                return [self.manager.export(row['id']) for row in runs]
-            time.sleep(.05)
-        self.fail('Incoming evidence did not finish: ' + str(self.listener.status()))
+        return wait_for_incoming_capture(self.manager, self.listener, count)
 
     def test_plain_clients_multiple_protocols_directions_and_no_duplicate_full_reports(self):
         port = self.start_listener()
