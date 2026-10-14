@@ -1100,8 +1100,11 @@ def render_docx(model):
         if not charts:
             para("These workloads have different measurement series; inspect their individual charts and comparison caveats below.")
     for index, run in enumerate(model["runs"], 1):
-        document.add_page_break()
-        document.add_heading(f"{'Check' if run.get('kind') == 'diagnostic-check' else 'Test'} {index}", 1)
+        heading = document.add_heading(f"{'Check' if run.get('kind') == 'diagnostic-check' else 'Test'} {index}", 1)
+        # A standalone break paragraph can itself move onto a fresh page and
+        # create an empty sheet after a full evidence table in LibreOffice.
+        heading.paragraph_format.page_break_before = True
+        heading.paragraph_format.space_before = Pt(0)
         para(run["label"])
         for heading, head, rows in _sections(run):
             document.add_heading(heading, 2)

@@ -161,6 +161,13 @@ class CheckReportTests(unittest.TestCase):
         self.manager.save(after)
         model = prepare_report(self.manager, {"ids": [before["id"], after["id"]]})
         self.assertEqual(model["runs"][1]["provenance"]["lineage"], after["lineage"])
+        document = Document(BytesIO(render_docx(model)))
+        run_headings = [paragraph for paragraph in document.paragraphs
+                        if paragraph.style.name == "Heading 1" and paragraph.text in ("Check 1", "Check 2")]
+        self.assertEqual(len(run_headings), 2)
+        self.assertTrue(all(paragraph.paragraph_format.page_break_before for paragraph in run_headings))
+        # A separate break paragraph can overflow and manufacture a blank page.
+        self.assertEqual(document._element.xpath('.//w:br[@w:type="page"]'), [])
         for row in model["comparisons"][0]["metrics"]:
             self.assertNotIn("percent_change", row)
             self.assertIn("delta", row)

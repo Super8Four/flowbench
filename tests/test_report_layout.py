@@ -12,6 +12,14 @@ spec.loader.exec_module(layout)
 
 
 class ReportLayoutChecks(unittest.TestCase):
+    def test_header_footer_only_page_is_rejected_without_counting_final_formfeed(self):
+        first = "FlowBench\nNetwork diagnostic report\nFlowBench | Page 1\f"
+        blank = "FlowBench\n\nFlowBench | Page 2\n\f"
+        last = "FlowBench\nCheck 2\nEvidence table\nFlowBench | Page 3\f"
+        self.assertEqual(layout.blank_body_pages(first + blank + last), [2])
+        self.assertEqual(layout.blank_body_pages(first + last), [])
+        self.assertEqual(layout.blank_body_pages(first + "\f" + last), [2])
+
     def test_comparison_must_keep_heading_caveats_and_first_body_row_together(self):
         root = ET.fromstring('''<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
           <w:p><w:r><w:t>Baseline compared with Test 3</w:t></w:r></w:p>
