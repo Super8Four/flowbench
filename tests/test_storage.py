@@ -236,7 +236,7 @@ class StorageTests(unittest.TestCase):
                 raise OSError('Simulated storage failure after Popen')
             return original(record)
         self.manager.capabilities['available'] = True
-        with patch('app.runner.subprocess.Popen', return_value=process), patch.object(self.manager, 'save', side_effect=fail_running):
+        with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen', return_value=process), patch.object(self.manager, 'save', side_effect=fail_running):
             record = self.manager.start({'target': '127.0.0.1', 'mode': 'upload'})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())

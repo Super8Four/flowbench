@@ -1,4 +1,4 @@
-import {createWorkflows} from './workflows.js';
+import {createWorkflows, preflightSummary} from './workflows.js';
 import {rateScale, formatRate, formatMbps, runColor, palette} from './units.js';
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
@@ -124,8 +124,6 @@ function fields() {
   $('server-fields').classList.toggle('d-none', !server);
   $('client-fields').querySelectorAll('input, select').forEach((element) => { element.disabled = server; });
   $('idle_timeout').disabled = !server;
-  $('traceroute').disabled = server;
-  $('traceroute').closest('.form-check').classList.toggle('d-none', server);
   $('custom-editor').closest('.card').classList.toggle('d-none', server);
   const usesUdp = ['udp', 'both'].includes($('protocol').value);
   $('bandwidth').disabled = server || !usesUdp;
@@ -140,7 +138,6 @@ function fields() {
 function settingsData() {
   const data = Object.fromEntries(new FormData($('test-form')));
   data.debug = $('debug').checked;
-  data.traceroute = !($('role').value === 'server') && $('traceroute').checked;
   // Disabled UDP fields still belong to a reusable configuration.
   data.bandwidth = $('bandwidth').value;
   return {...data, ...workflows.settings()};
@@ -322,7 +319,8 @@ function renderPeer() {
 }
 function renderSelected() {
   if (!selected) return;
-  $('session-status').textContent = selected.status[0].toUpperCase() + selected.status.slice(1);
+  const phase = selected.preflight?.status === 'pending' && !terminal.has(selected.status) ? 'Preflight running' : selected.status[0].toUpperCase() + selected.status.slice(1);
+  if ($('session-status').textContent !== phase) $('session-status').textContent = phase;
   $('session-date').textContent = date(selected.created_at);
   if (Number.isFinite(selected.overview?.runtime_seconds)) $('session-date').textContent += ` · Run time ${number(selected.overview.runtime_seconds)}s`;
   $('selected-label').textContent = title(selected);
@@ -340,7 +338,7 @@ function renderSelected() {
   if (selected.kind === 'protocol-job') {
     const tests = selected.protocol_runs || [];
     $('protocol-job-status').textContent = `Job: ${selected.status}. ${tests.filter((test) => test.status === 'completed').length} of 2 protocols completed.`;
-    $('protocol-job-results').innerHTML = `<table class="table"><thead><tr><th>Protocol / direction</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Evidence</th></tr></thead><tbody>${tests.map((test) => `<tr><td>${escape(test.protocol.toUpperCase())} / ${escape(test.mode)}</td><td>${escape(test.status)}${test.error ? `<div class="form-text">${escape(test.error)}</div>` : ''}</td><td>${formatMbps(test.metrics.upload_mbps)}</td><td>${formatMbps(test.metrics.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(test.id)}">Open ${escape(test.protocol.toUpperCase())}</a></td></tr>`).join('')}</tbody></table>`;
+    $('protocol-job-results').innerHTML = `<table class="table"><thead><tr><th>Protocol / direction</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Route evidence</th><th>Clock query</th><th>Evidence</th></tr></thead><tbody>${tests.map((test) => `<tr><td>${escape(test.protocol.toUpperCase())} / ${escape(test.mode)}</td><td>${escape(test.status)}${test.error ? `<div class="form-text">${escape(test.error)}</div>` : ''}</td><td>${formatMbps(test.metrics.upload_mbps)}</td><td>${formatMbps(test.metrics.download_mbps)}</td><td>${escape(preflightSummary(test).route)}</td><td>${escape(preflightSummary(test).clock)}</td><td><a href="/?run=${encodeURIComponent(test.id)}">Open ${escape(test.protocol.toUpperCase())}</a></td></tr>`).join('')}</tbody></table>`;
   }
   renderPeer();
   if (selected.kind === 'protocol-job') {
@@ -391,18 +389,37 @@ function historyTrend(overview, run) {
   }).join('');
   return `<svg class="history-sparkline" viewBox="0 0 140 36" role="img" aria-label="Upload and download throughput trend, scaled to this test"><title>Solid upload, dashed download. Peak ${formatMbps(maxRate)}; ${number(maxSeconds)} seconds. Scale varies by test; color is saved with the run.</title>${lines}</svg>`;
 }
+const historyMarkup = new WeakMap();
+export function replaceHistoryContent(body, markup) {
+  if (historyMarkup.get(body) === markup) return;
+  const active = document.activeElement;
+  const focused = body.contains?.(active) ? active : null;
+  const focusedRow = focused?.closest?.('[data-run-id]');
+  const rowId = focusedRow?.dataset.runId;
+  const identity = focused ? ['data-open', 'data-export', 'href'].map((key) => [key, focused.getAttribute(key)]).find(([, value]) => value !== null) : null;
+  const matches = (element) => identity && element.tagName === focused.tagName && element.getAttribute(identity[0]) === identity[1];
+  const ordinal = focusedRow && identity ? [...focusedRow.querySelectorAll('button, a')].filter(matches).indexOf(focused) : 0;
+  body.innerHTML = markup; historyMarkup.set(body, markup);
+  if (!focused) return;
+  const row = [...body.querySelectorAll('[data-run-id]')].find((element) => element.dataset.runId === rowId);
+  const controls = row ? [...row.querySelectorAll('button, a')] : [];
+  const replacement = identity && controls.filter(matches)[Math.max(0, ordinal)];
+  // A removed row returns focus to search. An unchanged row/control retains its
+  // identity even when another saved measurement causes the table to update.
+  (replacement || controls[0] || $('history-search'))?.focus({preventScroll: true});
+}
 function renderHistory() {
   if (!$('history-body')) return;
   const search = $('history-search').value.toLowerCase();
   const visible = runs.filter((run) => `${title(run)} ${run.settings.target} ${run.settings.notes} ${Object.values(run.settings.tags || {}).join(' ')}`.toLowerCase().includes(search) && workflows.matches(run));
-  $('history-body').innerHTML = visible.map((run) => {
+  const markup = visible.map((run) => {
     const config = run.effective_settings || run.settings;
     const stats = run.overview || {};
     const warnings = Array.isArray(run.measurement_warnings) ? run.measurement_warnings : [];
     const warning = stats.status === 'unavailable' || warnings.length
       ? `<div class="history-date text-warning-emphasis mt-2" role="note" aria-label="Stored measurement warning"><strong>Interval measurements unavailable</strong><p class="mb-1">${escape(stats.note || 'Stored interval evidence could not be interpreted. Raw evidence remains available.')}</p>${warnings.length ? `<ul class="mb-0 ps-3">${warnings.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>` : ''}</div>` : '';
     const color = {completed: 'success', failed: 'danger', cancelled: 'secondary', interrupted: 'warning', running: 'primary', starting: 'primary'}[run.status] || 'secondary';
-    return `<tr><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}${warning}</td>
+    return `<tr data-run-id="${escape(run.id)}"><td class="history-session"><button class="history-link" data-open="${run.id}">${escape(title(run))}</button><div class="history-date">${escape(date(run.created_at))} ${run.imported ? '<span class="badge text-bg-secondary">Imported</span>' : ''}</div>${workflows.tags(run)}${warning}</td>
       <td>${escape(run.settings.target || run.settings.bind || 'All interfaces')}:${run.settings.port}<div class="history-date">${run.kind === 'flent-run' ? 'Flent RRUL · 8 TCP load flows + latency probes' : `${escape(config.protocol.toUpperCase())} · ${escape(config.mode)} · ${config.streams} stream(s) · ${escape(run.settings.role)}`}</div></td>
       <td><span class="badge text-bg-${color}">${escape(run.status)}</span></td>
       <td class="history-speed"><strong>${formatMbps(stats.max_upload_mbps)}</strong><div class="history-date">Avg ${formatMbps(run.metrics.upload_mbps)}</div></td>
@@ -411,6 +428,7 @@ function renderHistory() {
       <td>${historyTrend(stats, run)}</td>
       <td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary" data-open="${run.id}">Open</button> <button class="btn btn-sm btn-outline-secondary" data-export="${run.id}">Export</button></td></tr>`;
   }).join('') || '<tr><td colspan="8" class="text-center py-5 history-muted">No matching saved sessions.</td></tr>';
+  replaceHistoryContent($('history-body'), markup);
   $('history-count').textContent = `${visible.length} of ${runs.length} saved sessions`;
 }
 function comparisonOptions() {
@@ -781,17 +799,6 @@ function renderResults() {
   $('result-outcome-box').className = `metric-card outcome-card outcome-${selected.status}`;
   const losses = ['upload','download'].filter((d) => Number.isFinite(metrics[d+'_lost_percent'])).map((d) => `${d} loss ${number(metrics[d+'_lost_percent'])}%`);
   $('result-quality').textContent = losses.join(' · ') || 'No packet-loss measurement reported';
-  const route = selected.route;
-  $('route-note').textContent = route ? `${route.status}: ${route.note || ''}` : 'No route evidence in this saved run.';
-  $('route-output').textContent = route?.raw_output || '';
-  const hops = route?.hops || [];
-  $('route-hops').innerHTML = hops.length ? `<table class="table"><thead><tr><th>Hop</th><th>Address</th><th>Probe RTT · ms</th></tr></thead><tbody>${hops.map((h) => `<tr><td>${escape(h.hop)}</td><td>${escape(h.address || 'No reply')}</td><td>${[...(h.rtt_ms || []).map((v) => number(v)), ...(h.rtt_upper_bound_ms || []).map((v) => '&lt;' + number(v))].join(' / ') || '—'}</td></tr>`).join('')}</tbody></table>` : '';
-  if (selected.incoming || selected.concurrency) {
-    const notes = [];
-    if (selected.incoming) notes.push(`Managed incoming capture from ${selected.incoming.remote_host || 'unknown peer'}. Directions use that client's perspective: upload enters this server, download leaves it.`);
-    if (selected.concurrency) notes.push(selected.concurrency.note);
-    $('route-note').textContent = notes.join(' ');
-  }
 }
 
 window.addEventListener('resize', () => { if (testPage && selected) renderPeer(); if ($('comparison-chart')) overlay(); });

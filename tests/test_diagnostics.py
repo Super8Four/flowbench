@@ -285,7 +285,7 @@ class DiagnosticRunnerTests(unittest.TestCase):
 
     def test_diagnostic_adapter_failure_does_not_fail_measured_traffic(self):
         process = self.traffic_process()
-        with patch("app.runner.subprocess.Popen", return_value=process), patch("app.diagnostics.DiagnosticsCapture.baseline", side_effect=RuntimeError("native adapter failed")):
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", return_value=process), patch("app.diagnostics.DiagnosticsCapture.baseline", side_effect=RuntimeError("native adapter failed")):
             record = self.manager.start({"target": "127.0.0.1", "mode": "upload", "latency": True})
             self.manager.worker.join(timeout=5)
         result = self.manager.export(record["id"])
@@ -306,7 +306,7 @@ class DiagnosticRunnerTests(unittest.TestCase):
                 evidence.append(self.manager.storage.read(record["id"])["diagnostics"])
                 captured.set()
         process.wait.side_effect = lambda timeout: 0 if captured.wait(3) else self.fail("No diagnostic checkpoint")
-        with patch("app.runner.subprocess.Popen", return_value=process), patch.object(self.manager, "save", side_effect=save), patch("app.diagnostics.DiagnosticsCapture._probe", side_effect=lambda phase, size=None: reply(2, phase)):
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", return_value=process), patch.object(self.manager, "save", side_effect=save), patch("app.diagnostics.DiagnosticsCapture._probe", side_effect=lambda phase, size=None: reply(2, phase)):
             record = self.manager.start({"target": "127.0.0.1", "mode": "upload", "latency": True})
             self.manager.worker.join(timeout=5)
         self.assertFalse(self.manager.worker.is_alive())
@@ -330,7 +330,7 @@ class DiagnosticRunnerTests(unittest.TestCase):
                 raise OSError("fixture disk full")
             return original_save(record)
         process.wait.side_effect = lambda timeout: 0 if failed.wait(3) else self.fail("No storage failure exercised")
-        with patch("app.runner.subprocess.Popen", return_value=process), patch.object(self.manager, "save", side_effect=save), patch("app.diagnostics.DiagnosticsCapture._probe", side_effect=lambda phase, size=None: reply(2, phase)):
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", return_value=process), patch.object(self.manager, "save", side_effect=save), patch("app.diagnostics.DiagnosticsCapture._probe", side_effect=lambda phase, size=None: reply(2, phase)):
             record = self.manager.start({"target": "127.0.0.1", "mode": "upload", "latency": True})
             self.manager.worker.join(timeout=5)
         self.assertFalse(self.manager.worker.is_alive())

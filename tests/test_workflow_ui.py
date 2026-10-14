@@ -51,8 +51,9 @@ class WorkflowUiTests(unittest.TestCase):
 
     def test_probes_and_flent_require_explicit_selection(self):
         page = self.page('/')
-        for identifier in ('latency', 'endpoint_health', 'mtu', 'traceroute', 'flent-confirm'):
+        for identifier in ('latency', 'endpoint_health', 'mtu', 'flent-confirm'):
             self.assertNotIn('checked', page.control(identifier))
+        self.assertFalse(any(attributes.get('id') == 'traceroute' for _, attributes in page.items))
         self.assertIn('disabled', page.control('flent-start'))
         self.assertEqual(page.control('flent-start')['type'], 'button')
         self.assertEqual(page.control('matrix-start')['type'], 'button')

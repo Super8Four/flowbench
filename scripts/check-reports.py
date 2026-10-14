@@ -21,14 +21,30 @@ sys.path.insert(0, str(source_root))
 
 from app.diagnostics import latency_summary
 from app.flent import normalize as normalize_flent, RRUL_TCP, RRUL_RTT
+from app.geolocation import empty_location, geolocation_metadata
 from app.projects import ProjectStore
 from app.reports import prepare_report, render_pdf, render_docx
 from app.runner import RunManager, settings_from
+from app.time_quality import time_quality_result
 
 
 def fixture():
     baseline = [{"status": "reply", "rtt_ms": value, "rtt_upper_bound_ms": None} for value in (2.0, 2.1, 2.2)]
     loaded = [{"status": "reply", "rtt_ms": value, "rtt_upper_bound_ms": None} for value in (4.0, 4.1, 4.2, 4.3)] + [{"status": "no_reply", "rtt_ms": None}]
+    quality = time_quality_result("captured", "Synthetic local provider observation; no external time query was performed.")
+    quality.update(observed_at="2026-01-01T09:59:58.200000+00:00", provider="chrony", source="192.0.2.123",
+                   synchronized=True, offset_seconds=-.0000004, uncertainty_seconds=.0000012,
+                   uncertainty_kind="root_dispersion_proxy", root_delay_seconds=.002, root_dispersion_seconds=.0000012,
+                   last_sync_at="2026-01-01T09:59:50+00:00", query_elapsed_seconds=.05,
+                   command=["/usr/bin/chronyc", "-n", "-c", "-h", "127.0.0.1", "tracking"])
+    geo = geolocation_metadata("available", "Synthetic location fixture only; no real IP lookup, dataset download or network traffic.")
+    geo.update(database_type="DBIP-City-Lite", build_epoch=1767225600)
+    located = []
+    for address, city, latitude, longitude in (("8.8.8.8", "Synthetic city A", 12.5, -34.75),
+                                               ("2001:4860:4860::8888", "Synthetic city B", -25.25, 130.5)):
+        location = empty_location(address)
+        location.update(status="located", city=city, country="Synthetic country", country_code="ZZ", latitude=latitude, longitude=longitude)
+        located.append(location)
     return {"schema_version": 1, "id": "a" * 32, "created_at": "2026-01-01T10:00:00+00:00",
             "finished_at": "2026-01-01T10:00:10+00:00", "status": "completed",
             "settings": settings_from({"target": "192.0.2.10", "label": "Synthetic before change", "notes": "Disposable report layout fixture"}),
@@ -36,7 +52,21 @@ def fixture():
             "summary": {"sum_received": {"bits_per_second": 100e6}, "sum_sent": {"retransmits": 2}},
             "intervals": [{"sum": {"start": i, "end": i + 1, "bits_per_second": rate * 1e6}} for i, rate in ((0, 90), (1, 110), (4, 120), (5, 100))], "test_parameters": None,
             "annotations": [{"id": "d" * 32, "timestamp": "2026-01-01T10:00:04+00:00", "seconds": 4, "text": "Synthetic note at the first captured interval after a gap"}],
-            "route": {"status": "captured", "hops": [{"hop": 1, "address": "192.0.2.1", "rtt_ms": [1.2, 1.3], "responded": True}], "raw_output": "Reserved fixture"},
+            "preflight": {"schema_version": 1, "policy": "once_per_test", "status": "captured", "phase": "before_traffic",
+                          "started_at": "2026-01-01T09:59:58+00:00", "finished_at": "2026-01-01T09:59:59+00:00",
+                          "elapsed_seconds": 1, "time_quality": quality},
+            "route": {"status": "captured", "phase": "before_traffic", "started_at": "2026-01-01T09:59:58+00:00",
+                      "finished_at": "2026-01-01T09:59:58.650000+00:00", "elapsed_seconds": .65,
+                      "geolocation": geo,
+                      "hops": [{"hop": 1, "address": "192.168.1.1", "addresses": ["192.168.1.1"],
+                                "rtt_ms": [1.2, 1.3], "rtt_upper_bound_ms": [1], "responded": True, "observed": True,
+                                "locations": [empty_location("192.168.1.1")]},
+                               {"hop": 2, "address": "8.8.8.8", "addresses": ["8.8.8.8", "2001:4860:4860::8888"],
+                                "rtt_ms": [2.5], "rtt_upper_bound_ms": [3], "responded": True, "observed": True, "locations": located,
+                                "observations": [{"addresses": ["8.8.8.8"], "rtt_ms": [2.5], "rtt_upper_bound_ms": [], "detail": "Synthetic reply A"},
+                                                 {"addresses": ["2001:4860:4860::8888"], "rtt_ms": [], "rtt_upper_bound_ms": [3], "detail": "Synthetic reply B"}]},
+                               {"hop": 3, "address": None, "addresses": [], "rtt_ms": [], "rtt_upper_bound_ms": [],
+                                "responded": False, "observed": False, "locations": [empty_location(None)]}], "raw_output": "Reserved fixture"},
             "diagnostics": {"schema_version": 1, "latency": {"enabled": True, "metric": "ICMP echo RTT",
                             "baseline": {"status": "captured", "samples": baseline, "summary": latency_summary(baseline)},
                             "loaded": {"status": "captured", "samples": loaded, "summary": latency_summary(loaded)}, "mean_increase_ms": 2.05},
@@ -78,7 +108,7 @@ def main():
                 comparison_ids.append(extra["id"])
             flent = copy.deepcopy(before)
             flent.update(id="c" * 32, kind="flent-run", summary={}, intervals=[], iperf_version=None,
-                         diagnostics=None, route=None, annotations=[])
+                         diagnostics=None, annotations=[])
             flent["settings"].update(engine="flent", flent_workload="rrul", streams=4, mode="bidir", port=12865,
                                      bandwidth="0", label="Synthetic complete native Flent format")
             native = {"version": 4, "metadata": {"NAME": "rrul", "HOST": "192.0.2.10", "LENGTH": 30},

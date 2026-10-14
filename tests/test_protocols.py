@@ -51,7 +51,7 @@ class ProtocolTests(unittest.TestCase):
 
     def run_job(self, codes=(0, 0), **settings):
         processes = [process_for(protocol, code) for protocol, code in zip(['tcp', 'udp'], codes)]
-        with patch('app.runner.subprocess.Popen', side_effect=processes) as launch:
+        with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen', side_effect=processes) as launch:
             response = self.client.post('/api/runs', json={'target': '127.0.0.1', 'protocol': 'both', 'duration': 1, 'bandwidth': '2M', **settings})
             self.assertEqual(response.status_code, 201, response.get_json())
             self.manager.worker.join(10)
@@ -120,7 +120,7 @@ class ProtocolTests(unittest.TestCase):
             self.manager.stop(self.manager.active_id)
             return -1
         process.wait.side_effect = stop_wait
-        with patch('app.runner.subprocess.Popen', return_value=process) as launch:
+        with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen', return_value=process) as launch:
             record = self.manager.start({'target': '127.0.0.1', 'protocol': 'both', 'duration': 1, 'bandwidth': '2M'})
             self.manager.worker.join(10)
         self.assertFalse(self.manager.worker.is_alive())
@@ -137,7 +137,7 @@ class ProtocolTests(unittest.TestCase):
             self.manager.stop(self.manager.active_id)
             return -1
         udp.wait.side_effect = stop_wait
-        with patch('app.runner.subprocess.Popen', side_effect=[process_for('tcp'), udp]):
+        with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen', side_effect=[process_for('tcp'), udp]):
             record = self.manager.start({'target': '127.0.0.1', 'protocol': 'both', 'duration': 1, 'bandwidth': '2M'})
             self.manager.worker.join(10)
         self.assertFalse(self.manager.worker.is_alive())
@@ -149,7 +149,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_default_new_start_and_presets_preserve_explicit_and_old_import_modes(self):
         for supplied, expected in [({}, 'bidir'), ({'mode': 'upload'}, 'upload'), ({'mode': 'download'}, 'download')]:
-            with patch('app.runner.subprocess.Popen', return_value=process_for('tcp')):
+            with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen', return_value=process_for('tcp')):
                 record = self.manager.start({'target': '127.0.0.1', **supplied})
                 self.manager.worker.join(5)
             self.assertEqual(record['settings']['mode'], expected)
@@ -223,7 +223,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_unsupported_bidir_both_and_server_both_fail_before_any_write_or_launch(self):
         self.manager.capabilities['udp_bidir'] = False
-        with patch('app.runner.subprocess.Popen') as launch:
+        with patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen') as launch:
             for settings in [{'protocol': 'both'}, {'protocol': 'udp'}, {'role': 'server', 'protocol': 'both'}]:
                 response = self.client.post('/api/runs', json={'target': '127.0.0.1', **settings})
                 self.assertEqual(response.status_code, 400)
@@ -238,7 +238,7 @@ class ProtocolTests(unittest.TestCase):
             if len(writes) == 3:
                 raise OSError('Simulated archive failure')
             return original(record, connection)
-        with patch.object(self.manager.storage, 'save', side_effect=fail_third), patch('app.runner.subprocess.Popen') as launch:
+        with patch.object(self.manager.storage, 'save', side_effect=fail_third), patch.object(self.manager, 'preflight', return_value=True), patch('app.runner.subprocess.Popen') as launch:
             response = self.client.post('/api/runs', json={'target': '127.0.0.1', 'protocol': 'both', 'bandwidth': '2M'})
             self.assertEqual(response.status_code, 503)
             launch.assert_not_called()

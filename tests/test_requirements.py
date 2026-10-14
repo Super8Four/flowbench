@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 from app.route import capture_route, parse_hops, route_command
 from app.runner import settings_from
+from app.time_quality import time_quality_result
 import test_imports as fixtures
 saved_run = fixtures.saved_run
 
@@ -57,13 +58,13 @@ class WorkspaceTests(unittest.TestCase):
         row = saved_run(); row['route'] = {'status': 'captured', 'hops': 'invalid'}
         self.assertEqual(self.upload('/api/runs/import', row).status_code, 400)
 
-    def test_post_test_route_failure_keeps_throughput_success(self):
+    def test_preflight_route_failure_keeps_throughput_success(self):
         process = Mock()
         process.stdout = io.StringIO(json.dumps({'end': saved_run()['summary']}) + '\n')
         process.stderr = io.StringIO('')
         process.wait.return_value = 0
         self.manager.capabilities['available'] = True
-        with patch('app.runner.subprocess.Popen', return_value=process), patch('app.runner.capture_route', return_value={'status':'unavailable', 'hops':[], 'note':'Not installed'}) as capture:
+        with patch('app.runner.subprocess.Popen', return_value=process), patch('app.preflight.capture_route', return_value={'status':'unavailable', 'hops':[], 'note':'Not installed'}) as capture, patch('app.time_quality.capture_time_quality', return_value=time_quality_result()):
             record = self.manager.start({'target':'127.0.0.1','mode':'upload','traceroute':True})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())
@@ -73,24 +74,31 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(result['route']['status'], 'unavailable')
         capture.assert_called_once()
 
-    def test_stop_during_route_capture_cancels_and_keeps_measurements(self):
+    def test_stop_during_preflight_route_prevents_traffic(self):
         process = Mock()
         process.stdout = io.StringIO(json.dumps({'end': saved_run()['summary']}) + '\n')
         process.stderr = io.StringIO(''); process.wait.return_value = 0; process.poll.return_value = None
+        process.kill.side_effect = lambda: setattr(process.poll, 'return_value', -1)
         self.manager.capabilities['available'] = True
         def route(settings, begin, cancelled):
             begin(['mock-route', '127.0.0.1'])
             self.manager.stop(self.manager.active)
             self.assertTrue(cancelled())
             return {'status':'cancelled','hops':[]}
-        with patch('app.runner.subprocess.Popen', return_value=process), patch('app.runner.capture_route', side_effect=route):
+        with patch('app.runner.subprocess.Popen', return_value=process) as launch, patch('app.preflight.capture_route', side_effect=route):
             record = self.manager.start({'target':'127.0.0.1','mode':'upload','traceroute':True})
             self.manager.worker.join(5)
         self.assertFalse(self.manager.worker.is_alive())
         result = self.manager.export(record['id'])
         self.assertEqual(result['status'],'cancelled')
-        self.assertEqual(result['metrics']['upload_mbps'],100)
-        process.terminate.assert_called_once()
+        self.assertIsNone(result['metrics'].get('upload_mbps'))
+        self.assertEqual(result['route']['status'], 'cancelled')
+        self.assertEqual(result['preflight']['status'], 'cancelled')
+        self.assertEqual(launch.call_args.args[0], ['mock-route', '127.0.0.1'])
+        launch.assert_called_once()
+        process.kill.assert_called_once()
+        process.terminate.assert_not_called()
+        process.stdout.close(); process.stderr.close()
 
 
 class RouteTests(unittest.TestCase):
@@ -112,7 +120,7 @@ class RouteTests(unittest.TestCase):
         process.poll.return_value = None
         process.communicate.side_effect = [subprocess.TimeoutExpired('tracepath',20), ('1:  127.0.0.1  0.1ms','')]
         # A polling timeout is temporary; only the overall deadline ends capture.
-        with patch('app.route.route_command', return_value=['tracepath','127.0.0.1']), patch('app.route.time.monotonic', side_effect=[0, 0, 0, 21]):
+        with patch('app.route.route_command', return_value=['tracepath','127.0.0.1']), patch('app.route.time.monotonic', side_effect=[0, 0, 0, 21, 21, 21, 21]):
             process.kill.side_effect = lambda: setattr(process.poll, 'return_value', -1)
             result = capture_route(settings_from({'target':'127.0.0.1'}), lambda _:process, lambda:False)
             self.assertEqual(result['status'], 'timeout'); process.kill.assert_called_once()

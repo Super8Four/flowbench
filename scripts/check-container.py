@@ -77,6 +77,23 @@ def main():
             time.sleep(.1)
         raise RuntimeError('Incoming sessions did not finish: ' + str(request('/api/listener')))
 
+    def check_preflight(run, incoming=False):
+        evidence = run['preflight']
+        assert evidence['schema_version'] == 1 and evidence['policy'] == 'once_per_test'
+        assert evidence['phase'] == ('observed_after_start' if incoming else 'before_traffic')
+        assert evidence['finished_at'] and evidence['elapsed_seconds'] >= 0
+        clock = evidence['time_quality']
+        assert clock['schema_version'] == 1 and clock['ntp_verified'] is False
+        assert clock['clock_source'] == 'system_utc' and clock['observed_at']
+        assert clock['query_elapsed_seconds'] <= 4, clock
+        assert clock['synchronized'] in (None, True, False)
+        assert run['route']['phase'] == evidence['phase']
+        if incoming:
+            assert run['route']['status'] == 'not_applicable' and not run['route']['command']
+        else:
+            assert run['route']['elapsed_seconds'] <= 21, run['route']
+            assert len(run['route']['hops']) <= 16
+
     docker("volume", "create", volume)
     try:
         # Seed only this disposable volume with the pre-SQLite file layout.
@@ -142,6 +159,7 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         assert run["metrics"]["upload_mbps"] > 0 and run["metrics"]["download_mbps"] > 0
         assert run["peer"]["available"] and run["events"]
         exported = request(f"/api/runs/{run_id}/export?format=json")
+        check_preflight(exported)
         xml_body = request(f"/api/runs/{run_id}/export?format=xml", raw=True)
         xml = ElementTree.fromstring(xml_body)
         assert xml.find("./field[@name='id']").text == run_id
@@ -165,6 +183,7 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         group_export = request(f"/api/runs/{job_id}/export")
         assert [run["settings"]["protocol"] for run in group_export["runs"]] == ["tcp", "udp"]
         for run in group_export["runs"]:
+            check_preflight(run)
             assert run["metrics"]["upload_mbps"] > 0 and run["metrics"]["download_mbps"] > 0
             assert {point["direction"] for point in run["series"]} == {"upload", "download"}
         group_import = request("/api/runs/import", {"filename": "both.json", "content": json.dumps(group_export)})
@@ -199,7 +218,9 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         matrix_export = request('/api/runs/' + matrix['id'] + '/export')
         assert [row['settings']['protocol'] for row in matrix_export['runs']] == ['tcp', 'udp']
         assert matrix_run['metrics'] == {}, 'Different matrix tests were combined into a throughput value'
+        assert 'preflight' not in matrix_export and 'route' not in matrix_export
         for child in matrix_export['runs']:
+            check_preflight(child)
             assert child['metrics']['upload_mbps'] > 0, child
             evidence = child['diagnostics']
             assert evidence['schema_version'] == 1
@@ -221,7 +242,7 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         assert request('/api/runs/import', {'filename': 'matrix.xml', 'content': matrix_xml.decode()})['duplicates'] == matrix_import['imported']
         imported_matrix_export = request('/api/runs/' + matrix_import['imported'][0] + '/export')
         for original_child, imported_child in zip(matrix_export['runs'], imported_matrix_export['runs']):
-            for field in ('diagnostics', 'route', 'annotations', 'events'):
+            for field in ('diagnostics', 'route', 'preflight', 'annotations', 'events'):
                 assert imported_child.get(field) == original_child.get(field), field
         project_report = request('/api/projects/' + project['id'])
         assert project_report['project']['baseline_id'] == run_id
@@ -237,9 +258,11 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         database_evidence = docker('exec', name, 'python', '-c',
             "import json,sqlite3; c=sqlite3.connect('/data/runs/archive.sqlite3'); "
             f"r=json.loads(c.execute('SELECT document FROM runs WHERE id=?', ('{first_child}',)).fetchone()[0]); "
-            "print(json.dumps({key:r[key] for key in ('diagnostics','annotations','settings')})); c.close()")
+            "print(json.dumps({key:r[key] for key in ('diagnostics','preflight','route','annotations','settings')})); c.close()")
         database_evidence = json.loads(database_evidence)
         assert database_evidence['diagnostics'] == matrix_export['runs'][0]['diagnostics']
+        assert database_evidence['preflight'] == matrix_export['runs'][0]['preflight']
+        assert database_evidence['route'] == matrix_export['runs'][0]['route']
         assert database_evidence['annotations'] == matrix_export['runs'][0]['annotations']
         assert database_evidence['settings']['tags'] == tags
         # Reports consume committed individual measurements, never a combined
@@ -278,6 +301,7 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         assert len({row['id'] for row in captures}) == 3
         assert all(row['status'] == 'completed' for row in captures), captures
         incoming_export = request('/api/runs/' + captures[0]['id'] + '/export')
+        check_preflight(incoming_export, incoming=True)
         assert incoming_export['incoming']['remote_host'] == '127.0.0.1'
         assert incoming_export['events'] and incoming_export['native_result']
         docker('exec', '--detach', name, 'iperf3', '-c', '127.0.0.1', '-p', '5204', '-t', '4', '-b', '2M', '-J')

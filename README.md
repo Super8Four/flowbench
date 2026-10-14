@@ -56,6 +56,7 @@ The Windows engine does not support UDP bidirectional; use a Linux image or sele
 
 - [Setup and troubleshooting](docs/setup-and-testing.md)
 - [TCP, UDP and Both](docs/protocol-tests.md)
+- [Route and clock preparation](docs/preflight.md)
 - [Incoming capture](docs/incoming-listener.md)
 - [Backup and rollback](docs/sqlite-storage.md)
 - [Brand assets](docs/brand-assets.md), [verification](docs/verification.md) and [remaining requirements](docs/requirements.md)

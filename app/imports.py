@@ -265,6 +265,9 @@ def prepare_run(data, filename, allow_job=False):
     if "diagnostics" in record:
         from .diagnostics import validate_diagnostics
         validate_diagnostics(record["diagnostics"])
+    if "preflight" in record:
+        from .preflight import validate_preflight
+        validate_preflight(record["preflight"])
     if record.get("kind") == "flent-run":
         from .flent import validate_flent
         validate_flent(record.get("flent"))
@@ -274,21 +277,8 @@ def prepare_run(data, filename, allow_job=False):
             raise ValueError("Flent runs must retain their native RRUL workload settings.")
     route = record.get("route")
     if route is not None:
-        if not isinstance(route, dict) or not isinstance(route.get("hops"), list):
-            raise ValueError("Saved route must contain a hop array.")
-        for key in ("status", "note", "raw_output"):
-            if key in route and not isinstance(route[key], str):
-                raise ValueError("Route status, note, and output must be text.")
-        for hop in route["hops"]:
-            if (not isinstance(hop, dict) or isinstance(hop.get("hop"), bool)
-                    or not isinstance(hop.get("hop"), int) or not 1 <= hop["hop"] <= 16
-                    or (hop.get("address") is not None and not isinstance(hop["address"], str))
-                    or not isinstance(hop.get("rtt_ms"), list)
-                    or any(isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0 for v in hop["rtt_ms"])):
-                raise ValueError("Invalid saved route hop.")
-            bounds = hop.get("rtt_upper_bound_ms", [])
-            if not isinstance(bounds, list) or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in bounds):
-                raise ValueError("Invalid route RTT upper bounds.")
+        from .route import validate_route
+        validate_route(route)
     record.update(id=uuid4().hex, event_count=len(events),
                   imported={"at": now(), "filename": filename[:255], "source_id": source_id,
                             "sha256": digest, "format": "app" if "settings" in data else "native-iperf"})

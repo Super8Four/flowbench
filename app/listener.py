@@ -7,6 +7,7 @@ import json
 import math
 import subprocess
 import threading
+import time
 from uuid import uuid4
 
 from .runner import CREATE_FLAGS, RunManager, now, settings_from
@@ -53,6 +54,8 @@ class IncomingListener:
         self.stopping = False
         self.generation = None
         self.diagnostics = []
+        self.time_worker = None
+        self.time_cancel = None
 
     def status(self):
         with self.lock:
@@ -142,10 +145,69 @@ class IncomingListener:
                                     "remote_port": connection.get("port"), "observed_started_at": observed,
                                     "cookie": start.get("cookie"), "start": copy.deepcopy(start),
                                     "log_stream": "combined stdout/stderr", "directions": "client perspective"}}
+        from .preflight import initial_preflight, route_placeholder
+        self.record["route"] = route_placeholder(settings, "not_applicable", "observed_after_start")
+        self.record["preflight"] = initial_preflight("observed_after_start", "not_applicable")
         self.events, self.full_lines, self.end_seen = [], [], False
         self.manager.save(self.record)
+        self.start_time_quality(self.record["id"])
         if self.manager.active and self.manager.record["settings"]["role"] == "client" and self.manager.process and self.manager.process.poll() is None:
             self.mark_overlap(self.manager.record)
+
+    def start_time_quality(self, run_id):
+        """Read local clock state after acceptance, outside the measurement lock.
+
+        At most one clock query runs for this listener. A rapid following test
+        records unavailable evidence if the preceding bounded query is still
+        finishing, rather than spawning an unbounded background queue.
+        """
+        from .time_quality import time_quality_result
+        if self.stopping or (self.time_worker and self.time_worker.is_alive()):
+            if self.time_cancel:
+                self.time_cancel.set()
+            updated = copy.deepcopy(self.record)
+            evidence = updated["preflight"]
+            evidence.update(finished_at=now(), elapsed_seconds=0.0,
+                            time_quality=time_quality_result(status="cancelled" if self.stopping else "unavailable",
+                                note="The listener is stopping; no new local time query was launched." if self.stopping else
+                                "The previous incoming session's bounded local time query is still finishing. No additional query was queued."))
+            self.manager.save(updated)
+            self.record = updated
+            return
+        cancellation = threading.Event()
+        self.time_cancel = cancellation
+        began = time.monotonic()
+        worker = threading.Thread(target=self.capture_time_quality, args=(run_id, cancellation, began),
+                                  name="iperf-incoming-clock", daemon=True)
+        self.time_worker = worker
+        worker.start()
+
+    def capture_time_quality(self, run_id, cancellation, began):
+        from .time_quality import capture_time_quality, time_quality_result
+        try:
+            try:
+                quality = capture_time_quality(cancelled=cancellation.is_set, timeout=3)
+            except Exception as exc:
+                quality = time_quality_result(status="error", note=("Local time adapter failed: " + str(exc))[:1024])
+            with self.lock:
+                # The test can finish while the read-only query runs. Update its
+                # current archived document, never an old pre-summary snapshot.
+                active = self.record is not None and self.record["id"] == run_id
+                current = self.record if active else self.manager.storage.read(run_id)
+                updated = copy.deepcopy(current)
+                evidence = updated["preflight"]
+                evidence.update(finished_at=now(), elapsed_seconds=round(max(0, time.monotonic() - began), 6), time_quality=quality)
+                quality["note"] = (quality.get("note", "") + " Observed after the external client started; this is not a before-traffic snapshot.")[:2048]
+                self.manager.save(updated)
+                if active:
+                    self.record = updated
+        except OSError as exc:
+            with self.lock:
+                self.manager.storage_error = str(exc)
+                self.error = "Incoming clock evidence archive write failed: " + str(exc)
+                self.state, self.stopping = "failed", True
+                if self.process and self.process.poll() is None:
+                    self.process.kill()
 
     def mark_overlap(self, outbound):
         if not self.record:
@@ -301,14 +363,22 @@ class IncomingListener:
                 self.error = "Listener stopped, but disabled setting could not be saved: " + str(exc)
             finally:
                 self.stopping = True
+                if self.time_cancel:
+                    self.time_cancel.set()
                 if self.running:
                     self.process.terminate()
             worker = self.worker
         if worker and worker is not threading.current_thread():
             worker.join(5)
-            if worker.is_alive() and self.running:
-                self.process.kill()
+            if worker.is_alive():
+                if self.running:
+                    self.process.kill()
                 worker.join(5)
+        time_worker = self.time_worker
+        if time_worker and time_worker is not threading.current_thread():
+            time_worker.join(3.5)
+            if time_worker.is_alive():
+                self.manager.storage_error = "Incoming time query did not finish; archive writer ownership must be retained."
         if storage_failure:
             raise storage_failure
         return self.status()
