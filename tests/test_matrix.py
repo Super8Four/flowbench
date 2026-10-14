@@ -265,7 +265,9 @@ class RealMatrixTests(unittest.TestCase):
                 time.sleep(.4)
                 data = request(settings={"target": "127.0.0.1", "port": port, "duration": 1, "bandwidth": "1M"}, streams=[1])
                 job = manager.start_matrix(data)
-                manager.worker.join(30)
+                # Four children each retain their bounded route/clock preflight
+                # before the one-second traffic measurement.
+                manager.worker.join(120)
                 self.assertFalse(manager.worker.is_alive())
                 result = manager.export(job["id"])
                 self.assertEqual(result["status"], "completed", result["error"])
