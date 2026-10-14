@@ -20,6 +20,8 @@ from .peer import peer_results
 from .storage import SQLiteArchive
 from .matrix import matrix_plan
 from .units import RATE_CONTRACT
+from .endpoints import (initial_endpoints, observe_iperf_start, derive_endpoints,
+                        endpoint_view, endpoints_summary, validate_context, runtime_hostname)
 
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "partial", "skipped"}
@@ -245,6 +247,7 @@ class RunManager:
                                     if record.get("flent") else None)
                     row["project_id"] = record["settings"].get("project_id")
                     row["tags"] = record["settings"].get("tags", {})
+                    row["endpoints_summary"] = endpoints_summary(record)
                     records.append(row)
                 except (KeyError, OSError, json.JSONDecodeError):
                     continue
@@ -316,14 +319,14 @@ class RunManager:
             cmd.append("--debug")
         return cmd
 
-    def start(self, data):
-        return self._admit("iperf-run", data)["run"]
+    def start(self, data, *, initiator_context=None):
+        return self._admit("iperf-run", data, initiator_context=initiator_context)["run"]
 
-    def start_matrix(self, data):
-        return self._admit("matrix-job", data)["run"]
+    def start_matrix(self, data, *, initiator_context=None):
+        return self._admit("matrix-job", data, initiator_context=initiator_context)["run"]
 
-    def start_check(self, data):
-        return self._admit("diagnostic-check", data)["run"]
+    def start_check(self, data, *, initiator_context=None):
+        return self._admit("diagnostic-check", data, initiator_context=initiator_context)["run"]
 
     def _request_replay(self, token, intent):
         from .reruns import AdmissionConflict, AdmissionUnavailable
@@ -410,13 +413,17 @@ class RunManager:
                 worker = self.run_job
         return record, children, worker
 
-    def _admit(self, kind, data, source_id=None):
+    def _admit(self, kind, data, source_id=None, *, initiator_context=None):
         from .reruns import request_identity, lineage_for, AdmissionConflict, AdmissionUnavailable
         token, intent = request_identity(data, "rerun:" + source_id if source_id else kind)
         with self.lock:
             replay = self._request_replay(token, intent)
             if replay is not None:
                 return replay
+            if "initiator_context" in data or isinstance(data.get("settings"), dict) and "initiator_context" in data["settings"]:
+                raise ValueError("Initiating HTTP context must not be supplied in execution JSON.")
+            if initiator_context is not None:
+                validate_context(initiator_context)
             source = None
             snapshot = None
             config = {key: value for key, value in data.items() if key != "request_id"}
@@ -448,6 +455,11 @@ class RunManager:
             if self.active:
                 raise AdmissionConflict("A session is already running. Stop it before starting another.")
             record, children, worker = self._prepare_execution(kind, config)
+            hostname = runtime_hostname()
+            for row in [record, *children]:
+                row["endpoints"] = initial_endpoints(row, hostname)
+                if initiator_context is not None:
+                    row["initiator_context"] = copy.deepcopy(initiator_context)
             if source_id:
                 record["lineage"] = lineage_for(source_id)
                 originals = source.get("children", [])
@@ -517,8 +529,8 @@ class RunManager:
                     "required_confirmations": confirmations,
                     "note": "Creates a new execution using saved configuration notes and metadata; captured results and timeline annotations are not copied. Incoming tests wait once for at most 60 seconds for a client; an accepted test retains the existing total hard deadline of idle_timeout + 3645 seconds."}
 
-    def rerun(self, source_id, data):
-        return self._admit(None, data, source_id=source_id)
+    def rerun(self, source_id, data, *, initiator_context=None):
+        return self._admit(None, data, source_id=source_id, initiator_context=initiator_context)
 
     @property
     def active_id(self):
@@ -534,6 +546,7 @@ class RunManager:
                                "streams": effective_settings(child)["streams"], "settings": child["settings"],
                                "diagnostics": child.get("diagnostics"), "annotations": child.get("annotations"),
                                "preflight": child.get("preflight"), "route": child.get("route"),
+                               "endpoint_view": endpoint_view(child),
                                "error": child.get("error"), "metrics": measurements(child),
                                "created_at": child["created_at"], "finished_at": child["finished_at"]})
             return result
@@ -623,6 +636,7 @@ class RunManager:
         event, data = obj.get("event"), obj.get("data")
         if event == "start" and isinstance(data, dict):
             self.record["test_parameters"] = data.get("test_start")
+            self.record["endpoints"] = observe_iperf_start(self.record, data)
         elif event == "interval" and isinstance(data, dict):
             self.record["intervals"].append(data)
         elif event == "error":
@@ -639,6 +653,8 @@ class RunManager:
             self.record["summary"] = obj["end"]
         if "error" in obj:
             self.record["error"] = str(obj["error"])
+        if event in ("start", "end", "server_output_json") or "end" in obj:
+            self.record["endpoints"] = derive_endpoints(self.record)
 
     def parse_text(self, line):
         # Compatibility with older iPerf3 builds; the complete raw log is also retained.
@@ -678,6 +694,7 @@ class RunManager:
                         self.record["test_parameters"] = obj.get("start", {}).get("test_start", self.record["test_parameters"])
                         if "error" in obj:
                             self.record["error"] = str(obj["error"])
+                        self.record["endpoints"] = derive_endpoints(self.record)
                         self.save(self.record)
                 except json.JSONDecodeError:
                     pass
@@ -843,6 +860,7 @@ class RunManager:
             with self.lock:
                 self.diagnostics_capture = None
                 self.record["finished_at"] = now()
+                self.record["endpoints"] = derive_endpoints(self.record)
                 try:
                     self.save(self.record)
                 except OSError as save_error:
@@ -926,8 +944,8 @@ class RunManager:
         from .annotations import annotate_run
         return annotate_run(self, run_id, data)
 
-    def start_flent(self, data):
-        return self._admit("flent-run", data)["run"]
+    def start_flent(self, data, *, initiator_context=None):
+        return self._admit("flent-run", data, initiator_context=initiator_context)["run"]
 
     def _check_children_alive(self):
         capture = self.check_capture
@@ -965,6 +983,7 @@ class RunManager:
                         snapshot.update(status="running", finished_at=None)
                     candidate.update(result=snapshot, status=check_run_status(snapshot), finished_at=None,
                                      time_quality=copy.deepcopy(snapshot.get("time_quality")))
+                    candidate["endpoints"] = derive_endpoints(candidate)
                     try:
                         self.save(candidate)
                     except OSError as exc:
@@ -1000,6 +1019,7 @@ class RunManager:
                     final_result["time_quality"] = time_quality_result("unavailable", note="The check stopped before a clock observation was retained.")
                 candidate.update(result=final_result, status=check_run_status(final_result), finished_at=stamp,
                                  error=final_result.get("error"), time_quality=copy.deepcopy(final_result.get("time_quality")))
+                candidate["endpoints"] = derive_endpoints(candidate)
                 try:
                     self.save(candidate)
                 except OSError as exc:
@@ -1086,6 +1106,7 @@ class RunManager:
                     self.record["status"] = ("cancelled" if self.cancel_requested else
                                              "partial" if code == 0 and self.record["flent"].get("status") == "partial" and not self.capture_errors else
                                              "completed" if code == 0 and not self.record["error"] else "failed")
+                    self.record["endpoints"] = derive_endpoints(self.record)
                     self.log("system", "Actual Flent workload " + self.record["status"] + "; native evidence " + self.record["flent"]["status"] + ".")
         except Exception as exc:
             with self.lock:
@@ -1105,6 +1126,7 @@ class RunManager:
                 reader.join(timeout=5)
             with self.lock:
                 self.record["finished_at"] = now()
+                self.record["endpoints"] = derive_endpoints(self.record)
                 try:
                     self.save(self.record)
                 except OSError as exc:

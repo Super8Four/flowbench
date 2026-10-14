@@ -46,6 +46,12 @@ Choose a completed measured individual baseline to overlay against an active ind
 
 Run labels, notes and the site/device/circuit/ticket tags are editable. Timeline notes have a timezone-aware timestamp and an optional elapsed second. They are user observations, separate from original native measurement output. Editing a parent job's project or tags also updates its children transactionally; timeline notes apply to the selected record. Metadata edits publish only after storage commits.
 
+## Endpoint detail in saved results (branch preview)
+
+The separate `feature/test-endpoints` branch adds a **Test endpoints** panel and compact history availability summary; implementation/review is pending and current main does not contain this addition. Selected details distinguish a captured execution/container hostname, per-reporter numeric socket pairs or typed destinations, and any captured initiating web peer. Current viewing context is separate. Both/matrix parents do not invent combined endpoints; inspect each child.
+
+Imported and older records can show a view-only fallback from retained structured native output, with unknown hostname/initiator values left unavailable. Opening history does not send lookups or rewrite the archive. Full JSON/XML/project exports can contain sensitive endpoint/context values; PDF/Word default redaction removes them, including raw and nested copies. See [endpoint provenance and sharing](test-endpoints.md).
+
 ## SQLite, export and compatibility
 
 The database remains `RUNS_DIRECTORY/archive.sqlite3`, or `/data/runs/archive.sqlite3` in the persistent container volume. Runs are JSON documents in SQLite's `runs` table, raw events are separate ordered records, and project catalog metadata is stored in the same database. Diagnostic data, route evidence, tags and timeline notes commit with their run documents. These are actual database writes; no database server is required.

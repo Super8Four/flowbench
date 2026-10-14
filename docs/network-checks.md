@@ -66,3 +66,7 @@ The browser supplies a request identity to prevent a double click or replayed re
 - `POST /api/runs/<id>/rerun` submits the reviewed plan's `source_fingerprint`, a fresh `request_id` and any required confirmations.
 
 Check records use the existing history, run status, cancellation and report endpoints. The API has no login protection; keep it on loopback or behind the intended authenticated access boundary.
+
+## Destination context (branch preview)
+
+The separate `feature/test-endpoints` branch is adding endpoint context and remains under implementation/review. For DNS, the destination is the numeric resolver and port recorded by each UDP/TCP attempt; the question and returned answer are not that network destination. For ICMP, the destination is the retained pinned address and family, with no invented TCP/UDP port. A separately captured initiating web peer is not the probe source address, and current viewing context does not replace historical evidence. Opening/importing results sends no extra lookup. Full exports retain sensitive context; default-redacted reports remove it, including raw copies. See [endpoint interpretation](test-endpoints.md); current main and rc.2 do not yet include this addition.

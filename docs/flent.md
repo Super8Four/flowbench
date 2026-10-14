@@ -31,3 +31,7 @@ Flent is GPLv3. Its [license explicitly excludes generated output](https://githu
 [Reports](reports.md) include completed Flent evidence with native series labels. [Measurement workflows](measurement-workflows.md) explain project baselines, annotations and persistent archives.
 
 **Run again** can prepare a fresh RRUL execution from a saved record. It rechecks current tool support and requires a new explicit Netserver confirmation; saved native output is never replayed as a new measurement. See [Run again](network-checks.md#run-again).
+
+## Reported target (branch preview)
+
+The `feature/test-endpoints` branch, under implementation/review, labels a target found in retained Flent metadata as a **reported target**. A declared hostname is not proof of a measured numeric socket, interface or public address. Viewing it performs no resolution or network probe. See [endpoint context and privacy](test-endpoints.md). This addition is not in current main or existing rc.2 downloads.

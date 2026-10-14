@@ -2,6 +2,14 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
+## Branch preview - Test endpoints (review pending)
+
+The `feature/test-endpoints` branch adds optional captured execution hostname, reporter-local/remote socket pairs, typed destinations and initiating web-peer context, with separate current viewing context. It is not merged into main or included in existing rc.2 downloads. See [endpoint interpretation and privacy](docs/test-endpoints.md).
+
+- Preserve iPerf reporter perspective for reverse/bidirectional traffic, distinct control connections, DNS resolver attempts, ICMP pinned destinations and Flent declared targets without a public-IP service or inferred NAT mapping.
+- Keep historical fallback view-only, validate additive JSON/XML metadata before atomic imports, and redact endpoint/context copies in PDF/Word reports even with raw output selected. Existing SQLite schema and persistent volume remain unchanged.
+- Keep this feature separate from main integration and deployment. Its pull request records exact-source checks and remaining acceptance limits.
+
 ## Unreleased - checks, route evidence and measurement workflows
 
 These changes are merged into current main (`0.2.0-dev`). Published rc.1 and rc.2 tags and downloads remain immutable; build current main for the additions below.

@@ -4,6 +4,8 @@
 
 FlowBench's current main (`0.2.0-dev`) is a portable measurement/evidence workspace with iPerf3 throughput, standalone DNS and ICMP checks, projects, incoming capture, history/import, comparisons, reports and saved configuration. Ubuntu native AMD64/ARM64 containers and SQLite persistence are part of this development version. The GitHub repository is `flowbench`; existing local checkout, image tag and archive paths remain compatible. Published rc.1 and rc.2 downloads retain their original feature sets.
 
+The separate `feature/test-endpoints` branch adds [captured endpoint and execution-context evidence](test-endpoints.md) for review. It is not included in the current-main implementation table or published rc.2 downloads. Its pull request records exact-source CI, browser/report checks and remaining acceptance limits.
+
 | Area | Current implementation | Acceptance boundary |
 | --- | --- | --- |
 | Client configuration and measurement | TCP/UDP/Both, explicit directions, default bidirectional, bounded validation, logs/local and available remote reports | Peer compatibility, real network conditions and target performance need evaluation |
