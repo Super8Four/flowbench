@@ -33,3 +33,11 @@ The preview returns a `fingerprint` of its displayed evidence. Pass that fingerp
 Native CI renders the synthetic Word fixtures with LibreOffice, then runs `scripts/check-report-layout.py` using Poppler `pdftotext`. It checks that captured Word text remains present in the converted PDF, including table labels and saved colors across page boundaries. It also checks that each comparison heading, caveats, table header and first metric share a page, and rejects pages containing only the report header and footer. Word comparisons and individual test or check sections start through their heading's page-break property; later table rows may continue with repeated headers. These checks detect omitted rows, orphaned comparison headings and blank body pages; they supplement visual inspection of every rendered page rather than establishing layout quality by themselves.
 
 The PDF renderer is [ReportLab 4.4.9](https://pypi.org/project/reportlab/4.4.9/) under its BSD license. Word generation uses [python-docx 1.2.0](https://pypi.org/project/python-docx/1.2.0/) under the MIT license. Their installed distributions preserve the upstream notices, including the bundled font license. Report generation does not provide authentication; use FlowBench on loopback or the intended trusted network.
+
+## Endpoint/context privacy
+
+Current main extends report snapshots with captured endpoint and initiating-context evidence. PDF/Word regressions and rendered-page review are recorded in [verification](verification.md). Published rc.2 downloads do not include this addition.
+
+On that branch, default redaction removes execution hostnames, local/remote/control/destination addresses, ports, IPv6 scopes, socket IDs and initiating web-peer fields, including nested or arbitrary future copies. Selecting raw evidence does not bypass redaction. Only safe availability/count/family/protocol categories remain. Full JSON/XML exports remain sensitive unredacted evidence.
+
+Unredacted output labels the capturing process/container namespace, each reporter's local/remote perspective, declared versus numeric destinations and proxy/NAT uncertainty. Current viewing context is not substituted into a saved run. Endpoint/context changes are included in preview fingerprints, so changed evidence requires a fresh preview. See [endpoint interpretation and sharing](test-endpoints.md).

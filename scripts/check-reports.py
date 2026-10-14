@@ -27,6 +27,7 @@ from app.reports import prepare_report, render_pdf, render_docx
 from app.runner import RunManager, settings_from
 from app.time_quality import time_quality_result
 from app.checks import prepare_check, initial_result, summarize_check, check_run_status, validate_check_record
+from app.endpoints import derive_endpoints, observe_iperf_start
 
 
 def check_fixture(check_type, run_id="e" * 32, partial=False):
@@ -133,6 +134,17 @@ def main():
         manager = RunManager(archive, "missing-iperf")
         try:
             before = fixture()
+            # Synthetic native socket observations, distinct from the synthetic
+            # HTTP controller. No host identity lookup or network work occurs.
+            before["endpoints"] = observe_iperf_start(before, {
+                "test_start": {"protocol": "TCP"}, "connecting_to": {"host": "192.0.2.10"},
+                "connected": [{"socket": 7, "local_host": "192.0.2.11", "local_port": 43117,
+                               "remote_host": "192.0.2.10", "remote_port": 5201},
+                              {"socket": 8, "local_host": "fe80::11%fixture_scope", "local_port": 43118,
+                               "remote_host": "2001:db8::10", "remote_port": 5201}]})
+            before["endpoints"]["execution_hostname"] = "synthetic-container.example"
+            before["initiator_context"] = {"schema_version": 1, "observed_at": "2026-01-01T10:00:00Z",
+                                           "source": "wsgi_remote_addr", "peer": {"address": "203.0.113.19", "port": None, "family": 4}}
             project = ProjectStore(manager).create({"name": "Synthetic circuit change", "description": "Disposable comparison fixture"})
             before["settings"]["project_id"] = project["id"]
             after = copy.deepcopy(before)
@@ -165,10 +177,20 @@ def main():
                       "results": {name: [index + 1, index + 2, None, index + 4]
                                   for index, name in enumerate(sorted(RRUL_TCP | RRUL_RTT))}}
             flent["flent"] = normalize_flent(native, "Synthetic fixture")
+            flent.pop("endpoints", None)
+            flent["endpoints"] = derive_endpoints(flent)
+            flent["endpoints"]["execution_hostname"] = "synthetic-container.example"
             manager.save(flent)
             for check_type, run_id in (("dns", "e" * 32), ("loss", "f" * 32)):
-                manager.save(check_fixture(check_type, run_id))
+                captured = check_fixture(check_type, run_id)
+                captured["endpoints"] = derive_endpoints(captured)
+                captured["endpoints"]["execution_hostname"] = "synthetic-container.example"
+                captured["initiator_context"] = copy.deepcopy(before["initiator_context"])
+                manager.save(captured)
                 rerun = check_fixture(check_type, ("8" if check_type == "dns" else "9") * 32, partial=True)
+                rerun["endpoints"] = derive_endpoints(rerun)
+                rerun["endpoints"]["execution_hostname"] = "synthetic-container.example"
+                rerun["initiator_context"] = copy.deepcopy(before["initiator_context"])
                 rerun["lineage"] = {"schema_version": 1, "action": "run_again", "source_run_id": run_id, "external_source_id": None}
                 manager.save(rerun)
             for name, ids, redact in (("single", [before["id"]], False), ("comparison-redacted", comparison_ids, True), ("flent", [flent["id"]], False),

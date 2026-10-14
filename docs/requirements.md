@@ -4,6 +4,8 @@
 
 FlowBench's current main (`0.2.0-dev`) is a portable measurement/evidence workspace with iPerf3 throughput, standalone DNS and ICMP checks, projects, incoming capture, history/import, comparisons, reports and saved configuration. Ubuntu native AMD64/ARM64 containers and SQLite persistence are part of this development version. The GitHub repository is `flowbench`; existing local checkout, image tag and archive paths remain compatible. Published rc.1 and rc.2 downloads retain their original feature sets.
 
+Current main includes [captured endpoint and execution-context evidence](test-endpoints.md), delivered through PR24. Published rc.2 downloads do not contain this addition. Exact-source CI, browser/report checks and remaining limits are recorded in [verification](verification.md).
+
 | Area | Current implementation | Acceptance boundary |
 | --- | --- | --- |
 | Client configuration and measurement | TCP/UDP/Both, explicit directions, default bidirectional, bounded validation, logs/local and available remote reports | Peer compatibility, real network conditions and target performance need evaluation |
@@ -12,6 +14,7 @@ FlowBench's current main (`0.2.0-dev`) is a portable measurement/evidence worksp
 | Incoming listener | Managed independent process, raw client captures, one incoming at a time, restart/stop/error and overlap metadata | No unlimited concurrency or guaranteed measurement isolation |
 | Route evidence | Once-per-test bounded preflight tracepath/tracert, ordered observations, offline optional approximate public-IP map and read-only local clock context | Approximate network locations do not establish a physical route or bottleneck; no guaranteed clock accuracy or independently NTP-verified timestamps; passive incoming capture cannot pretrace an unknown peer |
 | Standalone checks and reruns | Merged typed DNS query and ICMP echo observations, same-type terminal comparisons, reports and new executions from saved configuration | ICMP nonresponse is not UDP/application loss; unknown evidence stays unavailable; current peer/tool/permission support is rechecked |
+| Endpoint context | Captured runtime hostname, per-reporter sockets, typed destinations and separate initiating/current web context; strict imports and report redaction | Process/container namespace is not verified physical identity or NAT/public egress; missing evidence stays unavailable |
 | UI | Supplied FlowBench logo, tagline, gunmetal/navy/crimson, flat measured cards, responsive layouts, visible focus/errors | Targeted browser QA is not a full WCAG certification or full audit closure |
 | R13 profiles/thresholds | Pending | Presets are not automatic threshold evaluation |
 | R14 reports | Merged PDF/DOCX for completed measured tests and terminal same-type diagnostic checks, individual or selected comparisons, with normalized preview and redaction | Resource budgets, font coverage and evidence gates apply; rendered fixtures and targeted testing do not establish full canonical acceptance |

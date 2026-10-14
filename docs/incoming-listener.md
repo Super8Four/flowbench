@@ -38,3 +38,9 @@ Cross-origin browser writes and non-JSON control requests are rejected. This is 
 Set `FLOWBENCH_RESUME_LISTENER=0` before maintenance CLI operations/exports to prevent saved listener startup. This suppresses startup for that process without altering configuration. Full backups include the listener metadata; legacy rollback exports do not provide automatic listener resume in the old application.
 
 This feature does **not** implement R17 authenticated FlowBench-to-FlowBench coordination, peer authorization, instance pairing or cross-instance correlation. Those remain pending.
+
+## Endpoint perspective
+
+Current main retains numeric socket/control-peer context when the tool supplies it. Incoming pairs use the accepting reporter's local/remote perspective; accepted control-port evidence is not relabelled as a data-stream port. The execution hostname can identify a container namespace rather than the physical host.
+
+A managed incoming session has no inferred initiating browser request: an external iPerf client started its traffic. An explicit web-requested incoming Run again receives fresh initiating context for its new bounded wait. That web peer can be a proxy, is separate from traffic endpoints and does not prove the remote client's public identity. Current viewer context never fills missing historical values. See [Test endpoints](test-endpoints.md); existing rc.2 downloads do not contain this addition.

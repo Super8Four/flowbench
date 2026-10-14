@@ -3,6 +3,7 @@ import {rateScale, formatRate, formatMbps, runColor, palette} from './units.js';
 import {displayTimestamp, initTimestamps} from './timestamps.js';
 import {createChecks, isCheck, checkComparable, checkLabel, checkSummary, renderCheckComparison} from './checks.js';
 import {createAttempt, createRunActions, loadSavedDraft, renderLineage, comparisonEligible, comparisonQuery} from './run-actions.js';
+import {createEndpointPanel} from './endpoints.js';
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped']);
 let runs = [], activeId = null, selectedId = null, selected = null, events = [];
@@ -33,6 +34,10 @@ const checks = createChecks({escape, number, date, controls, typeChanged: () => 
   metadata: () => ({label: $('label').value, notes: $('notes').value, ...$('draft-color')?.value ? {color: $('draft-color').value} : {}, ...workflows.settings()})});
 const startAttempt = createAttempt({api, start: started, status: message, retryButton: $('start-retry')});
 const runActions = createRunActions({api, start: started, selected: () => selected, active: () => activeId, load: loadDraft});
+const endpointPanel = createEndpointPanel({api, escape, date, draft: () => checks.type() === 'iperf'
+  ? {settings: settingsData()} : {kind: 'diagnostic-check', check_type: checks.type(), settings: checks.settings()}});
+$('test-form')?.addEventListener('input', () => endpointPanel.refresh());
+$('test-form')?.addEventListener('change', () => endpointPanel.refresh());
 async function started(run) { activeId = run.id; controls(); await selectRun(run.id); await loadHistory(); }
 function selectedReportIds() {
   if ($('comparison')) {
@@ -355,6 +360,7 @@ function renderPeer() {
 }
 function renderSelected() {
   if (!selected) return;
+  endpointPanel.render(selected);
   const phase = selected.preflight?.status === 'pending' && !terminal.has(selected.status) ? 'Preflight running' : selected.status[0].toUpperCase() + selected.status.slice(1);
   if ($('session-status').textContent !== phase) $('session-status').textContent = phase;
   $('session-date').textContent = date(selected.created_at);
@@ -404,7 +410,9 @@ async function selectRun(id) {
   if (!testPage) { location.href = `/?run=${encodeURIComponent(id)}`; return; }
   selectionVersion++;
   selectedId = id; selected = null; events = [];
-  await loadSelected(true);
+  endpointPanel.loading(id);
+  try { await loadSelected(true); }
+  catch (error) { if (selectedId === id) endpointPanel.failed(id); throw error; }
   if (!selected || selected.id !== id) return;
   $('annotation-card').classList.remove('d-none');
   $('saved-label').value = selected.settings.label;
@@ -798,6 +806,7 @@ async function tick() {
   finally { setTimeout(tick, 800); }
 }
 async function init() {
+  endpointPanel.init();
   try {
     const status = await api('/api/status');
     renderStatus(status);
@@ -812,7 +821,7 @@ async function init() {
       if (query.get('run') || activeId) await selectRun(query.get('run') || activeId);
     }
     await compare();
-    initTimestamps(() => { renderHistory(); comparisonOptions(); if (selected) renderSelected(); if (comparisonData) renderComparison(); workflows.refreshDates(); });
+    initTimestamps(() => { renderHistory(); comparisonOptions(); if (selected) renderSelected(); else endpointPanel.refresh(); if (comparisonData) renderComparison(); workflows.refreshDates(); });
   } catch (error) { message(error.message); }
   tick();
 }

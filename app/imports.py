@@ -203,7 +203,7 @@ def prepare_run(data, filename, allow_job=False):
             if data["settings"].get("flent_workload") != "rrul":
                 raise ValueError("Flent runs must retain their native RRUL workload settings.")
             record["settings"]["flent_workload"] = "rrul"
-        for key in ("metrics", "effective_settings", "series", "peer", "raw_stdout", "raw_stderr", "events", "request_id", "execution_request"):
+        for key in ("metrics", "effective_settings", "series", "peer", "endpoint_view", "raw_stdout", "raw_stderr", "events", "request_id", "execution_request"):
             record.pop(key, None)
         record["created_at"] = timestamp(data.get("created_at"))
         record["finished_at"] = timestamp(data.get("finished_at"), optional=True)
@@ -273,6 +273,8 @@ def prepare_run(data, filename, allow_job=False):
                   "native_result": data, "test_parameters": params}
         events = [{"sequence": 1, "timestamp": record["created_at"], "source": "stdout",
                    "message": json.dumps(data, indent=2, ensure_ascii=False)}]
+        from .endpoints import derive_endpoints
+        record["endpoints"] = derive_endpoints(record)
     else:
         raise ValueError("File is not a saved run or native iperf3 -J result.")
     if not isinstance(record.get("summary"), dict) or not isinstance(record.get("intervals"), list):
@@ -313,6 +315,11 @@ def prepare_run(data, filename, allow_job=False):
     if route is not None:
         from .route import validate_route
         validate_route(route)
+    from .endpoints import validate_endpoints, validate_context
+    if "endpoints" in record:
+        validate_endpoints(record["endpoints"], record)
+    if "initiator_context" in record:
+        validate_context(record["initiator_context"])
     record.update(id=uuid4().hex, event_count=len(events),
                   imported={"at": now(), "filename": filename[:255], "source_id": source_id,
                             "sha256": digest, "format": "app" if "settings" in data else "native-iperf"})

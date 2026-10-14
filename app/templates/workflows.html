@@ -3,6 +3,38 @@
 {% for key in ['site','device','circuit','ticket'] %}<div class="col-6"><label class="form-label" for="{{ prefix }}{{ key }}">{{ key|capitalize }}</label><input id="{{ prefix }}{{ key }}" class="form-control" maxlength="100"></div>{% endfor %}
 </div>
 {% endmacro %}
+{% macro endpoints() %}
+<section id="test-endpoints" class="card endpoint-panel" aria-labelledby="endpoint-heading">
+  <div class="card-header d-flex align-items-center flex-wrap gap-2"><h2 id="endpoint-heading" class="card-title">Test endpoints</h2><span id="endpoint-status" class="endpoint-state ms-auto">No attempt selected</span></div>
+  <div class="card-body">
+    <p id="endpoint-scope" class="endpoint-scope">Tests execute in FlowBench. Your browser controls the test; its web connection is separate from measured traffic.</p>
+    <div class="endpoint-cards">
+      <section class="endpoint-card" aria-labelledby="endpoint-execution-heading"><h3 id="endpoint-execution-heading" class="fs-6">FlowBench execution</h3>
+        <dl class="endpoint-values"><dt id="endpoint-runtime-label">Current runtime name</dt><dd><code id="endpoint-runtime-host">Unavailable</code></dd><dt>Measured local endpoint</dt><dd><code id="endpoint-local">Unavailable</code></dd><dt>Requested local bind</dt><dd id="endpoint-requested-bind">Unavailable</dd></dl>
+        <button id="endpoint-copy-local" type="button" class="btn btn-sm btn-outline-secondary" disabled>Copy execution details</button>
+      </section>
+      <section class="endpoint-card" aria-labelledby="endpoint-peer-heading"><h3 id="endpoint-peer-heading" class="fs-6">Test peer</h3>
+        <dl class="endpoint-values"><dt id="endpoint-peer-label">Measured peer</dt><dd><code id="endpoint-peer">Unavailable</code></dd><dt>Requested target / settings</dt><dd id="endpoint-requested-target">Not selected</dd></dl>
+        <button id="endpoint-copy-peer" type="button" class="btn btn-sm btn-outline-secondary" disabled>Copy peer details</button>
+      </section>
+    </div>
+    <p id="endpoint-provenance" class="form-text mt-3 mb-1">No recorded endpoint evidence selected.</p>
+    <details id="endpoint-connections" class="endpoint-disclosure"><summary id="endpoint-connections-summary">Recorded connections</summary>
+      <p id="endpoint-namespace-note" class="form-text mt-2">Runtime names and local addresses refer to the reporting process/container; no physical host or public egress is inferred.</p><p class="form-text">Upload is client to server; download is server to client, including bidirectional tests.</p>
+      <div class="table-responsive mt-3" tabindex="0" aria-label="Recorded data socket endpoints"><table class="table"><caption>Data sockets: local and remote are relative to the named reporter.</caption><thead><tr><th scope="col">Reporter</th><th scope="col">Role</th><th scope="col">Socket ID</th><th scope="col">Protocol</th><th scope="col">Reporter local</th><th scope="col">Reporter remote</th></tr></thead><tbody id="endpoint-socket-rows"><tr><td colspan="6">No recorded data sockets.</td></tr></tbody></table></div>
+      <div class="table-responsive" tabindex="0" aria-label="Accepted control peers"><table class="table"><caption>Accepted control peers. These ports are not data-stream ports.</caption><thead><tr><th scope="col">Reporter</th><th scope="col">Control peer</th></tr></thead><tbody id="endpoint-control-rows"><tr><td colspan="2">No accepted control peer recorded.</td></tr></tbody></table></div>
+      <div class="table-responsive" tabindex="0" aria-label="Check and tool destinations"><table class="table"><caption>Check destinations and tool declarations. Their source does not establish a local socket.</caption><thead><tr><th scope="col">Purpose</th><th scope="col">Address</th><th scope="col">Reported host</th><th scope="col">Transport</th><th scope="col">Evidence source</th></tr></thead><tbody id="endpoint-destination-rows"><tr><td colspan="5">No recorded destination.</td></tr></tbody></table></div>
+    </details>
+    <details id="endpoint-web-context" class="endpoint-disclosure"><summary>Web control context — separate from test traffic</summary>
+      <p class="form-text mt-2">These are immediate web request peers as seen by FlowBench. A proxy or local connection may appear here. They do not establish the browser device's address or the measured traffic source.</p>
+      <dl class="endpoint-values"><dt>Saved initiating web peer</dt><dd id="endpoint-saved-web">Not recorded</dd><dt>Current viewing web peer</dt><dd id="endpoint-current-web">Loading current viewing context…</dd><dt>Current viewing runtime name</dt><dd id="endpoint-current-runtime">Unavailable</dd></dl>
+      <button id="endpoint-copy-web" type="button" class="btn btn-sm btn-outline-secondary" disabled>Copy web context</button>
+    </details>
+    <p id="endpoint-copy-feedback" class="endpoint-copy-feedback form-text mb-0" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="endpoint-copy-fallback" class="mt-3" hidden><label for="endpoint-copy-value" class="form-label">Endpoint details for manual copy</label><textarea id="endpoint-copy-value" class="form-control" rows="5" readonly></textarea></div>
+  </div>
+</section>
+{% endmacro %}
 {% macro check_fields() %}
 <fieldset id="dns-fields" class="measurement-fields" hidden disabled><legend class="fs-6">DNS lookup</legend>
 <label for="dns-target" class="form-label">DNS name or PTR IP address</label><input id="dns-target" class="form-control mb-3" required autocomplete="off"><p class="form-text">Enter the full name to query. No public target or resolver is selected automatically. PTR accepts a numeric IP address.</p>

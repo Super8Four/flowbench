@@ -12,4 +12,6 @@ Current main (`0.2.0-dev`) includes projects/baselines, bounded sequential matri
 
 PRs [#10](https://github.com/Super8Four/flowbench/pull/10) and [#21](https://github.com/Super8Four/flowbench/pull/21) merged into main `22f15addf6b0e232bbe6dcf44d57705ce9b546b3`. Its tree matches the tested `010177c5b85802dd89779e3d530965a5867efeba` feature source. This identifies the delivered code; exact CI results and screenshot/render provenance belong in [verification](verification.md), rather than being inferred from a moving main badge.
 
+[Test endpoints](test-endpoints.md), delivered through [PR24](https://github.com/Super8Four/flowbench/pull/24), distinguish captured execution hostname and numeric socket/destination evidence from requested settings and separate web-control context. Historical views do not rewrite records or substitute current-host values. Existing rc.2 downloads remain unchanged.
+
 Profiles/thresholds, retention, authentication and authenticated instance coordination remain pending. Keep the API within a trusted access boundary. Target Pi deployment, hardware power-loss recovery and full requirements/WCAG/audit acceptance remain unverified. See [remaining requirements](requirements.md).
