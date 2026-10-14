@@ -156,10 +156,16 @@ body { font-size: 1rem; line-height: 1.5; background: var(--workspace-bg); }
 .app-content-header { padding-top: 28px; padding-bottom: 24px; }
 .app-content { padding-bottom: 32px; }
 .container-fluid { max-width: 1680px; }
-.brand-link { display: block; padding: 10px 16px; }
-.sidebar-brand { min-height: 92px; height: auto; }
-.brand-logo { display: block; background: #f8fafc; border-radius: 6px; padding: 4px 8px; }
+.brand-link { display: flex; align-items: center; width: 100%; min-height: 80px; padding: 16px; }
+.sidebar-brand { min-height: 80px; height: auto; }
+.brand-logo { display: block; width: 100%; background: transparent; }
 .brand-logo img { display: block; width: 100%; height: auto; object-fit: contain; }
+.header-brand-link { display: none; }
+.header-brand-logo { display: block; width: 116px; height: auto; }
+@media (max-width: 991px) {
+  .header-brand-link { display: flex; align-items: center; min-height: 44px; flex-shrink: 0; }
+  .workspace-title { display: none; }
+}
 .sidebar-caption { text-transform: none; letter-spacing: .04em; font-size: .75rem; margin-top: 20px; }
 .sidebar-menu .nav-link { min-height: 44px; display: flex; align-items: center; gap: 10px; }
 .sidebar-menu .nav-link.active { background: var(--flowbench-navy); box-shadow: inset 3px 0 var(--flowbench-crimson); }

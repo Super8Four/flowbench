@@ -2,48 +2,56 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](assets/badges/container.svg)](setup-and-testing.md) [![Architecture](assets/badges/platform.svg)](setup-and-testing.md) [![Python](assets/badges/python.svg)](setup-and-testing.md) [![SQLite](assets/badges/storage.svg)](sqlite-storage.md) [![iPerf3](assets/badges/engine.svg)](protocol-tests.md)
 
-## Repeatable checks
+## Current source and repeatable checks
 
-Run `python -m unittest discover -s tests -v` with a verified iPerf3 engine. All 89 tests passed locally on Windows with Python 3.12 and the pinned 3.22 engine. The suite covers SQLite migration/rollback/import/export, simultaneous readers/capture/notes, actual lock contention/page exhaustion, denied writes, interrupted transactions/recovery, protocol job identity/outcomes, and managed listener raw-client captures, stop/resume/errors. Native Linux additionally executes UDP bidirectional; Windows checks its explicit rejection.
+Current main is unreleased `0.2.0-dev`, including measurement workflows, actual optional Linux Flent and PDF/Word reports. The latest published downloads remain rc.2. Use the exact source SHA and terminal CI run, rather than a changing badge, to identify tested code. [Testing](testing.md) maps meaningful checks and platform limits; [lifecycle](lifecycle.md) describes review and release evidence.
 
-The branch CI builds Ubuntu images on native AMD64 and ARM64 runners, runs the suite inside each image, then `scripts/check-container.py`. That script creates its own disposable container and volume, tests legacy migration, real TCP/UDP/Both, remote reports, JSON/XML round trips, managed incoming clients, independent overlap, resume without duplication, graceful incoming/outgoing stop and evidence/preset persistence after replacement. It verifies architecture, non-root/read-only runtime and SQLite integrity. No production Compose project/archive or live target is used.
+Run `python -m unittest discover -s tests -v` with the verified engine and dependencies. Source/Windows and native AMD64/ARM64 workflows exercise archive transaction/concurrency/error/restart, JSON/XML import/export, protocol/listener behavior, measurement workflows, report privacy, native Flent and report rendering. Node-dependent wrappers can skip in the Node-free image; actual controller behavior is exercised separately in the source job. Read the test summary, including skips, for the exact commit.
 
-Release publication requires terminal success for both native jobs at the exact source commit, followed by checked artifact hashes/OCI revision labels and verification that the release tag resolves to that commit. The live branch badge follows the named feature branch; it does not represent main or a stable release. The release page records the exact source and run.
+## Current browser captures
 
-## Browser QA
+The gallery shows the actual application with a disposable SQLite archive and synthetic completed records, not an SVG reconstruction of the interface. Graphics are self-contained SVG; screenshots remain raster images. The supplied original logo/PNG remain unchanged. Its dark-surface SVG uses the identical outlines, a light foreground/navy tint and unchanged crimson, with transparent clear space. The sidebar and mobile header render it directly without a white plaque. See [asset usage](brand-assets.md).
 
-The UI was checked through the actual Edge browser with a disposable loopback fixture and synthetic records at CSS viewports 1440×1000, 375×843 and 843×375. Checks included wrapping, scrolling tables, three-test comparison, keyboard skip/sidebar navigation, listener validation/error-summary focus, missing remote evidence, empty search results and reduced-motion styling. Injected archive failure showed the error and disabled listener/outgoing controls; restoring access restored normal state. No application console errors were observed. Screenshots retain the supplied logo; private reference pictures are excluded. Browser captures below show the actual UI with synthetic measurements and reserved example endpoints.
-
-Targeted checks do not certify full WCAG compliance, close all UI/audit requirements, establish hardware durability/power-loss recovery or demonstrate a Pi deployment. Full/comparison charts draw measured samples directly and break paths across missing spans. History sparklines are bounded summaries with their own scale. Available controls/data remain limited to the implementation described in [requirements](requirements.md).
+Targeted browser checks cover the seven application routes, desktop 1440×1000, mobile 375×842 and landscape 842×375, navigation opening/closing, keyboard focus and page overflow. These checks do not establish full WCAG certification, physical Pi deployment, external network performance or power-loss durability.
 
 ### Test and export
 
-![Synthetic desktop test results](assets/test-desktop.jpg)
+![Synthetic current desktop test](assets/integrated-test-desktop.jpg)
 
 ### Persistent history
 
-![Synthetic desktop history](assets/history-desktop.jpg)
+![Synthetic current history](assets/integrated-history-desktop.jpg)
 
-### Three-test comparison
+### Five mixed-duration tests
 
-![Synthetic three-test comparison](assets/comparison-desktop.jpg)
+![Synthetic current five-test comparison](assets/integrated-comparison-desktop.jpg)
 
-### Configuration and incoming capture
+### Before/after projects
 
-![Stopped managed listener configuration](assets/configuration-desktop.jpg)
+![Synthetic current project baseline](assets/integrated-projects-desktop.jpg)
 
-### Mobile
+### Incoming capture and configuration
 
-![Synthetic mobile test results](assets/test-mobile.jpg)
+![Stopped current incoming capture](assets/integrated-incoming-desktop.jpg)
 
-![Mobile listener configuration](assets/configuration-mobile.jpg)
+![Current configuration](assets/integrated-configuration-desktop.jpg)
 
-## 0.1.0-rc.2 vector logo checks
+### Server presets
 
-The supplied SVG was inspected as actual browser pixels at large and sidebar sizes before integration. It contains only SVG/title/description/path elements with outlined lettering and solid brand fills; there are no scripts, fonts, embedded raster, links or external dependencies. New checks verify this safe asset contract, HTTP MIME/bytes, accessible SVG preference and PNG fallback across pages. Container lifecycle checks fetch both assets from the running image and compare the app/image version. Exact-source native CI results are linked in the release notes.
+![Current presets without external traffic](assets/integrated-servers-desktop.jpg)
 
-The SVG update was also checked in the actual app on desktop and mobile. The gallery captures above and below have been refreshed for rc.2 with synthetic records; rc.1 keeps its original screenshots in the immutable tag.
+### Mobile and landscape
 
-![SVG logo in the desktop app](assets/svg-logo-desktop.jpg)
+![Current mobile test page](assets/integrated-test-mobile.jpg)
 
-![SVG logo in the mobile navigation](assets/svg-logo-mobile.jpg)
+![Transparent logo in current mobile navigation](assets/integrated-navigation-mobile.jpg)
+
+![Current mobile landscape navigation](assets/integrated-navigation-landscape.jpg)
+
+## Report-download verification boundary
+
+Actual UI requests produced valid redacted individual and five-run PDF/DOCX responses. Repeat requests, invalidated previews, the genuine stale-fingerprint rejection and controlled generation-error recovery were exercised. Supported browser download methods timed out for both the app and a plain local attachment control; final browser file saves remain unconfirmed. Captured HTTP response bodies are not browser-saved artifacts. This documented limitation was accepted for integration and is not reported as a passed browser save.
+
+## Historical prerelease evidence
+
+The rc.1/rc.2 tags retain their original verification pages and screenshots. At rc.2, 89 local Windows tests and both exact-source native jobs passed, with the original SVG preferred over PNG on a light sidebar plaque. Those screenshots and downloads describe that historical release, not the current transparent integration. The [rc.2 release notes](release-0.1.0-rc.2.md) identify its source and checks; existing published tags/assets remain immutable.

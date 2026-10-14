@@ -121,8 +121,11 @@ catalog = dict(schema_version=1, presets=[normalize(dict(name='Legacy preset', s
         assert b'data-bs-theme="dark"' in request("/", raw=True)
         assert b'brand/flowbench-logo.svg' in request('/', raw=True)
         assert b'brand/flowbench-logo.png' in request('/', raw=True)
+        assert b'brand/flowbench-logo-dark.svg' in request('/', raw=True)
         svg = request('/static/brand/flowbench-logo.svg', raw=True)
         assert b'<path ' in svg and b'<image' not in svg and b'<script' not in svg
+        dark_svg = request('/static/brand/flowbench-logo-dark.svg', raw=True)
+        assert b'<path ' in dark_svg and b'<rect' not in dark_svg and b'<image' not in dark_svg and b'<script' not in dark_svg
         assert request('/static/brand/flowbench-logo.png', raw=True).startswith(b'\x89PNG\r\n\x1a\n')
         version = docker('exec', name, 'python', '-c', 'from app.version import __version__; print(__version__)')
         assert status['version'] == version
