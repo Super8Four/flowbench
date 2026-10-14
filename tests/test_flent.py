@@ -192,7 +192,7 @@ class FlentRunnerTests(unittest.TestCase):
         return launch
 
     def run_fixture(self, **kwargs):
-        with patch("app.runner.subprocess.Popen", side_effect=self.fixture(**kwargs)), patch("app.flent.stop_process") as stop:
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", side_effect=self.fixture(**kwargs)), patch("app.flent.stop_process") as stop:
             record = self.manager.start_flent(payload())
             self.manager.worker.join(10)
         self.assertFalse(self.manager.worker.is_alive())
@@ -237,7 +237,7 @@ class FlentRunnerTests(unittest.TestCase):
         self.assertIn("incomplete", record["error"])
 
     def test_unavailable_invalid_and_disk_failure_before_launch(self):
-        with patch("app.runner.subprocess.Popen") as launch:
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
             self.manager.flent_capabilities["available"] = False
             with self.assertRaises(RuntimeError): self.manager.start_flent(payload())
             self.manager.flent_capabilities["available"] = True

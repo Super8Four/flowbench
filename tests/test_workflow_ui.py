@@ -51,8 +51,9 @@ class WorkflowUiTests(unittest.TestCase):
 
     def test_probes_and_flent_require_explicit_selection(self):
         page = self.page('/')
-        for identifier in ('latency', 'endpoint_health', 'mtu', 'traceroute', 'flent-confirm'):
+        for identifier in ('latency', 'endpoint_health', 'mtu', 'flent-confirm'):
             self.assertNotIn('checked', page.control(identifier))
+        self.assertFalse(any(attributes.get('id') == 'traceroute' for _, attributes in page.items))
         self.assertIn('disabled', page.control('flent-start'))
         self.assertEqual(page.control('flent-start')['type'], 'button')
         self.assertEqual(page.control('matrix-start')['type'], 'button')
@@ -65,6 +66,14 @@ class WorkflowUiTests(unittest.TestCase):
                 self.assertNotIn('checked', page.control('report-raw'))
                 self.assertIn('disabled', page.control('report-download'))
                 self.assertIn('disabled', page.control('report-preview-button'))
+
+    def test_incoming_listener_waits_for_saved_settings_before_editing_or_starting(self):
+        page = self.page('/configuration')
+        self.assertEqual(page.control('listener-form')['aria-busy'], 'true')
+        for identifier in ('listener-bind', 'listener-port', 'listener-duration', 'listener-label',
+                           'listener-notes', 'listener-start', 'listener-stop'):
+            self.assertIn('disabled', page.control(identifier))
+        self.assertEqual(page.control('listener-loading')['role'], 'status')
 
     def test_comparison_can_add_rows_and_rate_labels_are_dynamic(self):
         page = self.page('/comparison')
@@ -84,6 +93,15 @@ class WorkflowUiTests(unittest.TestCase):
 
 
 class JavaScriptWorkflowTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('node'), 'Node is absent; the source CI job runs this isolated JavaScript controller fixture.')
+    def test_listener_initial_settings_gate_and_validation_preserve_user_edits(self):
+        script = Path(__file__).resolve().with_name('listener-ui-behavior.mjs')
+        module = Path(application.__file__).resolve().parent / 'static' / 'app.js'
+        result = subprocess.run([shutil.which('node'), str(script), str(module)],
+                                text=True, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Listener UI behavior passed:', result.stdout)
+
     @unittest.skipUnless(shutil.which('node'), 'Node is absent; the host CI step runs the isolated JavaScript behavior test.')
     def test_flent_requests_and_reload_preserve_ip_family(self):
         script = Path(__file__).resolve().with_name('workflows-flent-behavior.mjs')

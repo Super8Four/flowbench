@@ -3,7 +3,23 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 
 class Element {
-  constructor(value = '') { this.value = value; this.textContent = ''; this.innerHTML = ''; this.dataset = {}; this.classList = {add() {}, remove() {}, toggle() {}}; }
+  constructor(value = '') { this.value = value; this.textContent = ''; this.html = ''; this.writes = 0; this.rows = []; this.dataset = {}; this.classList = {add() {}, remove() {}, toggle() {}}; }
+  get innerHTML() { return this.html; }
+  set innerHTML(value) {
+    this.html = value; this.writes++;
+    this.rows = [...value.matchAll(/<tr data-run-id="([^"]+)">([\s\S]*?)<\/tr>/g)].map(([, id, content]) => {
+      const row = {dataset: {runId: id}, controls: [], querySelectorAll() { return this.controls; }};
+      row.controls = [...content.matchAll(/<(button|a)\b([^>]+)>/g)].map(([, tag, attributes]) => ({
+        tagName: tag.toUpperCase(), attributes: Object.fromEntries([...attributes.matchAll(/([\w-]+)="([^"]*)"/g)].map((match) => [match[1], match[2]])),
+        getAttribute(key) { return this.attributes[key] ?? null; }, closest() { return row; },
+        focus() { document.activeElement = this; },
+      }));
+      return row;
+    });
+  }
+  contains(element) { return this.rows.some((row) => row.controls.includes(element)); }
+  querySelectorAll() { return this.rows; }
+  focus() { document.activeElement = this; }
   addEventListener() {}
   setAttribute() {}
 }
@@ -34,14 +50,14 @@ globalThis.fetch = async (path) => {
   return {ok: true, status: 200, json: async () => data};
 };
 const moduleUrl = process.argv[2] ? pathToFileURL(process.argv[2]).href : new URL('../app/static/app.js', import.meta.url).href;
-await import(moduleUrl);
+const {replaceHistoryContent} = await import(moduleUrl);
 for (let attempt = 0; attempt < 20 && !elements.get('history-body').innerHTML; attempt++) {
   await new Promise((resolve) => setImmediate(resolve));
 }
 const rendered = elements.get('history-body').innerHTML;
 assert.match(rendered, /Historical fixture/);
 assert.match(rendered, /Valid fixture/);
-assert.equal((rendered.match(/<tr>/g) || []).length, 2, 'The invalid historical row must remain visible.');
+assert.equal((rendered.match(/<tr data-run-id=/g) || []).length, 2, 'The invalid historical row must remain visible.');
 assert.equal((rendered.match(/role="note" aria-label="Stored measurement warning"/g) || []).length, 1);
 assert.match(rendered, /Interval measurements unavailable/);
 assert.match(rendered, /raw captured evidence is preserved/);
@@ -53,4 +69,19 @@ assert.match(rendered, /3 Gbps/, 'Unaffected interval peaks must still render.')
 assert.equal(elements.get('history-count').textContent, '2 of 2 saved sessions');
 assert.ok(requests.includes('/api/runs'));
 assert.equal(elements.get('message').textContent, '', 'A bad historical row must not break the entire page.');
-console.log('History warning UI behavior passed: visible escaped warning, unavailable intervals, valid summaries and unaffected rows retained.');
+const body = elements.get('history-body');
+const fixtureRows = (second = 'Other row') => `<tr data-run-id="stable"><td><button data-open="stable">Title</button><a href="/projects?project=fixture">Project</a><button data-open="stable">Open</button><button data-export="stable">Export</button></td></tr><tr data-run-id="other"><td>${second}</td></tr>`;
+replaceHistoryContent(body, fixtureRows());
+const projectChip = body.rows[0].controls[1]; projectChip.focus();
+const before = body.writes;
+replaceHistoryContent(body, fixtureRows());
+assert.equal(body.writes, before, 'Unchanged polling must retain existing history DOM.');
+assert.equal(document.activeElement, projectChip, 'Unchanged polling must preserve project-chip focus.');
+replaceHistoryContent(body, fixtureRows('Updated measurement'));
+assert.equal(document.activeElement.getAttribute('href'), '/projects?project=fixture', 'Changed rows restore the same project control.');
+body.rows[0].controls[2].focus();
+replaceHistoryContent(body, fixtureRows('Updated again'));
+assert.equal(document.activeElement, body.rows[0].controls[2], 'Duplicate open actions retain their control position.');
+replaceHistoryContent(body, '<tr><td>No matching saved sessions.</td></tr>');
+assert.equal(document.activeElement, elements.get('history-search'), 'Removing the focused row returns focus to search.');
+console.log('History warning UI behavior passed: visible escaped warning, unavailable intervals, valid summaries, unchanged DOM and focus retained across history updates.');

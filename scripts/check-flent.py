@@ -77,6 +77,9 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
             "stdout": record["raw_stdout"][-12000:], "stderr": record["raw_stderr"][-16000:]
         }, ensure_ascii=False), flush=True)
         assert record["status"] == "completed", record
+        assert record['preflight']['policy'] == 'once_per_test' and record['preflight']['phase'] == 'before_traffic'
+        assert record['preflight']['finished_at'] and record['preflight']['time_quality']['ntp_verified'] is False
+        assert record['route']['phase'] == 'before_traffic' and len(record['route']['hops']) <= 16
         assert record["flent"]["status"] == "captured", record["flent"]
         assert record["flent"]["data"]["metadata"]["NAME"] == "rrul"
         rates = [r for r in record["flent"]["summaries"] if r["unit"] == "Mbits/s" and r["mean"] is not None]
@@ -87,6 +90,8 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
             content = xml_export(record).decode() if xml else json.dumps(record)
             imported = client.post("/api/runs/import", json={"content": content, "filename": "rrul.xml" if xml else "rrul.json"})
             assert imported.status_code == 200, imported.get_json()
+            imported_id = (imported.get_json()['imported'] or imported.get_json()['duplicates'])[0]
+            assert manager.export(imported_id)['preflight'] == record['preflight']
         # A second actual RRUL is cancelled while its TCP children are active.
         payload["duration"] = 30
         response = client.post("/api/flent", json=payload)
@@ -111,6 +116,7 @@ with tempfile.TemporaryDirectory(prefix="flowbench-flent-check-") as directory:
         manager.shutdown()
         manager = RunManager(directory)
         assert manager.export(record["id"])["flent"]["data"] == original_data
+        assert manager.export(record['id'])['preflight'] == record['preflight']
         assert manager.read(cancel_id)["status"] == "cancelled"
         assert manager.active_id is None
         assert not list(Path(directory).glob("flent-*")), "Owned temporary output leaked"

@@ -34,7 +34,7 @@ class MatrixTests(unittest.TestCase):
         data = data or request()
         _, combinations, _ = matrix_plan(data, settings_from)
         codes = codes or [0] * len(combinations)
-        with patch("app.runner.subprocess.Popen", side_effect=[process_for(row["protocol"], code)
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", side_effect=[process_for(row["protocol"], code)
                                                               for row, code in zip(combinations, codes)]) as launch:
             record = self.manager.start_matrix(data)
             self.manager.worker.join(10)
@@ -79,7 +79,7 @@ class MatrixTests(unittest.TestCase):
                    request(settings={"target": "127.0.0.1", "role": "server"}),
                    request(settings={"target": "127.0.0.1", "duration": 61}),
                    request(settings={"target": "127.0.0.1", "duration": 60})]
-        with patch("app.runner.subprocess.Popen") as launch:
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
             for data in invalid:
                 with self.subTest(data=data), self.assertRaises(ValueError):
                     self.manager.start_matrix(data)
@@ -115,7 +115,7 @@ class MatrixTests(unittest.TestCase):
             if len(calls) == 4:
                 raise OSError("Fixture disk failure")
             return original(row, connection)
-        with patch.object(self.manager.storage, "save", side_effect=fail), patch("app.runner.subprocess.Popen") as launch:
+        with patch.object(self.manager.storage, "save", side_effect=fail), patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
             with self.assertRaises(OSError):
                 self.manager.start_matrix(request())
             launch.assert_not_called()
@@ -149,7 +149,7 @@ class MatrixTests(unittest.TestCase):
             self.manager.stop(self.manager.active_id)
             return -1
         process.wait.side_effect = stop_wait
-        with patch("app.runner.subprocess.Popen", return_value=process) as launch:
+        with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", return_value=process) as launch:
             record = self.manager.start_matrix(request())
             self.manager.worker.join(10)
         job = self.manager.export(record["id"])
@@ -187,7 +187,7 @@ class MatrixTests(unittest.TestCase):
             self.manager.stop(self.manager.active_id)
         capture.baseline.side_effect = cancel_baseline
         data = request(settings={"target": "127.0.0.1", "duration": 1, "bandwidth": "2M", "latency": True})
-        with patch("app.diagnostics.DiagnosticsCapture", return_value=capture), patch("app.runner.subprocess.Popen") as launch:
+        with patch("app.diagnostics.DiagnosticsCapture", return_value=capture), patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen") as launch:
             job = self.manager.start_matrix(data)
             self.manager.worker.join(10)
         result = self.manager.export(job["id"])
@@ -207,7 +207,7 @@ class MatrixTests(unittest.TestCase):
             capture.snapshot.return_value = {"fixture": index}
         data = request(settings={"target": "127.0.0.1", "duration": 1, "bandwidth": "2M", "endpoint_health": True},
                        protocols=["tcp"], streams=[1])
-        with patch("app.diagnostics.DiagnosticsCapture", side_effect=captures), patch("app.runner.subprocess.Popen", side_effect=[process_for("tcp"), OSError("Fixture launch failure")]):
+        with patch("app.diagnostics.DiagnosticsCapture", side_effect=captures), patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", side_effect=[process_for("tcp"), OSError("Fixture launch failure")]):
             job = self.manager.start_matrix(data)
             self.manager.worker.join(10)
         result = self.manager.export(job["id"])
@@ -265,7 +265,9 @@ class RealMatrixTests(unittest.TestCase):
                 time.sleep(.4)
                 data = request(settings={"target": "127.0.0.1", "port": port, "duration": 1, "bandwidth": "1M"}, streams=[1])
                 job = manager.start_matrix(data)
-                manager.worker.join(30)
+                # Four children each retain their bounded route/clock preflight
+                # before the one-second traffic measurement.
+                manager.worker.join(120)
                 self.assertFalse(manager.worker.is_alive())
                 result = manager.export(job["id"])
                 self.assertEqual(result["status"], "completed", result["error"])

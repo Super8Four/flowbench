@@ -167,7 +167,14 @@ class RealIperfTests(unittest.TestCase):
         time.sleep(.4)
         return port
 
-    def finish(self, run_id, timeout=15):
+    def finish(self, run_id, timeout=None):
+        data = self.client.get(f'/api/runs/{run_id}').get_json()
+        if timeout is None:
+            # A native route can legitimately consume 20 seconds, followed by
+            # a three-second clock query, before traffic starts. Each Both child
+            # has its own budget; preserve the actual completion assertions.
+            count = max(1, len(data.get('children', [])))
+            timeout = count * (23 + data['settings']['duration'] + 10)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             data = self.client.get(f'/api/runs/{run_id}').get_json()
@@ -175,7 +182,10 @@ class RealIperfTests(unittest.TestCase):
                 self.manager.worker.join(2)
                 return data
             time.sleep(.05)
-        self.fail('iPerf session did not reach a terminal status')
+        self.fail('iPerf session did not reach a terminal status: ' + json.dumps({
+            'status': data.get('status'), 'preflight_status': data.get('preflight', {}).get('status'),
+            'route_status': data.get('route', {}).get('status'), 'route_seconds': data.get('route', {}).get('elapsed_seconds'),
+            'clock_status': data.get('preflight', {}).get('time_quality', {}).get('status')}))
 
     def run_test(self, **settings):
         data = {'target': '127.0.0.1', 'port': self.server(), 'duration': 2, 'mode': 'upload', 'label': 'Loopback verification', **settings}
@@ -187,7 +197,7 @@ class RealIperfTests(unittest.TestCase):
         # Leave enough time for the Windows subprocess to start and flush a
         # full interval while still proving output arrives before completion.
         run_id = self.run_test(streams=2, duration=4)
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 28  # Native preflight budget plus the first live interval.
         live = None
         while time.monotonic() < deadline:
             candidate = self.client.get(f'/api/runs/{run_id}').get_json()
@@ -282,7 +292,13 @@ class RealIperfTests(unittest.TestCase):
         port = self.port()
         response = self.client.post('/api/runs', json={'role': 'server', 'bind': '127.0.0.1', 'port': port, 'idle_timeout': 10})
         run_id = response.get_json()['id']
-        time.sleep(.5)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if self.client.get(f'/api/runs/{run_id}').get_json()['status'] == 'running':
+                break
+            time.sleep(.05)
+        self.assertEqual(self.client.get(f'/api/runs/{run_id}').get_json()['status'], 'running')
+        time.sleep(.2)
         peer = subprocess.run([IPERF, '-c', '127.0.0.1', '-p', str(port), '-t', '2', '-R'],
                               capture_output=True, timeout=12, creationflags=CREATE_FLAGS)
         self.assertEqual(peer.returncode, 0, peer.stderr)

@@ -1,4 +1,207 @@
 import {rateScale, formatRate, formatMbps, runColor} from './units.js';
+
+export function preflightSummary(run) {
+  const terminal = ['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped'].includes(run.status);
+  const label = (value) => value === 'pending' && terminal ? 'Incomplete checkpoint' : typeof value === 'string' && value ? value.replaceAll('_', ' ') : 'Not recorded';
+  return {route: label(run.route?.status), clock: label(run.preflight?.time_quality?.status)};
+}
+
+// Geographic positions are captured offline evidence, never inferred in the UI.
+export function connectionMapData(route) {
+  const hops = (Array.isArray(route?.hops) ? route.hops : []).map((hop, index) => {
+    const addresses = Array.isArray(hop.addresses) && hop.addresses.length ? hop.addresses : hop.address ? [hop.address] : [];
+    const locations = Array.isArray(hop.locations) && hop.locations.length ? hop.locations : (addresses.length ? addresses : [null]).map((address) => ({address, scope: 'unknown', status: address ? 'unavailable' : 'missing'}));
+    return {...hop, index, addresses, locations};
+  });
+  const markers = [], markerByCoordinate = new Map(), edges = [];
+  let previous = null;
+  for (const hop of hops) {
+    const located = hop.locations.filter((location) => location.scope === 'public' && location.status === 'located'
+      && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)
+      && Math.abs(location.latitude) <= 90 && Math.abs(location.longitude) <= 180);
+    for (const location of located) {
+      const key = `${location.longitude},${location.latitude}`;
+      let marker = markerByCoordinate.get(key);
+      if (!marker) {
+        marker = {key: `world:${key}`, x: (location.longitude + 180) * 2.5, y: (90 - location.latitude) * 2.5, records: []};
+        markerByCoordinate.set(key, marker); markers.push(marker);
+      }
+      marker.records.push({hop: hop.hop, location});
+    }
+    // No bridge across unknown/private/special or ambiguous multiple-address hops.
+    const current = located.length === 1 && hop.locations.length === 1 ? {hop: hop.hop, location: located[0]} : null;
+    if (previous && current && Number.isInteger(previous.hop) && current.hop === previous.hop + 1
+      && Math.abs(current.location.longitude - previous.location.longitude) <= 180) {
+      edges.push({from: previous, to: current});
+    }
+    previous = current;
+  }
+  return {hops, markers, edges};
+}
+
+const connectionMapStates = new WeakMap();
+const connectionMarkup = new WeakMap();
+export function renderConnectionMaps(run, context) {
+  const $ = (id) => document.getElementById(id), {escape: esc, number: num} = context;
+  const world = $('route-world-map'), topology = $('route-topology-map');
+  if (!world || !topology) return;
+  const text = (id, value) => { if ($(id) && $(id).textContent !== value) $(id).textContent = value; };
+  // SVG serialization changes self-closing tags. Compare the source we wrote,
+  // not browser serialization, so unchanged polls retain the focused marker.
+  const html = (element, value) => {
+    if (!element || connectionMarkup.get(element) === value) return;
+    const active = document.activeElement;
+    const focusedKey = element.contains?.(active) ? active?.closest?.('[data-map-key]')?.dataset.mapKey : null;
+    element.innerHTML = value; connectionMarkup.set(element, value);
+    if (focusedKey) [...element.querySelectorAll('[data-map-key]')].find((marker) => marker.dataset.mapKey === focusedKey)?.focus({preventScroll: true});
+  };
+  let state = connectionMapStates.get(world);
+  if (!state) { state = {manual: false, selection: null}; connectionMapStates.set(world, state); }
+  if (state.runId !== run.id) { state.manual = false; state.selection = null; state.runId = run.id; }
+  state.run = run; state.context = context;
+  const data = connectionMapData(run.route);
+  const locationText = (location) => location.status === 'located' && location.scope === 'public'
+    ? `Approximate public-IP location: ${[location.city, location.country].filter(Boolean).join(', ') || 'area not named'}`
+    : location.scope === 'internal' ? 'Internal network · no geographic position'
+      : location.scope === 'special' ? 'Special-use address · no geographic position'
+        : location.status === 'missing' ? 'Address missing · location unknown' : 'Location unavailable';
+  const describeHop = (hop) => `Hop ${hop.hop}: ${hop.locations.map((location) => `${location.address || 'Address unavailable'} · ${locationText(location)}`).join('; ')}`;
+  if (!state.manual) state.mode = data.markers.length ? 'world' : 'topology';
+  if ($('route-world-panel').hidden !== (state.mode !== 'world')) $('route-world-panel').hidden = state.mode !== 'world';
+  if ($('route-topology-panel').hidden !== (state.mode !== 'topology')) $('route-topology-panel').hidden = state.mode !== 'topology';
+  for (const mode of ['world', 'topology']) if ($('route-view-' + mode).getAttribute('aria-pressed') !== String(state.mode === mode)) $('route-view-' + mode).setAttribute('aria-pressed', String(state.mode === mode));
+  const geo = run.route?.geolocation;
+  text('route-geo-note', `${geo?.note || 'Location evidence is not recorded. The ordered topology remains available.'} ${data.markers.length ? `${data.markers.length} approximate public-IP position(s).` : 'No geographic positions are available for this route.'}`);
+  state.selections = new Map(data.hops.map((hop) => [`hop:${hop.index}`, describeHop(hop)]));
+  let worldSvg = '<title>Approximate public-IP positions from captured offline location evidence</title><desc>Numbered markers identify hops. A count followed by x groups overlapping observations. Unknown and private hops break world-map lines. Lines are observed order, not cables.</desc><rect width="900" height="450" fill="#172127"/><image href="/static/maps/world-land.svg" width="900" height="450" aria-hidden="true"/>';
+  const markerScale = 900 / Math.max(260, world.getBoundingClientRect().width || 900);
+  for (const edge of data.edges) worldSvg += `<path class="connection-map-world-edge" d="M ${(edge.from.location.longitude + 180) * 2.5} ${(90 - edge.from.location.latitude) * 2.5} L ${(edge.to.location.longitude + 180) * 2.5} ${(90 - edge.to.location.latitude) * 2.5}"/>`;
+  for (const marker of data.markers) {
+    const description = marker.records.map((record) => `Hop ${record.hop}: ${record.location.address} · ${locationText(record.location)}`).join('; ');
+    state.selections.set(marker.key, description);
+    worldSvg += `<g class="connection-map-marker" role="button" tabindex="0" data-map-key="${marker.key}" aria-label="${esc(description)}" transform="translate(${marker.x},${marker.y})"><title>${esc(description)}</title><circle r="${22 * markerScale}" class="connection-map-hit"/><circle r="${(marker.records.length > 1 ? 14 : 11) * markerScale}" class="connection-map-dot"/><text text-anchor="middle" dy="${4 * markerScale}" font-size="${12 * markerScale}" aria-hidden="true">${marker.records.length > 1 ? marker.records.length + 'x' : esc(marker.records[0].hop)}</text></g>`;
+  }
+  if (!data.markers.length) worldSvg += '<text x="450" y="225" text-anchor="middle" class="connection-map-empty">No recorded geographic positions</text>';
+  html(world, worldSvg);
+  const width = Math.max(260, topology.getBoundingClientRect().width || 760), columns = width < 450 ? 2 : width < 700 ? 3 : 4;
+  const positions = data.hops.map((hop, index) => {
+    const row = Math.floor(index / columns), column = row % 2 ? columns - 1 - index % columns : index % columns;
+    return {x: (column + .5) * width / columns, y: row * 96 + 36, hop};
+  });
+  const height = Math.max(110, Math.ceil(data.hops.length / columns) * 96 + 8);
+  if (topology.getAttribute('viewBox') !== `0 0 ${width} ${height}`) topology.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  let topologySvg = '<title>Ordered topology of recorded hop observations</title><desc>Positions are schematic. Lines preserve observed hop order, including unknown hops, and do not prove physical links.</desc>';
+  for (let index = 1; index < positions.length; index++) {
+    const previous = positions[index - 1], current = positions[index];
+    const unknown = previous.hop.observed === false || current.hop.observed === false || !previous.hop.addresses.length || !current.hop.addresses.length || current.hop.hop !== previous.hop.hop + 1;
+    topologySvg += `<path class="connection-map-topology-edge ${unknown ? 'connection-map-unknown-edge' : ''}" d="M ${previous.x} ${previous.y} L ${current.x} ${current.y}"/>`;
+  }
+  for (const position of positions) {
+    const {hop, x, y} = position, description = describeHop(hop);
+    const scope = hop.locations.every((location) => location.scope === 'internal') ? 'Internal network'
+      : hop.locations.every((location) => location.scope === 'special') ? 'Special-use address' : hop.locations.some((location) => location.status === 'located') ? 'Approx. public-IP area' : 'Location unknown';
+    topologySvg += `<g class="connection-map-marker" role="button" tabindex="0" data-map-key="hop:${hop.index}" aria-label="${esc(description)}" transform="translate(${x},${y})"><title>${esc(description)}</title><circle r="22" class="connection-map-hit"/><circle r="13" class="connection-map-dot ${!hop.addresses.length ? 'connection-map-unknown-dot' : ''}"/><text text-anchor="middle" dy="4" aria-hidden="true">${esc(hop.hop)}</text><text y="33" text-anchor="middle" class="connection-map-topology-label">Hop ${esc(hop.hop)}</text><text y="48" text-anchor="middle" class="connection-map-topology-scope">${esc(scope)}</text></g>`;
+  }
+  if (!positions.length) topologySvg += `<text x="${width / 2}" y="55" text-anchor="middle" class="connection-map-empty">No hop observations recorded</text>`;
+  html(topology, topologySvg);
+  html($('route-location-rows'), data.hops.flatMap((hop) => hop.locations.map((location) => `<tr><th scope="row">${esc(hop.hop)}</th><td>${esc(location.address || 'Unavailable')}</td><td>${hop.observed === false ? 'No captured output' : hop.responded || hop.addresses.length ? 'Reply observed' : 'No reply recorded'}</td><td>${esc(location.scope || 'unknown')} / ${esc(location.status || 'unavailable')}</td><td>${esc(locationText(location))}</td></tr>`)).join('') || '<tr><td colspan="5">No captured hop observations.</td></tr>');
+  const picker = $('route-map-observation');
+  const pickerOptions = '<option value="">Choose a hop observation</option>' + data.hops.map((hop) => `<option value="hop:${hop.index}">Hop ${esc(hop.hop)} · ${esc(hop.addresses.join(', ') || 'Address unavailable')}</option>`).join('');
+  html(picker, pickerOptions);
+  const showSelection = (key) => {
+    state.selection = key;
+    text('route-map-selection', state.selections.get(key) || 'Select a marker or choose a hop observation to inspect captured evidence.');
+    if (picker) picker.value = key?.startsWith('hop:') ? key : '';
+  };
+  showSelection(state.selection);
+  if (!state.initialized) {
+    state.initialized = true;
+    for (const mode of ['world', 'topology']) $('route-view-' + mode).addEventListener('click', () => { state.manual = true; state.mode = mode; renderConnectionMaps(state.run, state.context); });
+    for (const svg of [world, topology]) for (const eventName of ['click', 'focusin', 'keydown']) svg.addEventListener(eventName, (event) => {
+      const marker = event.target.closest('[data-map-key]');
+      if (!marker || eventName === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+      if (eventName === 'keydown') { event.preventDefault(); event.stopPropagation(); }
+      showSelection(marker.dataset.mapKey);
+    });
+    picker?.addEventListener('change', () => showSelection(picker.value));
+  }
+}
+
+// Render saved local evidence only. No browser clock or network lookup is used.
+export function renderPreflight(run, context) {
+  const $ = (id) => document.getElementById(id), {escape: esc, number: num} = context;
+  if (!$('preflight-evidence')) return;
+  renderConnectionMaps(run, context);
+  const text = (id, value) => { const element = $(id); if (element && element.textContent !== value) element.textContent = value; };
+  const phrase = (value) => typeof value === 'string' && value ? value.replaceAll('_', ' ') : 'Not recorded';
+  const utc = (value) => {
+    if (typeof value !== 'string' || !value) return 'Unavailable';
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : 'Unavailable';
+  };
+  const seconds = (value) => !Number.isFinite(value) ? 'Unavailable' : `${value !== 0 && (Math.abs(value) < 1e-6 || Math.abs(value) >= 1e9) ? value.toExponential(3) : num(value, 6)} s`;
+  const group = ['protocol-job', 'matrix-job'].includes(run.kind);
+  const preflight = run.preflight, route = run.route, clock = preflight?.time_quality;
+  const terminal = ['completed', 'failed', 'cancelled', 'interrupted', 'partial', 'skipped'].includes(run.status);
+  const incomplete = preflight?.status === 'pending' && terminal;
+  const statuses = preflightSummary(run);
+  const incoming = preflight?.phase === 'observed_after_start';
+  const noRoute = route?.status === 'not_applicable';
+  const summary = group ? 'Open an individual test for its route preflight and clock evidence.'
+    : incomplete ? `Incomplete preflight checkpoint retained · test ${run.status}. No preparation is running.`
+      : !preflight ? 'Preflight not recorded for this saved test. Existing route evidence is retained below.'
+      : `Evidence ${phrase(preflight.status)} · ${incoming ? 'local clock observed after incoming traffic started' : run.settings?.role === 'server' ? 'before local test traffic' : 'before outgoing traffic'}.`;
+  text('preflight-status', summary);
+  text('preflight-phase', group ? 'Per individual test' : !preflight ? 'Not recorded' : incoming ? 'Observed after incoming start' : 'Before traffic');
+  text('preflight-started', utc(preflight?.started_at));
+  text('preflight-finished', utc(preflight?.finished_at));
+  text('preflight-elapsed', seconds(preflight?.elapsed_seconds));
+  text('route-status', group ? 'Per individual test' : statuses.route);
+  text('route-note', group ? 'Each child retains its own route attempt; the group has no combined route.'
+    : incoming ? `Passive incoming capture: route preflight is not applicable. No reverse probes were sent. ${route?.note || ''}`
+      : noRoute ? `Route preflight is not applicable to this server test: no outgoing peer was selected. No route probes were sent. ${route?.note || ''}`
+      : incomplete && route?.status === 'pending' ? `Native route preparation did not finish before the test became ${run.status}. Saved observations are retained; no route probe is running.`
+        : route?.note || (preflight?.status === 'pending' ? 'Native route preflight is pending or running.'
+          : route?.hops?.length ? 'Recorded native hop observations are retained below; missing replies remain visible.'
+            : route ? `Recorded native route attempt: ${statuses.route}. No hop observations were captured.`
+              : 'No route evidence was recorded for this test.'));
+  text('route-timing', route && !noRoute ? `${route.phase === 'before_traffic' ? 'Before traffic' : 'Capture phase not recorded'} · started ${utc(route.started_at)} · duration ${seconds(route.elapsed_seconds)}` : '');
+  const hops = Array.isArray(route?.hops) ? route.hops : [];
+  const map = hops.map((hop) => {
+    const addresses = Array.isArray(hop.addresses) && hop.addresses.length ? hop.addresses : hop.address ? [hop.address] : [];
+    const state = hop.observed === false ? 'No captured output' : hop.responded || addresses.length ? 'Reply observed' : 'No reply recorded';
+    const rtts = [...(Array.isArray(hop.rtt_ms) ? hop.rtt_ms : []).map((value) => `${esc(num(value, 3))} ms`),
+      ...(Array.isArray(hop.rtt_upper_bound_ms) ? hop.rtt_upper_bound_ms : []).map((value) => `&lt;${esc(num(value, 3))} ms`)];
+    return `<li class="route-hop ${addresses.length ? 'route-hop-replied' : 'route-hop-unknown'}"><div class="route-hop-heading"><span class="route-hop-number" aria-hidden="true">${esc(hop.hop)}</span><strong>Hop ${esc(hop.hop)}</strong><span class="route-hop-state">${esc(state)}</span></div><div class="route-hop-addresses">${addresses.length ? addresses.map((address) => `<code>${esc(address)}</code>`).join('') : '<span class="text-body-secondary">Address unavailable</span>'}</div><p class="route-hop-rtt">${rtts.length ? rtts.join(' / ') : 'RTT unavailable'}</p>${!addresses.length && hop.detail ? `<p class="route-hop-detail">${esc(hop.detail)}</p>` : ''}</li>`;
+  }).join('');
+  const emptyMap = `<li class="route-hop route-hop-empty">${group ? 'Open a child test to view its ordered hops.' : incoming ? 'No route probes for passive incoming traffic.' : noRoute ? 'No route probes for this server test.' : 'No hop observations recorded.'}</li>`;
+  if ($('route-hops') && $('route-hops').innerHTML !== (map || emptyMap)) $('route-hops').innerHTML = map || emptyMap;
+  text('route-output', route?.raw_output || 'No native route output recorded.');
+  text('route-command', Array.isArray(route?.command) && route.command.length ? route.command.join(' ') : 'Not recorded');
+  text('clock-verification', clock ? 'Local UTC · not independently NTP-verified' : 'Clock evidence not recorded');
+  text('clock-query-status', group ? 'Per individual test' : statuses.clock);
+  text('clock-observed-at', utc(clock?.observed_at));
+  text('clock-system-source', clock?.clock_source === 'system_utc' ? 'Local system UTC clock' : clock?.clock_source || 'Unavailable');
+  text('clock-provider', clock?.provider ? ({chrony: 'chrony', windows_time: 'Windows Time', systemd: 'systemd'}[clock.provider] || clock.provider) : 'Unavailable');
+  text('clock-source', clock?.source || 'Unavailable');
+  text('clock-daemon-state', clock?.synchronized === true ? 'Reports synchronized' : clock?.synchronized === false ? 'Reports unsynchronized' : 'Unavailable');
+  text('clock-offset', seconds(clock?.offset_seconds));
+  text('clock-uncertainty', seconds(clock?.uncertainty_seconds));
+  text('clock-uncertainty-kind', clock?.uncertainty_kind ? phrase(clock.uncertainty_kind) : 'Unavailable');
+  text('clock-root-delay', seconds(clock?.root_delay_seconds));
+  text('clock-root-dispersion', seconds(clock?.root_dispersion_seconds));
+  text('clock-last-sync', utc(clock?.last_sync_at));
+  text('clock-query-elapsed', seconds(clock?.query_elapsed_seconds));
+  text('clock-note', terminal && clock?.status === 'pending' ? `The clock query did not finish before the test became ${run.status}. Saved local observations are retained.`
+    : clock?.note || (group ? 'Clock evidence belongs to each individual test.' : 'No clock observation was saved for this test.'));
+  text('clock-output', clock?.raw_output || 'No clock-query output recorded.');
+  text('clock-command', Array.isArray(clock?.command) && clock.command.length ? clock.command.join(' ') : 'Not recorded');
+  const notes = [];
+  if (run.incoming) notes.push(`Managed incoming capture from ${run.incoming.remote_host || 'unknown peer'}. Directions use the connecting client's perspective: upload enters this server, download leaves it.`);
+  if (run.concurrency?.note) notes.push(run.concurrency.note);
+  text('preflight-context-note', notes.join(' '));
+}
+
 // Local, offline-capable measurement workflows. No chart values are synthesized.
 export function createWorkflows(context) {
   const {api, message, escape: esc, number: num, date, title, smoothPath, download} = context;
@@ -163,7 +366,7 @@ export function createWorkflows(context) {
     if (run.kind !== 'matrix-job') return;
     const rows = run.matrix_runs || [];
     $('matrix-job-status').textContent = `Batch ${run.status}: ${rows.filter((row) => row.status === 'completed').length} of ${rows.length} completed.${run.error ? ' ' + run.error : ''}`;
-    $('matrix-job-results').innerHTML = `<table class="table"><thead><tr><th>Case</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Evidence</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}. ${esc(row.protocol?.toUpperCase())} / ${esc(row.mode)} / ${row.streams} streams</td><td>${esc(row.status)}${row.error ? `<p class="form-text">${esc(row.error)}</p>` : ''}</td><td>${formatMbps(row.metrics?.upload_mbps)}</td><td>${formatMbps(row.metrics?.download_mbps)}</td><td><a href="/?run=${encodeURIComponent(row.id)}">Open case ${index + 1}</a></td></tr>`).join('')}</tbody></table>`;
+    $('matrix-job-results').innerHTML = `<table class="table"><thead><tr><th>Case</th><th>Status</th><th>Upload rate</th><th>Download rate</th><th>Route evidence</th><th>Clock query</th><th>Evidence</th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${index + 1}. ${esc(row.protocol?.toUpperCase())} / ${esc(row.mode)} / ${row.streams} streams</td><td>${esc(row.status)}${row.error ? `<p class="form-text">${esc(row.error)}</p>` : ''}</td><td>${formatMbps(row.metrics?.upload_mbps)}</td><td>${formatMbps(row.metrics?.download_mbps)}</td><td>${esc(preflightSummary(row).route)}</td><td>${esc(preflightSummary(row).clock)}</td><td><a href="/?run=${encodeURIComponent(row.id)}">Open case ${index + 1}</a></td></tr>`).join('')}</tbody></table>`;
   }
   function latencySummary(stage) {
     const summary = stage?.summary || {};
@@ -193,7 +396,7 @@ export function createWorkflows(context) {
     $('diagnostics-summary').innerHTML = output;
     $('diagnostics-output').textContent = JSON.stringify(record, null, 2);
   }
-  function selected(run) { matrix(run); diagnostics(run); renderFlent(run); renderTimeline(run); updateLive(); controls(); }
+  function selected(run) { renderPreflight(run, context); matrix(run); diagnostics(run); renderFlent(run); renderTimeline(run); updateLive(); controls(); }
   function edit(run) {
     fill($('saved-project'), projects, 'No project', (row) => row.name, run.settings.project_id || '');
     keys.forEach((key) => { $('saved-tag-' + key).value = run.settings.tags?.[key] || ''; });
@@ -419,7 +622,7 @@ export function createWorkflows(context) {
       }
       if (button.dataset.deleteNote) { button.disabled = true; try { await patchAnnotations(rows.filter((row) => row.id !== button.dataset.deleteNote)); resetAnnotation(); } catch (error) { button.disabled = false; throw error; } }
     }));
-    window.addEventListener('resize', () => { drawLive(); drawFlent(); });
+    window.addEventListener('resize', () => { drawLive(); drawFlent(); if (context.state().selected) renderConnectionMaps(context.state().selected, context); });
     await context.refresh();
     drawLive(); controls();
   }

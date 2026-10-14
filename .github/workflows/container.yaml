@@ -47,6 +47,7 @@ jobs:
         run: >-
           docker run --rm --entrypoint python
           --mount type=bind,source="${{ github.workspace }}/tests",target=/tests,readonly
+          --mount type=bind,source="${{ github.workspace }}/scripts",target=/scripts,readonly
           iperf-workspace:local -m unittest discover -s /tests -v
       - name: Test container lifecycle and persistent evidence
         id: lifecycle
@@ -61,6 +62,7 @@ jobs:
       - name: Render PDF and Word report fixtures
         id: reports
         if: ${{ !cancelled() && steps.lifecycle.outcome == 'success' }}
+        shell: bash
         run: |
           mkdir -p report-qa
           chmod 777 report-qa
@@ -74,19 +76,20 @@ jobs:
           libreoffice -env:UserInstallation=file:///tmp/flowbench-report-qa-profile --headless \
             --convert-to pdf --outdir report-qa/docx-pdf report-qa/*.docx
           test "$(find report-qa/docx-pdf -name '*.pdf' | wc -l)" -eq 3
-          python3 scripts/check-report-layout.py --docx-dir report-qa --pdf-dir report-qa/docx-pdf
           for source in report-qa/*.pdf report-qa/docx-pdf/*.pdf; do
             name=$(basename "$source" .pdf)
             folder=$(basename "$(dirname "$source")")
             pdfinfo "$source"
             pdftoppm -r 110 -png "$source" "report-qa/rendered/${folder}-${name}"
           done
+          python3 scripts/check-report-layout.py --docx-dir report-qa --pdf-dir report-qa/docx-pdf | tee report-qa/layout-check.txt
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && steps.reports.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.lifecycle.outcome == 'success' }}
         with:
           name: report-qa-${{ matrix.arch }}
           path: report-qa/
           retention-days: 14
+          if-no-files-found: warn
       - name: Package verified image
         if: github.event_name != 'pull_request'
         run: |

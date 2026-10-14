@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import threading
 from xml.sax.saxutils import escape
+import xml.etree.ElementTree as ET
 
 from .annotations import identifier
 from .flent import normalize as normalize_flent, validate_flent
@@ -56,14 +57,16 @@ def _private_diagnostics(value, key=""):
     safe_states = {"completed", "captured", "incomplete", "partial", "failed", "timeout", "unavailable", "disabled", "no_reply", "error",
                    "cancelled", "reply", "missing", "blocked", "permission_blocked", "skipped", "confirmed",
                    "unconfirmed", "separate", "detected local", "local", "remote", "manual", "linux", "windows"}
-    safe_keys = set("schema_version latency endpoint_health path_context enabled metric baseline loaded samples summary mean_increase_ms sample_limit interval_seconds sample_limit_reached status timestamp elapsed_seconds rtt_ms rtt_upper_bound_ms note error errors exit_code local remote provenance before after delta cpu cpu_utilization_percent cpu_busy_percent interfaces counters total_ticks idle_ticks captured_at rx_bytes rx_errors rx_drops tx_bytes tx_errors tx_drops requested_ip_version probe_ip_version port protocol mtu route tested_packet_sizes largest_confirmed_packet_bytes packet_bytes hops hop responded concurrency overlaps incoming outgoing ids attempted replies missing numeric_samples min_ms max_ms mean_ms median_ms stddev_ms p95_ms".split())
+    safe_keys = set("schema_version latency endpoint_health path_context enabled metric baseline loaded samples summary mean_increase_ms sample_limit interval_seconds sample_limit_reached status timestamp elapsed_seconds rtt_ms rtt_upper_bound_ms note error errors exit_code local remote provenance before after delta cpu cpu_utilization_percent cpu_busy_percent interfaces counters total_ticks idle_ticks captured_at rx_bytes rx_errors rx_drops tx_bytes tx_errors tx_drops requested_ip_version probe_ip_version port protocol mtu route tested_packet_sizes largest_confirmed_packet_bytes packet_bytes hops hop responded observed observations concurrency overlaps incoming outgoing ids attempted replies missing numeric_samples min_ms max_ms mean_ms median_ms stddev_ms p95_ms phase started_at finished_at".split())
     if isinstance(value, dict):
         return {name if name in safe_keys else "field_" + str(index): _private_diagnostics(item, name) for index, (name, item) in enumerate(value.items(), 1)
                 if name not in {"raw", "raw_output", "raw_stdout", "raw_stderr", "command", "executable", "address", "host", "target", "bind", "source", "interface", "name"}}
     if isinstance(value, list):
         return [_private_diagnostics(item, key) for item in value]
     if isinstance(value, str):
-        if key in {"timestamp", "captured_at"}:
+        if key == "phase" and value in {"before_traffic", "observed_after_start", "after_traffic"}:
+            return value
+        if key in {"timestamp", "captured_at", "started_at", "finished_at"}:
             try:
                 parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
                 if parsed.tzinfo is not None:
@@ -72,6 +75,56 @@ def _private_diagnostics(value, key=""):
                 pass
         return value if key in {"status", "provenance", "platform"} and value in safe_states else "[redacted]"
     return _clean(value)
+
+
+def _private_preflight(value):
+    """Keep numbers and known clock states; never expose provider-supplied text."""
+    if not isinstance(value, dict):
+        return None
+    def state(value, choices):
+        return value if isinstance(value, str) and value in choices else "[redacted]" if value else None
+    def utc(value):
+        if not isinstance(value, str):
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.astimezone(timezone.utc).isoformat() if parsed.tzinfo else None
+        except ValueError:
+            return None
+    result = {"schema_version": 1, "policy": state(value.get("policy"), {"once_per_test"}),
+              "status": state(value.get("status"), {"pending", "captured", "partial", "cancelled", "not_applicable"}),
+              "phase": state(value.get("phase"), {"before_traffic", "observed_after_start"}),
+              "started_at": utc(value.get("started_at")), "finished_at": utc(value.get("finished_at")),
+              "elapsed_seconds": value.get("elapsed_seconds") if _finite(value.get("elapsed_seconds")) else None}
+    quality = value.get("time_quality")
+    if isinstance(quality, dict):
+        result["time_quality"] = {
+            "schema_version": 1,
+            "status": state(quality.get("status"), {"pending", "captured", "status_only", "malformed", "unavailable", "unsynchronized", "timeout", "error", "cancelled", "permission_blocked"}),
+            "observed_at": utc(quality.get("observed_at")), "clock_source": "system_utc", "ntp_verified": False,
+            "provider": state(quality.get("provider"), {"chrony", "windows_time", "systemd"}),
+            "source": "[redacted]" if quality.get("source") else None,
+            "synchronized": quality.get("synchronized") if isinstance(quality.get("synchronized"), bool) else None,
+            "uncertainty_kind": state(quality.get("uncertainty_kind"), {"root_dispersion_proxy"}),
+            "last_sync_at": utc(quality.get("last_sync_at")), "note": "[redacted]" if quality.get("note") else None}
+        for key in ("offset_seconds", "uncertainty_seconds", "root_delay_seconds", "root_dispersion_seconds", "query_elapsed_seconds"):
+            result["time_quality"][key] = quality.get(key) if _finite(quality.get(key)) else None
+    return result
+
+
+def _private_route(value):
+    """Route geometry/location is sensitive, including unknown future fields."""
+    if not isinstance(value, dict):
+        return None
+    result = {key: value[key] for key in ("status", "note", "phase", "started_at", "finished_at", "elapsed_seconds", "exit_code") if key in value}
+    result["hops"] = []
+    for hop in value.get("hops", []):
+        kept = {key: hop[key] for key in ("hop", "responded", "observed", "rtt_ms", "rtt_upper_bound_ms") if key in hop}
+        if isinstance(hop.get("observations"), list):
+            kept["observations"] = [{key: item[key] for key in ("rtt_ms", "rtt_upper_bound_ms") if key in item}
+                                    for item in hop["observations"] if isinstance(item, dict)]
+        result["hops"].append(kept)
+    return _private_diagnostics(result)
 
 
 def _bounded_raw(record):
@@ -111,6 +164,13 @@ def prepare_report(manager, data):
                 raise ValueError("Choose individual tests within a protocol or matrix batch.")
             if record.get("status") != "completed" or not record.get("finished_at"):
                 raise ValueError("Reports require completed tests.")
+            if "preflight" in record:
+                from .preflight import validate_preflight
+                validate_preflight(record["preflight"])
+            route = record.get("route")
+            if isinstance(route, dict) and ("geolocation" in route or any("locations" in hop for hop in route.get("hops", []) if isinstance(hop, dict))):
+                from .route import validate_route
+                validate_route(route)
             if record.get("kind") == "flent-run":
                 # Legacy archive rows can claim completion despite missing load
                 # flows. Revalidate source evidence without changing that row.
@@ -172,12 +232,14 @@ def prepare_report(manager, data):
         settings = effective_settings(record)
         project = projects.get(settings.get("project_id"))
         diagnostics, route = copy.deepcopy(record.get("diagnostics")), copy.deepcopy(record.get("route"))
+        preflight = copy.deepcopy(record.get("preflight"))
         if not include_raw and not redact:
             def drop_raw(value):
                 if isinstance(value, dict):
                     return {k: drop_raw(v) for k, v in value.items() if k not in {"raw", "raw_output", "raw_stdout", "raw_stderr", "command", "executable", "detail"}}
                 return [drop_raw(v) for v in value] if isinstance(value, list) else value
             diagnostics, route = drop_raw(diagnostics), drop_raw(route)
+            preflight = drop_raw(preflight)
         row = {"id": record["id"], "display_index": index, "color": run_color(record), "label": "Test " + str(index) if redact else record.get("label") or settings.get("label") or "Test " + str(index),
                "created_at": record["created_at"], "finished_at": record["finished_at"], "status": record["status"],
                "settings": {k: settings.get(k) for k in SETTINGS}, "metrics": {metric_names[k]: v for k, v in measurements(record).items()}, "series": report_series(record),
@@ -187,7 +249,8 @@ def prepare_report(manager, data):
                "annotations": [{"timestamp": note.get("timestamp"), "seconds": note.get("seconds"), "text": "[redacted]"}
                                for note in record.get("annotations", [])] if redact else copy.deepcopy(record.get("annotations", [])),
                "diagnostics": _private_diagnostics(diagnostics) if redact else diagnostics,
-               "route": _private_diagnostics(route) if redact else route,
+               "route": _private_route(route) if redact else route,
+               "preflight": _private_preflight(preflight) if redact else preflight,
                "provenance": {"engine": record.get("engine", "iperf3"), "engine_version": record.get("iperf_version"),
                               "output_format": record.get("output_format"), "imported": bool(record.get("imported")),
                               "concurrency": _private_diagnostics(record.get("concurrency")) if redact else copy.deepcopy(record.get("concurrency"))}}
@@ -263,6 +326,12 @@ def metric_label(key):
 
 def metric_value(key, value):
     return format_mbps(value) if key.endswith("_mbps") and _finite(value) else display(value)
+
+
+def _clock_seconds(value, signed=False):
+    if not _finite(value):
+        return "Unavailable"
+    return format(value, "+.9g" if signed and value else ".9g")
 
 
 def _bandwidth(value):
@@ -345,6 +414,7 @@ def _sections(run):
                 ("Requested duration and streams", f"{display(s.get('duration'))} seconds | {display(s.get('streams'))} streams"),
                 ("Requested bandwidth and IP version", f"{_bandwidth(s.get('bandwidth'))} | {display(s.get('ip_version'))}"),
                 ("Recorded timestamps", "Started " + run["created_at"] + "\nFinished " + run["finished_at"]),
+                ("Clock verification", "Host system UTC; not independently NTP verified. Provider synchronization is local status only."),
                 ("Saved test ID", run["id"]),
                 ("Engine and evidence", f"{display(run['provenance'].get('engine'))} | {display(run['provenance'].get('engine_version'))}\nOutput {display(run['provenance'].get('output_format'))} | Imported {display(run['provenance'].get('imported'))}")]
     if run["provenance"].get("concurrency"):
@@ -353,6 +423,55 @@ def _sections(run):
         settings.append(("Workload", run["workload"]))
     sections = [("Test settings and provenance", ["Setting", "Recorded value"], settings),
                 ("Measured results", ["Metric", "Value"], [(metric_label(k), metric_value(k, v)) for k, v in sorted(run["metrics"].items())])]
+    preflight = run.get("preflight") or {}
+    quality = preflight.get("time_quality") or {}
+    if preflight:
+        clock_rows = [("Preflight status and policy", display(preflight.get("status")) + " | " + display(preflight.get("policy"))),
+                      ("Capture timing", display(preflight.get("phase"))),
+                      ("Preflight UTC", display(preflight.get("started_at")) + " to " + display(preflight.get("finished_at"))),
+                      ("Preflight elapsed seconds", display(preflight.get("elapsed_seconds"))),
+                      ("Time quality status", display(quality.get("status"))),
+                      ("Clock observation UTC", display(quality.get("observed_at"))),
+                      ("Provider and source", display(quality.get("provider")) + " | " + display(quality.get("source"))),
+                      ("Provider synchronized", display(quality.get("synchronized")) + " (local provider report; no independent NTP verification)"),
+                      ("Reported correction seconds", _clock_seconds(quality.get("offset_seconds"), signed=True)),
+                      ("Root dispersion proxy seconds", _clock_seconds(quality.get("uncertainty_seconds")) + " | " + display(quality.get("uncertainty_kind")) + "; not guaranteed clock accuracy"),
+                      ("Root delay / dispersion seconds", _clock_seconds(quality.get("root_delay_seconds")) + " / " + _clock_seconds(quality.get("root_dispersion_seconds"))),
+                      ("Last synchronization UTC", display(quality.get("last_sync_at"))),
+                      ("Clock query elapsed seconds", display(quality.get("query_elapsed_seconds")))]
+        sections.append(("Preflight and clock quality", ["Evidence", "Recorded value"], clock_rows))
+    else:
+        sections.append(("Preflight and clock quality", ["Evidence", "Recorded value"],
+                         [("Legacy evidence", "Preflight timing and clock quality were not recorded; no synchronization or accuracy is inferred.")]))
+    route = run.get("route") or {}
+    if route:
+        sections.append(("Route capture context", ["Evidence", "Recorded value"],
+                         [("Capture status", display(route.get("status"))),
+                          ("Capture phase", display(route.get("phase")) if route.get("phase") else "Timing not recorded in this legacy test"),
+                          ("Capture UTC", display(route.get("started_at")) + " to " + display(route.get("finished_at"))),
+                          ("Capture elapsed seconds", display(route.get("elapsed_seconds"))),
+                          ("Interpretation", "TTL order shows observed replies, not geography or proof of a bottleneck. Missing replies are not measured packet loss. Probe path/source may differ from traffic.")]))
+    geography = route.get("geolocation")
+    if isinstance(geography, dict):
+        build = geography.get("build_epoch")
+        try:
+            build_date = datetime.fromtimestamp(build, timezone.utc).isoformat() if type(build) is int else "Unavailable"
+        except (OverflowError, OSError, ValueError):
+            build_date = "Unavailable"
+        sections.append(("Approximate location provenance", ["Evidence", "Recorded value"],
+                         [("Local dataset status", display(geography.get("status"))),
+                          ("Attribution", "IP Geolocation by DB-IP | https://db-ip.com | CC-BY-4.0"),
+                          ("Database build UTC", build_date),
+                          ("Interpretation", "Approximate public-IP network locations; not GPS, router positions or proof of the physical route. Internal and unknown hops have no invented coordinates.")]))
+        location_rows = []
+        for hop in route.get("hops", []):
+            for alternate, location in enumerate(hop.get("locations", []), 1):
+                place = ", ".join(str(location[key]) for key in ("city", "country") if location.get(key))
+                coordinates = (f"{location['latitude']:.6g}, {location['longitude']:.6g}"
+                               if _finite(location.get("latitude")) and _finite(location.get("longitude")) else "Unavailable")
+                location_rows.append((str(hop.get("hop")) + "." + str(alternate), location.get("address") or "No address",
+                                      place or "Unknown location", display(location.get("scope")) + " / " + display(location.get("status")), coordinates))
+        sections.append(("Approximate route locations", ["TTL / reply", "Observed address", "Approximate place", "Scope / status", "Latitude, longitude"], location_rows))
     diagnostics = run.get("diagnostics") or {}
     latency = diagnostics.get("latency") or {}
     rows = []
@@ -383,6 +502,90 @@ def _sections(run):
                            "; ".join(key + " " + (format_mbps(item.get(key)) if item.get("unit") == "Mbits/s" and key in {"mean", "min", "max"} else display(item.get(key))) for key in ("count", "missing", "mean", "min", "max")))
                           for item in run["flent_summaries"]]))
     return sections
+
+
+def _route_rows(run):
+    rows = []
+    for hop in (run.get("route") or {}).get("hops", []):
+        observations = [(str(hop.get("hop")), hop)]
+        observations.extend((str(hop.get("hop")) + " (obs " + str(index) + ")", observation)
+                            for index, observation in enumerate(hop.get("observations", []), 1))
+        for label, observation in observations:
+            addresses = observation.get("addresses") or ([observation["address"]] if observation.get("address") else [])
+            address = ", ".join(addresses) if addresses else "[redacted]" if run.get("redacted") else "No reply or address unavailable"
+            values = [display(value) for value in observation.get("rtt_ms", [])]
+            values.extend("<" + display(value) for value in observation.get("rtt_upper_bound_ms", []))
+            rows.append([label, address, ", ".join(values) if values else "Unavailable"])
+    return rows
+
+
+def _route_diagrams(run):
+    """TTL sequence only: arrows do not claim geographic or physical links."""
+    from PIL import Image, ImageDraw, ImageFont
+    import reportlab
+    hops = (run.get("route") or {}).get("hops", [])
+    font = ImageFont.truetype(str(Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"), 26)
+    diagrams = []
+    for offset in range(0, len(hops), 16):
+        panel = hops[offset:offset + 16]
+        image = Image.new("RGB", (1500, 360), "white")
+        draw = ImageDraw.Draw(image)
+        for index, hop in enumerate(panel):
+            column, row = index % 8, index // 8
+            x, y = 20 + column * 185, 30 + row * 160
+            draw.rounded_rectangle((x, y, x + 160, y + 110), radius=8, outline=run["color"], width=3, fill="#f1f4f6")
+            draw.text((x + 12, y + 12), "TTL " + str(hop.get("hop")), font=font, fill="#183b50")
+            draw.text((x + 12, y + 48), "Reply" if hop.get("responded") else "No reply", font=font, fill="#41494d")
+            if index % 8 < 7 and index + 1 < len(panel):
+                draw.line((x + 165, y + 55, x + 180, y + 55), fill="#41494d", width=2)
+                draw.polygon([(x + 180, y + 55), (x + 174, y + 50), (x + 174, y + 60)], fill="#41494d")
+        output = BytesIO()
+        image.save(output, "PNG")
+        diagrams.append(output.getvalue())
+    return diagrams
+
+
+def _world_map(run):
+    """Render bundled public-domain M/L/Z land paths and approximate TTL markers."""
+    from PIL import Image, ImageDraw, ImageFont
+    import reportlab
+    route = run.get("route") or {}
+    points = [(hop.get("hop"), index, location) for hop in route.get("hops", [])
+              for index, location in enumerate(hop.get("locations", []), 1)
+              if location.get("status") == "located" and _finite(location.get("latitude")) and _finite(location.get("longitude"))]
+    if not points:
+        return None
+    image = Image.new("RGB", (1500, 850), "white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.truetype(str(Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"), 23)
+    left, top, scale = 60, 45, 1380 / 900
+    draw.rectangle((left, top, left + 1380, top + 690), fill="#eef5fa", outline="#aab6bf", width=2)
+    for lon in range(-120, 180, 60):
+        x = left + (lon + 180) / 360 * 1380
+        draw.line((x, top, x, top + 690), fill="#d9e4ea")
+    for lat in range(-60, 90, 30):
+        y = top + (90 - lat) / 180 * 690
+        draw.line((left, y, left + 1380, y), fill="#d9e4ea")
+    asset = Path(__file__).resolve().parent / "static" / "maps" / "world-land.svg"
+    for path in ET.parse(asset).getroot().iter("{http://www.w3.org/2000/svg}path"):
+        for ring in re.findall(r"M([^MZ]+)Z", path.get("d", "")):
+            numbers = [float(number) for number in re.findall(r"-?\d+(?:\.\d+)?", ring)]
+            polygon = [(left + x * scale, top + y * scale) for x, y in zip(numbers[::2], numbers[1::2])]
+            if len(polygon) >= 3:
+                draw.polygon(polygon, fill="#cad6dd", outline="#90a3af")
+    for ttl, alternate, location in points:
+        x = left + (location["longitude"] + 180) / 360 * 1380
+        y = top + (90 - location["latitude"]) / 180 * 690
+        draw.ellipse((x - 7, y - 7, x + 7, y + 7), fill=run["color"], outline="white", width=2)
+        label = str(ttl) + "." + str(alternate)
+        # Latitude/longitude remain in the table; clamp labels inside the map.
+        draw.text((min(left + 1290, max(left + 5, x + 12)), min(top + 650, max(top + 5, y - 27))),
+                  label, font=font, fill="#183b50", stroke_width=2, stroke_fill="white")
+    draw.text((60, 760), "Markers: TTL.alternate reply; no physical route is inferred.", font=font, fill="#41494d")
+    draw.text((60, 800), "Natural Earth land: public domain. Location attribution is listed in this report.", font=font, fill="#41494d")
+    output = BytesIO()
+    image.save(output, "PNG")
+    return output.getvalue()
 
 
 def _native_chart(runs, unit, bounds=None):
@@ -506,15 +709,15 @@ def render_pdf(model):
     def p(text, style="FBBody"):
         return Paragraph(safe(text), styles[style])
     image_bytes = 0
-    def chart_image(payload):
+    def chart_image(payload, height=205):
         nonlocal image_bytes
         image_bytes += len(payload)
         if image_bytes > MODEL_BYTES:
             raise ValueError("Report exceeds the 32 MiB chart-image resource budget. Split the selection into smaller reports.")
-        return Image(BytesIO(payload), width=495, height=205)
+        return Image(BytesIO(payload), width=495, height=height)
     styles.add(ParagraphStyle("FBHeaderCell", parent=styles["FBCell"], textColor=colors.white, fontName="FlowBenchVeraBold"))
     def table(head, rows, widths=None):
-        widths = widths or ((210, 140, 145) if len(head) == 3 else (170, 325))
+        widths = widths or ((45, 120, 140, 90, 100) if len(head) == 5 else (210, 140, 145) if len(head) == 3 else (170, 325))
         content = [[p(item, "FBHeaderCell") for item in head]] + [[p(display(item), "FBCell") for item in row] for row in rows]
         result = Table(content, colWidths=widths, repeatRows=1, hAlign="LEFT")
         result.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#183b50")),
@@ -552,6 +755,14 @@ def render_pdf(model):
         flow.extend([PageBreak(), p(f"Test {index}", "FBTitle"), p(run["label"])])
         for heading, head, rows in _sections(run):
             flow.extend([p(heading, "FBHeading"), table(head, rows)])
+            if heading == "Route capture context":
+                for diagram in _route_diagrams(run):
+                    flow.extend([chart_image(diagram, height=119), p("Observed TTL sequence. Arrows show ordering only; reply addresses and measured RTTs appear in the hop table.")])
+            if heading == "Approximate route locations":
+                world = _world_map(run)
+                if world:
+                    flow.append(KeepTogether([p("Approximate public-IP world map", "FBHeading"), chart_image(world, height=280),
+                                              p("Approximate network locations only. Missing and internal hops stay unlocated; markers do not prove router positions or the physical route. Coincident markers can overlap; the table retains every reply.")]))
             if heading == "Measured results":
                 for title, chart, caption, legend in _charts([run]):
                     flow.append(KeepTogether([p(title, "FBHeading"), chart_image(chart), p(caption)]))
@@ -562,8 +773,7 @@ def render_pdf(model):
             flow.extend(p(text) for text in context)
         if isinstance(run.get("route"), dict) and run["route"].get("hops"):
             flow.extend([p("Captured route hops", "FBHeading"),
-                         table(["Hop", "Address or response", "RTT ms"], [[item.get("hop"), item.get("address", "[redacted]" if model["redacted"] else "No reply"), display(item.get("rtt_ms"))]
-                               for item in run["route"]["hops"]], (50, 290, 155))])
+                         table(["Hop", "Address or response", "RTT ms"], _route_rows(dict(run, redacted=model["redacted"])), (50, 290, 155))])
         if run.get("raw_evidence"):
             flow.extend([PageBreak(), p("Raw evidence", "FBHeading"), p("Raw fields are limited to 20000 characters each. Any truncation is explicitly recorded below."), p(display(run["raw_evidence"]))])
     output = BytesIO()
@@ -624,19 +834,19 @@ def render_docx(model):
     field.set(qn("w:instr"), "PAGE")
     footer._p.append(field)
     image_bytes = 0
-    def add_chart(payload):
+    def add_chart(payload, height=2.8):
         nonlocal image_bytes
         image_bytes += len(payload)
         if image_bytes > MODEL_BYTES:
             raise ValueError("Report exceeds the 32 MiB chart-image resource budget. Split the selection into smaller reports.")
-        document.add_picture(BytesIO(payload), width=Inches(6.8), height=Inches(2.8))
+        document.add_picture(BytesIO(payload), width=Inches(6.8), height=Inches(height))
         document.paragraphs[-1].paragraph_format.keep_with_next = True
     def para(text):
         document.add_paragraph(_clean(str(text)))
     def table(head, rows):
         result = document.add_table(rows=1, cols=len(head))
         result.autofit = False
-        widths = [3.25, 1.2, 1.2, 1.15] if len(head) == 4 else [0.8, 1.2, 4.8] if len(head) == 3 and head[0] in {"Test", "Trace"} else [2.8, 2, 2] if len(head) == 3 else [2.2, 4.6]
+        widths = [.6, 1.65, 1.85, 1.3, 1.4] if len(head) == 5 else [3.25, 1.2, 1.2, 1.15] if len(head) == 4 else [.8, 4.4, 1.6] if len(head) == 3 and head[0] == "Hop" else [0.8, 1.2, 4.8] if len(head) == 3 and head[0] in {"Test", "Trace"} else [2.8, 2, 2] if len(head) == 3 else [2.2, 4.6]
         for column, width in zip(result.columns, widths):
             column.width = Inches(width)
         for cell, title in zip(result.rows[0].cells, head):
@@ -696,7 +906,13 @@ def render_docx(model):
         table(["Test", "Measured end", "Common window mean"], _window_rows(model))
     for report in model["comparisons"]:
         selected = next(row["display_index"] for row in model["runs"] if row["id"] == report["after_id"])
-        document.add_heading("Baseline compared with Test " + str(selected), 1)
+        heading = document.add_heading("Baseline compared with Test " + str(selected), 1)
+        # Native LibreOffice can strand a comparison heading even with direct
+        # keepNext properties. Begin the bounded introductory block on a fresh
+        # page; the table can still paginate after its first measured row.
+        heading.paragraph_format.page_break_before = True
+        heading.paragraph_format.keep_with_next = True
+        heading.paragraph_format.keep_together = True
         para(report["caveat"])
         document.paragraphs[-1].paragraph_format.keep_with_next = True
         para("Different settings: " + (", ".join(report["settings_differences"]) or "None detected"))
@@ -722,6 +938,16 @@ def render_docx(model):
         for heading, head, rows in _sections(run):
             document.add_heading(heading, 2)
             table(head, rows)
+            if heading == "Route capture context":
+                for diagram in _route_diagrams(run):
+                    add_chart(diagram, height=1.63)
+                    para("Observed TTL sequence. Arrows show ordering only; reply addresses and measured RTTs appear in the hop table.")
+            if heading == "Approximate route locations":
+                world = _world_map(run)
+                if world:
+                    document.add_heading("Approximate public-IP world map", 2)
+                    add_chart(world, height=3.85)
+                    para("Approximate network locations only. Missing and internal hops stay unlocated; markers do not prove router positions or the physical route. Coincident markers can overlap; the table retains every reply.")
             if heading == "Measured results":
                 for title, chart, caption, legend in _charts([run]):
                     document.add_heading(title, 2)
@@ -734,8 +960,7 @@ def render_docx(model):
                 para(text)
         if isinstance(run.get("route"), dict) and run["route"].get("hops"):
             document.add_heading("Captured route hops", 2)
-            table(["Hop", "Address or response", "RTT ms"], [[item.get("hop"), item.get("address", "[redacted]" if model["redacted"] else "No reply"), display(item.get("rtt_ms"))]
-                  for item in run["route"]["hops"]])
+            table(["Hop", "Address or response", "RTT ms"], _route_rows(dict(run, redacted=model["redacted"])))
         if run.get("raw_evidence"):
             document.add_page_break()
             document.add_heading("Raw evidence", 1)

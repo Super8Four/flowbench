@@ -48,6 +48,55 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; f
 #history-project { max-width: 200px; min-width: 120px; }
 #diagnostics-output { max-height: 440px; }
 .report-preview { overflow-wrap: anywhere; }
+.preflight-status { padding: 10px 12px; border-left: 3px solid #c95d71; background: var(--workspace-raised); overflow-wrap: anywhere; }
+.preflight-columns { display: grid; gap: 24px; min-width: 0; }
+.preflight-columns > section { min-width: 0; }
+.preflight-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.preflight-evidence-state { color: var(--workspace-muted); font-size: .8rem; overflow-wrap: anywhere; }
+.route-hop-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr)); gap: 10px; list-style: none; padding: 0; margin: 16px 0; }
+.route-hop { border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-raised); padding: 12px; min-width: 0; overflow-wrap: anywhere; }
+.route-hop-unknown { border-style: dashed; }
+.route-hop-heading { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-bottom: 8px; }
+.route-hop-number { display: inline-grid; place-items: center; min-width: 24px; min-height: 24px; border-radius: 50%; border: 1px solid var(--workspace-border); color: var(--workspace-text); font-size: .8rem; }
+.route-hop-state { color: var(--workspace-muted); font-size: .75rem; flex-basis: 100%; }
+.route-hop-addresses { display: grid; gap: 4px; }
+.route-hop-addresses code { color: var(--workspace-text); white-space: normal; overflow-wrap: anywhere; }
+.route-hop-rtt, .route-hop-detail { font-size: .78rem; line-height: 1.5; margin: 8px 0 0; color: var(--workspace-muted); }
+.preflight-clock-verification { margin-top: 12px; font-size: .85rem; color: var(--workspace-text); }
+.preflight-clock-fields { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(0, 1fr); gap: 8px 16px; margin-block: 16px; }
+.preflight-clock-fields dt { font-size: .8rem; font-weight: 500; color: var(--workspace-muted); }
+.preflight-clock-fields dd { font-size: .85rem; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+#preflight-evidence summary { min-height: 44px; padding-block: 10px; cursor: pointer; }
+#preflight-evidence pre { max-height: 340px; }
+#route-command, #clock-command { overflow-wrap: anywhere; white-space: normal; }
+.connection-map-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.connection-map-controls .btn { min-height: 44px; }
+.connection-map-controls [aria-pressed="true"] { color: var(--workspace-text); border-color: #c95d71; background: var(--workspace-input); }
+.connection-world-map, .connection-topology-map { width: 100%; height: auto; display: block; border: 1px solid var(--workspace-border); border-radius: 5px; background: var(--workspace-console); }
+.connection-map-world-edge { fill: none; stroke: #ef7f98; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 5 4; }
+.connection-map-topology-edge { fill: none; stroke: var(--workspace-muted); stroke-width: 1.5; }
+.connection-map-unknown-edge { stroke-dasharray: 5 4; }
+.connection-map-hit { fill: transparent; stroke: none; }
+.connection-map-dot { fill: #8e2940; stroke: #e3edf5; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.connection-map-unknown-dot { fill: var(--workspace-input); stroke-dasharray: 3 2; }
+.connection-map-marker { cursor: pointer; }
+.connection-map-marker text { fill: var(--workspace-text); pointer-events: none; font-weight: 600; }
+.connection-map-marker:focus { outline: none; }
+.connection-map-marker:focus .connection-map-dot, .connection-map-marker:hover .connection-map-dot { stroke: #fff; stroke-width: 3.5; }
+.connection-map-topology-label { font-size: 12px; }
+.connection-map-topology-scope { font-size: 10px; font-weight: 400 !important; fill: var(--workspace-muted) !important; }
+.connection-map-empty { fill: var(--workspace-muted); font-size: 16px; }
+.connection-map-selection { background: var(--workspace-raised); padding: 12px; margin-top: 12px; border-radius: 5px; overflow-wrap: anywhere; }
+.connection-map-attribution { font-size: .75rem; }
+#route-location-rows td { overflow-wrap: anywhere; }
+@media (min-width: 768px) {
+  .preflight-clock-fields { grid-template-columns: minmax(100px, .8fr) minmax(0, 1fr) minmax(100px, .8fr) minmax(0, 1fr); }
+}
+@media (max-width: 575px) {
+  .route-hop-map { grid-template-columns: minmax(0, 1fr); }
+  .route-hop-heading { gap: 4px 10px; }
+  .route-hop-state { flex-basis: auto; margin-left: auto; }
+}
 .comparison-selections { display: grid; gap: 12px; }
 .comparison-selection { display: grid; grid-template-columns: minmax(100px, .3fr) minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--workspace-border); border-radius: 5px; }
 .comparison-selection .form-label { margin-bottom: 0; }

@@ -467,7 +467,7 @@ class DiagnosticsCapture:
             "path_context": {"target": self.settings.get("target"), "bind": self.settings.get("bind", ""), "requested_ip_version": self.settings.get("ip_version", "auto"),
                              "note": "Echo probes use the local OS default source address; an iPerf bind address is recorded but is not imposed on these probes. Hostnames use IPv4 probes unless IPv6 is selected; the iPerf connection can resolve differently.",
                              "probe_ip_version": self._family() if self.target else None, "port": self.settings.get("port"), "protocol": self.settings.get("protocol"),
-                             "mtu": mtu, "route": {"status": "separate" if self.settings.get("traceroute") else "disabled", "note": "When requested, the existing route capture is stored alongside diagnostics after traffic. A probe route does not prove a throughput bottleneck."}}
+                             "mtu": mtu, "route": {"status": "separate", "note": "New outgoing tests store one mandatory route capture before traffic alongside diagnostics. Inspect the saved route's phase; historical captures can have different timing. A probe route does not prove a throughput bottleneck."}}
         }
         if self.checkpoint_error:
             # Keep top-level schema stable; the persistence error belongs to the

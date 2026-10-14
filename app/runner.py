@@ -17,7 +17,6 @@ from uuid import uuid4
 
 from .metrics import effective_settings, measurements, series, overview
 from .peer import peer_results
-from .route import capture_route
 from .storage import SQLiteArchive
 from .matrix import matrix_plan
 from .units import RATE_CONTRACT
@@ -129,6 +128,7 @@ class RunManager:
         self.record = None
         self.job = None
         self.diagnostics_capture = None
+        self.preflight_capture = None
         self.listener = None
         self.events = []
         self.capture_errors = []
@@ -249,9 +249,21 @@ class RunManager:
 
     def recover(self):
         for record in self.storage.records():
+            changed = False
             if record["status"] not in TERMINAL or record.get("finished_at") is None:
                 record.update(status="interrupted", finished_at=now(),
                               error="The app stopped before this session finished.")
+                changed = True
+            preflight = record.get("preflight")
+            if preflight and (preflight.get("status") == "pending" or preflight.get("time_quality", {}).get("status") == "pending"):
+                from .time_quality import time_quality_result
+                preflight["status"] = "partial" if preflight.get("phase") == "before_traffic" else "not_applicable"
+                if preflight.get("time_quality", {}).get("status") == "pending":
+                    preflight["time_quality"] = time_quality_result(status="unavailable", note="The app stopped before the local time query was retained. No clock result has been inferred.")
+                if record.get("route", {}).get("status") == "pending":
+                    record["route"].update(status="unavailable", note="The app stopped before route capture was retained. No missing hops have been inferred.")
+                changed = True
+            if changed:
                 self.save(record)
 
     def command(self, settings):
@@ -389,6 +401,7 @@ class RunManager:
                                "mode": effective_settings(child)["mode"], "status": child["status"],
                                "streams": effective_settings(child)["streams"], "settings": child["settings"],
                                "diagnostics": child.get("diagnostics"), "annotations": child.get("annotations"),
+                               "preflight": child.get("preflight"), "route": child.get("route"),
                                "error": child.get("error"), "metrics": measurements(child),
                                "created_at": child["created_at"], "finished_at": child["finished_at"]})
             return result
@@ -544,11 +557,43 @@ class RunManager:
         finally:
             stream.close()
 
+    def preflight(self):
+        """Checkpoint one independent preflight for this actual outgoing child."""
+        from .preflight import PreflightCapture
+        settings = self.record["settings"]
+        capture = PreflightCapture(settings, lambda: self.cancel_requested or self.shutdown_requested)
+        owner_id = self.record["id"]
+        with self.lock:
+            self.preflight_capture = capture
+        def checkpoint(evidence, route):
+            with self.lock:
+                if self.record["id"] != owner_id:
+                    raise RuntimeError("Preflight archive ownership changed.")
+                previous = copy.deepcopy(self.record)
+                self.record.update(preflight=evidence, route=route)
+                try:
+                    self.save(self.record)
+                except OSError as exc:
+                    self.record = previous
+                    self.storage_error = str(exc)
+                    self.record["error"] = "Preflight archive write failed: " + str(exc)
+                    raise
+        try:
+            capture.capture(checkpoint)
+            return not capture.is_cancelled()
+        finally:
+            capture.cancel()
+            with self.lock:
+                self.preflight_capture = None
+
     def run(self, grouped=False):
         readers = []
         diagnostics = None
         try:
             settings = self.record["settings"]
+            if not self.preflight():
+                self.record["status"] = "cancelled"
+                return
             if settings["role"] == "client" and any(settings.get(key, False) for key in ("latency", "endpoint_health", "mtu")):
                 from .diagnostics import DiagnosticsCapture
                 diagnostics = DiagnosticsCapture(settings, lambda: self.cancel_requested)
@@ -635,27 +680,8 @@ class RunManager:
                     outcome = "cancelled"
                 else:
                     outcome = "completed" if code == 0 and not self.record["error"] else "failed"
-                trace = settings["role"] == "client" and settings["traceroute"] and outcome == "completed"
-                self.record["status"] = "running" if trace else outcome
+                self.record["status"] = outcome
                 self.log("system", f"iPerf3 exited with code {code}; throughput {outcome}.")
-                self.record["route"] = {"status": "pending" if trace else "skipped", "hops": [],
-                                        "note": "Route capture follows a successful client test when selected."}
-                if trace:
-                    self.record["status"] = "running"
-                    self.log("system", "Throughput finished; capturing route (maximum 20 seconds, 16 hops).")
-            if trace:
-                def begin_route(command):
-                    with self.lock:
-                        if self.cancel_requested:
-                            return None
-                        self.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                                        text=True, errors="replace", creationflags=CREATE_FLAGS)
-                        return self.process
-                result = capture_route(settings, begin_route, lambda: self.cancel_requested)
-                with self.lock:
-                    self.record["route"] = result
-                    self.record["status"] = "cancelled" if self.cancel_requested else outcome
-                    self.log("system", "Route capture: " + result["status"] + ".")
         except Exception as exc:
             with self.lock:
                 if self.process and self.process.poll() is None:
@@ -704,6 +730,8 @@ class RunManager:
                     if self.record and self.record.get("kind") not in {"protocol-job", "matrix-job"} and self.record["status"] not in TERMINAL:
                         self.log("system", "Grouped job stopped by user.")
                 finally:
+                    if self.preflight_capture:
+                        self.preflight_capture.cancel()
                     if self.diagnostics_capture:
                         self.diagnostics_capture.cancel()
                     if self.process and self.process.poll() is None:
@@ -716,6 +744,8 @@ class RunManager:
             try:
                 self.log("system", "Stop requested by user.")
             finally:
+                if self.preflight_capture:
+                    self.preflight_capture.cancel()
                 if self.diagnostics_capture:
                     self.diagnostics_capture.cancel()
                 if self.process and self.process.poll() is None:
@@ -740,7 +770,9 @@ class RunManager:
                 self.storage_error = str(exc)
         if self.worker and self.worker is not threading.current_thread():
             self.worker.join(timeout=15)
-        if self.worker and self.worker.is_alive():
+        if (self.worker and self.worker.is_alive()) or (self.listener and
+                ((self.listener.worker and self.listener.worker.is_alive()) or
+                 (self.listener.time_worker and self.listener.time_worker.is_alive()))):
             # A writer still holds the archive. Preserve ownership and honest
             # unavailable readiness instead of letting a second app race it.
             self.storage_error = "Shutdown did not finish within 15 seconds; archive writer ownership is retained until the worker exits."
@@ -790,6 +822,10 @@ class RunManager:
         readers = []
         process = None
         try:
+            if not self.preflight():
+                self.record["status"] = "cancelled"
+                self.record["flent"]["status"] = "cancelled"
+                return
             # Only files created in this owned temporary child directory are cleaned.
             with tempfile.TemporaryDirectory(prefix="flent-", dir=self.directory) as directory:
                 with self.lock:
