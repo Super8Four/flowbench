@@ -83,6 +83,8 @@ function renderListener(state) {
   if (!$('listener-form').dataset.loaded) {
     for (const [key, id] of Object.entries(fields)) $(id).value = state.settings[key];
     $('listener-form').dataset.loaded = 'true';
+    $('listener-form').setAttribute('aria-busy', 'false');
+    if ($('listener-loading')) $('listener-loading').hidden = true;
   }
   const running = state.state === 'listening';
   for (const id of Object.values(fields)) $(id).disabled = running;
@@ -763,6 +765,7 @@ init();
 
 $('listener-form')?.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!$('listener-form').dataset.loaded || $('listener-start').disabled) return;
   $('listener-start').disabled = true;
   $('listener-start').textContent = 'Enabling…';
   $('listener-error').classList.add('d-none');

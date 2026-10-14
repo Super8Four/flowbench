@@ -7,6 +7,7 @@
 - Capture one bounded route and read-only local clock-quality observation before each outgoing test, including Both/matrix children and Flent. Retain ordered hop evidence, explicit passive-capture limits, UTC verification limits and portable report/import evidence.
 - Add offline world and ordered connection views with optional operator-supplied DB-IP City Lite data, approximate public-IP markers, internal/unknown-hop fallbacks and location redaction in reports.
 - Keep history and map keyboard focus across polling updates. Expose sidebar/group expanded states and support mobile navigation focus containment, Escape and focus return.
+- Keep incoming listener controls disabled until saved settings load, so an early edit cannot be overwritten by the initial status response.
 - Integrate transparent outlined branding into the dark sidebar and mobile header, preserving original logo shapes and assets. Refresh current-app documentation and synthetic desktop/mobile screenshots.
 - Add independent review regressions for report redaction, Flent IP-family preservation and incomplete RRUL evidence. Keep native Word legends together across page boundaries.
 - Reject malformed interval identities atomically during JSON/XML imports. Preserve historical raw evidence while keeping affected rows visible with explicit unavailable-derived-measurement warnings.
