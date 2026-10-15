@@ -23,7 +23,7 @@ A native build selects the host architecture. The supplied Compose file runs non
 
 The 0.2.0-rc.1 images include the measurement, diagnostic and report features described in these guides.
 
-Download the matching architecture's `.tar.gz`, `.image.json` and `.SHA256SUMS` from the [release](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1). Keep them together in a new directory. Example for ARM64:
+Use the tagged checkout from the first two commands above (`git clone` and `cd`) so the matching `compose.yaml` is available; skip the build when using a prebuilt image. Download the matching architecture's `.tar.gz`, `.image.json` and `.SHA256SUMS` from the [release](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1). Keep the three files together in that checkout and run the following commands there. Example for ARM64:
 
 ```sh
 sha256sum -c flowbench-0.2.0-rc.1-linux-arm64.SHA256SUMS

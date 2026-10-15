@@ -2,7 +2,7 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](assets/badges/container.svg)](setup-and-testing.md) [![Architecture](assets/badges/platform.svg)](setup-and-testing.md) [![Python](assets/badges/python.svg)](setup-and-testing.md) [![SQLite](assets/badges/storage.svg)](sqlite-storage.md) [![iPerf3](assets/badges/engine.svg)](protocol-tests.md)
 
-These instructions cover **0.2.0-rc.1**, including standalone checks, reruns, endpoints, route/clock evidence and measurement reports. The [installation index](install/README.md) has platform-specific steps. Older rc.1/rc.2 downloads retain their original contents.
+These instructions cover **0.2.0-rc.1**, including standalone checks, reruns, endpoints, route/clock evidence and measurement reports. The [installation index](install/README.md) has platform-specific steps. Historical 0.1.0-rc.1 and 0.1.0-rc.2 downloads retain their original contents.
 
 ## Ubuntu container
 
@@ -55,7 +55,7 @@ Checks retain one read-only local clock observation but do not automatically cap
 
 ## Optional offline map data
 
-Current-main images/dependencies include the MMDB reader but no dataset. Supply a licensed **DB-IP City Lite MMDB** yourself, retaining its required attribution. The default `/data/geolocation/dbip-city-lite.mmdb` lives in the existing persistent volume. Native installations can set an absolute `FLOWBENCH_GEO_DB` path in `.env`. A different Compose path needs an explicit service-environment entry and readable local data; an unused `.env` variable is not automatically forwarded into the container.
+The 0.2.0-rc.1 images and requirements include the MMDB reader but no dataset. Supply a licensed **DB-IP City Lite MMDB** yourself, retaining its required attribution. The default `/data/geolocation/dbip-city-lite.mmdb` lives in the existing persistent volume. Native installations can set an absolute `FLOWBENCH_GEO_DB` path in `.env`. A different Compose path needs an explicit service-environment entry and readable local data; an unused `.env` variable is not automatically forwarded into the container.
 
 The app makes no online geolocation, tile or dataset-download requests. Private/special addresses are excluded from lookup. The ordered topology remains useful without locations, and public-IP coordinates are approximate network context rather than device GPS or a proven physical route. Follow [the dataset, licensing and attribution guide](preflight.md#optional-offline-public-ip-locations) before supplying data. Local clock quality can remain unavailable in a container; system UTC is not independently NTP verified.
 
