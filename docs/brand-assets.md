@@ -14,4 +14,4 @@ The original SVG and PNG retain their 2172×724 canvas. The dark-surface variant
 
 Both SVGs are self-contained: no scripts, fonts, embedded images, CSS dependencies or external resources. They are served as `image/svg+xml`. README branding chooses the dark SVG for dark readers and the original SVG for light readers, with no background panel. Real browser screenshots remain raster captures, rather than reconstructed SVG mockups. Security, geometry and serving checks run in the application suite; actual desktop/mobile pixels and keyboard navigation are checked separately.
 
-The dark integration belongs to current unreleased source, not the rc.2 downloads. Existing rc.1/rc.2 tags and assets remain immutable. See [release notes](release-0.1.0-rc.2.md) for that historical release and [current browser verification](verification.md) for the new app.
+The transparent dark-surface integration is included in 0.2.0-rc.1. Older rc.2 downloads retain their original presentation. Existing rc.1/rc.2 tags and assets remain immutable. See [release notes](release-0.1.0-rc.2.md) for that historical release and [current browser verification](verification.md) for the new app.

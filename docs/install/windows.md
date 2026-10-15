@@ -2,12 +2,11 @@
 
 [Installation index](README.md) · [Configuration](configuration.md) · [Maintenance](maintenance.md)
 
-Use 64-bit Windows, Python 3.12 with the `py` launcher, PowerShell and Git. Python 3.12 is the verified runtime. Clone main for the current development features. See [version selection](README.md#choose-a-source-version) before using an older published tag or source download:
+Use 64-bit Windows, Python 3.12 with the `py` launcher, PowerShell and Git. Python 3.12 is the verified runtime. Clone the tagged prerelease for reproducible installation. See [version selection](README.md#choose-a-source-version) before using an older published tag or source download:
 
 ```powershell
-git clone https://github.com/Super8Four/flowbench.git
+git clone --branch v0.2.0-rc.1 --depth 1 https://github.com/Super8Four/flowbench.git
 Set-Location -LiteralPath flowbench
-git switch main
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\scripts\install-iperf.ps1

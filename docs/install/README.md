@@ -2,13 +2,13 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](../assets/badges/container.svg)](containers.md) [![Architecture](../assets/badges/platform.svg)](containers.md) [![Python](../assets/badges/python.svg)](containers.md) [![SQLite](../assets/badges/storage.svg)](../sqlite-storage.md) [![iPerf3](../assets/badges/engine.svg)](../protocol-tests.md)
 
-Choose the method that fits your host. The guides below install **current main (`0.2.0-dev`)**, including DNS/ICMP checks, Run again, route/clock evidence, offline geographic views and measurement reports. These additions are merged source features, not a new published release.
+Use **0.2.0-rc.1** for a reproducible prerelease with DNS/ICMP checks, Run again, endpoint/route evidence, projects and reports. Choose a platform below, then follow [backup and maintenance](maintenance.md) before replacing an existing installation.
 
 ## Choose a source version
 
-Fresh-clone examples use `git switch main`. Record `git rev-parse HEAD` when building so a test result or image can be tied to its exact source. Main can continue changing; consult [verification](../verification.md) for checked revisions and remaining limits.
+Clone the tagged release with `git clone --branch v0.2.0-rc.1 --depth 1 https://github.com/Super8Four/flowbench.git`, or download its [checksummed native image](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1). Use one version's source, dependencies and metadata together.
 
-To reproduce published [0.1.0-rc.2](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2), select `git switch --detach v0.1.0-rc.2` after cloning, or load its matching checksummed image. Its tag and downloads remain unchanged and do not gain current-main features. Use one version's source, dependencies and container metadata together.
+For development, clone main and record its exact commit. Main can advance beyond a release. Historical 0.1.0-rc.1/rc.2 tags and downloads remain available with their original feature sets.
 
 ## Choose an installation
 
@@ -26,7 +26,7 @@ To reproduce published [0.1.0-rc.2](https://github.com/Super8Four/flowbench/rele
 - [Configuration, ports and data](configuration.md)
 - [Upgrades, backups, rollback and removal](maintenance.md)
 - [Troubleshooting](troubleshooting.md)
-- [Verification](../verification.md) and [release notes](../release-0.1.0-rc.2.md)
+- [Verification](../verification.md) and [release notes](../release-0.2.0-rc.1.md)
 
 The API has no login. Keep the web port local or behind authenticated access. All examples retain loopback defaults; installation does not configure a firewall or make a test server publicly reachable. Run one app process per archive.
 

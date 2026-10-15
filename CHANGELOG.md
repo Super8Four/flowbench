@@ -1,12 +1,16 @@
 # FlowBench changelog
 
-[![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.1.0-rc.2) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
+[![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
-## Proposed correction - partial endpoint evidence
+## 0.2.0-rc.1 - 2026-10-15
 
-The `fix/endpoint-partial-evidence` branch is under review and is not merged into main. It preserves known partial endpoint availability through end-only updates and finalization. Only fresh matching socket observations can reconcile the warning; an empty start or a different reporter cannot. It keeps normal unknown-field enrichment, existing row limits, SQLite schema and JSON/XML formats unchanged, without rewriting historical archives.
+This prerelease brings the merged measurement, diagnostic and reporting workflows into the release downloads. It retains SQLite schema 1 and the existing persistent data volume. See [release notes](docs/release-0.2.0-rc.1.md) for install, upgrade and verification links.
 
-## Unreleased - Test endpoints
+- Preserve partial endpoint availability through streamed start/end updates and finalization until fresh matching socket evidence reconciles it. Keep unknown-field enrichment, bounded lists and portable formats unchanged; older archived labels are not rewritten.
+- Update minimum Flask, python-dotenv and Waitress versions and use ReportLab 5.0.1 after regression and rendered-report review.
+- Refresh the README, platform guides and synthetic screenshots. Keep the supplied transparent SVG artwork and required third-party notices.
+
+### Test endpoints
 
 Current main adds optional captured execution hostname, reporter-local/remote socket pairs, typed destinations and initiating web-peer context, with separate current viewing context. These additions are delivered through PR24 and are not included in existing rc.2 downloads. See [endpoint interpretation and privacy](docs/test-endpoints.md).
 
@@ -14,9 +18,9 @@ Current main adds optional captured execution hostname, reporter-local/remote so
 - Keep historical fallback view-only, validate additive JSON/XML metadata before atomic imports, and redact endpoint/context copies in PDF/Word reports even with raw output selected. Existing SQLite schema and persistent volume remain unchanged.
 - Remove trailing empty Word body paragraphs that produced a blank final page, preserving the final tables. PR24 records exact-source checks and remaining acceptance limits. Integration creates no release or deployment.
 
-## Unreleased - checks, route evidence and measurement workflows
+### Checks, route evidence and measurement workflows
 
-These changes are merged into current main (`0.2.0-dev`). Published rc.1 and rc.2 tags and downloads remain immutable; build current main for the additions below.
+These changes are included in 0.2.0-rc.1. Published rc.1 and rc.2 tags and downloads remain immutable.
 
 - Add standalone typed DNS queries and ICMP echo observations, terminal-outcome comparisons and PDF/Word reporting with sensitive-context redaction. Keep unknown sends/RTT and failed captures explicit; ICMP nonresponse is not application or UDP packet loss.
 - Publish diagnostic completion after owned work is cleaned up, keeping captured terminal evidence and its completion time stable.
@@ -38,7 +42,7 @@ These changes are merged into current main (`0.2.0-dev`). Published rc.1 and rc.
 - Integrate optional actual Linux Flent RRUL through local tools, preserving native result data and stopping owned child processes.
 - Generate branded PDF/Word reports for completed tests and comparisons, with default redaction, an evidence preview and stale-preview checks.
 - Refresh installation guides and synthetic desktop/mobile screenshots for the merged main features, distinguishing source builds from existing prerelease downloads.
-- Keep rc.1 and rc.2 immutable. Merging these changes does not publish a release, deploy the app or complete authentication, retention, scenario thresholds or instance coordination.
+- Keep older 0.1.0-rc.1/rc.2 releases immutable. This release does not deploy the app or complete authentication, retention, scenario thresholds or instance coordination.
 
 ## 0.1.0-rc.2 - vector logo update
 
