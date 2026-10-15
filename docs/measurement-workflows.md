@@ -46,6 +46,12 @@ Choose a completed measured individual baseline to overlay against an active ind
 
 Run labels, notes and the site/device/circuit/ticket tags are editable. Timeline notes have a timezone-aware timestamp and an optional elapsed second. They are user observations, separate from original native measurement output. Editing a parent job's project or tags also updates its children transactionally; timeline notes apply to the selected record. Metadata edits publish only after storage commits.
 
+## Endpoint detail in saved results
+
+Current main includes a **Test endpoints** panel and compact history availability summary. Existing rc.2 downloads do not contain this addition. Selected details distinguish a captured execution/container hostname, per-reporter numeric socket pairs or typed destinations, and any captured initiating web peer. Current viewing context is separate. Both/matrix parents do not invent combined endpoints; inspect each child.
+
+Imported and older records can show a view-only fallback from retained structured native output, with unknown hostname/initiator values left unavailable. Opening history does not send lookups or rewrite the archive. Full JSON/XML/project exports can contain sensitive endpoint/context values; PDF/Word default redaction removes them, including raw and nested copies. See [endpoint provenance and sharing](test-endpoints.md).
+
 ## SQLite, export and compatibility
 
 The database remains `RUNS_DIRECTORY/archive.sqlite3`, or `/data/runs/archive.sqlite3` in the persistent container volume. Runs are JSON documents in SQLite's `runs` table, raw events are separate ordered records, and project catalog metadata is stored in the same database. Diagnostic data, route evidence, tags and timeline notes commit with their run documents. These are actual database writes; no database server is required.
@@ -54,8 +60,14 @@ Run, job and project exports use versioned JSON or the app's typed XML format. B
 
 A legacy snapshot can preserve additive records and `projects.json` for a compatible newer build. Older releases can ignore unfamiliar fields and cannot offer these new workflows; rollback is not a claim of feature compatibility. Keep the complete SQLite backup and the exact newer source/image identity. Never overwrite an existing archive to test an import or rollback.
 
+## Standalone checks and repeated executions
+
+Use **Test & export → Measurement type** for a standalone DNS lookup or ICMP echo check. These save typed attempts and outcomes without throughput values, and can be filtered in history, compared with the same check type and included in PDF/Word reports. A failed or partial check can still contain useful evidence; missing sends, replies and RTTs remain unavailable. See the [check workflows and interpretation limits](network-checks.md).
+
+**Run again** starts a new execution from saved configuration, with a new identity and immutable source link. Ordinary outgoing iPerf, Both/matrix and DNS/ICMP records start immediately after validation; Flent and incoming records first require their review panel and a fresh confirmation. **Load settings** fills the editable form for review or changes before a normal new start and does not promise lineage. Neither action rewrites the saved source; opening, exporting or importing evidence starts no traffic.
+
 ## Verification boundaries
 
 The workflow tests use disposable SQLite archives and synthetic records to check direct database contents, reopen persistence, JSON/XML interchange, project ID remapping, failed-import rollback, legacy compatibility and sparse live comparisons. Container lifecycle checks use bounded, disposable loopback iPerf peers and a fresh volume, verify native diagnostic status honestly under dropped capabilities, then replace the container and compare saved exports.
 
-Passing those checks does not establish a physical Pi deployment, external network performance, remote health access, full accessibility acceptance or resilience to physical storage failure. Consult the CI result for the exact feature-branch commit; existing prerelease tags and assets remain immutable.
+Passing those checks does not establish a physical Pi deployment, external network performance, remote health access, full accessibility acceptance or resilience to physical storage failure. Consult the CI result for the exact source commit; existing prerelease tags and assets remain immutable.

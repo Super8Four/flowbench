@@ -59,7 +59,7 @@ def _private_diagnostics(value, key=""):
                    "unconfirmed", "separate", "detected local", "local", "remote", "manual", "linux", "windows"}
     safe_keys = set("schema_version latency endpoint_health path_context enabled metric baseline loaded samples summary mean_increase_ms sample_limit interval_seconds sample_limit_reached status timestamp elapsed_seconds rtt_ms rtt_upper_bound_ms note error errors exit_code local remote provenance before after delta cpu cpu_utilization_percent cpu_busy_percent interfaces counters total_ticks idle_ticks captured_at rx_bytes rx_errors rx_drops tx_bytes tx_errors tx_drops requested_ip_version probe_ip_version port protocol mtu route tested_packet_sizes largest_confirmed_packet_bytes packet_bytes hops hop responded observed observations concurrency overlaps incoming outgoing ids attempted replies missing numeric_samples min_ms max_ms mean_ms median_ms stddev_ms p95_ms phase started_at finished_at".split())
     if isinstance(value, dict):
-        return {name if name in safe_keys else "field_" + str(index): _private_diagnostics(item, name) for index, (name, item) in enumerate(value.items(), 1)
+        return {name: _private_diagnostics(item, name) for name, item in _without_endpoint_context(value).items() if name in safe_keys
                 if name not in {"raw", "raw_output", "raw_stdout", "raw_stderr", "command", "executable", "address", "host", "target", "bind", "source", "interface", "name"}}
     if isinstance(value, list):
         return [_private_diagnostics(item, key) for item in value]
@@ -75,6 +75,42 @@ def _private_diagnostics(value, key=""):
                 pass
         return value if key in {"status", "provenance", "platform"} and value in safe_states else "[redacted]"
     return _clean(value)
+
+
+def _without_endpoint_context(value):
+    """Remove sensitive endpoint subtrees before any generic report projection."""
+    if isinstance(value, dict):
+        if ({"sockets", "control_peers", "destinations"} <= value.keys()
+                or value.get("source") == "wsgi_remote_addr" and "peer" in value):
+            return {}
+        return {key: _without_endpoint_context(item) for key, item in value.items()
+                if key not in {"endpoints", "endpoint_view", "initiator_context", "web_request", "browser_peer"}}
+    if isinstance(value, list):
+        return [_without_endpoint_context(item) for item in value]
+    return value
+
+
+def _report_endpoints(record, redact):
+    from .endpoints import endpoint_view, validate_context
+    captured = endpoint_view(record)
+    context = copy.deepcopy(record.get("initiator_context"))
+    if context is not None:
+        validate_context(context)
+    if not redact:
+        return _clean(captured), _clean(context)
+    # Exact projection: even numeric identifiers and unknown future fields are
+    # private. Raw opt-in never changes this boundary.
+    sockets, destinations = captured.get("sockets", []), captured.get("destinations", [])
+    points = [item.get(side) or {} for item in sockets for side in ("local", "remote")]
+    points += [item.get("endpoint") or {} for item in destinations]
+    summary = {"schema_version": 1, "status": captured["status"], "provenance": captured["provenance"],
+               "identifiers_redacted": True, "socket_count": len(sockets),
+               "control_peer_count": len(captured.get("control_peers", [])), "destination_count": len(destinations),
+               "families": sorted({point["family"] for point in points if point.get("family") in (4, 6)}),
+               "protocols": sorted({item["protocol"] for item in sockets if item.get("protocol") in {"tcp", "udp"}})}
+    private_context = {"schema_version": 1, "status": "recorded" if context else "not_recorded",
+                       "identifiers_redacted": True}
+    return summary, private_context
 
 
 def _private_preflight(value):
@@ -153,7 +189,7 @@ def _private_check(value, key=""):
                 "version": "[redacted]" if value.get("version") else None,
                 "platform": value.get("platform") if value.get("platform") in {"linux", "win32", "darwin"} else "[redacted]"}
     if isinstance(value, dict):
-        return {name: _private_check(item, name) for name, item in value.items() if name in fields or key == "outcomes" and name in states}
+        return {name: _private_check(item, name) for name, item in _without_endpoint_context(value).items() if name in fields or key == "outcomes" and name in states}
     if isinstance(value, list):
         return [_private_check(item, key) for item in value]
     if isinstance(value, str):
@@ -192,11 +228,13 @@ def _check_report(manager, records, projects, redact, include_raw, expected_fing
         settings = copy.deepcopy(record["settings"])
         project = projects.get(settings.get("project_id"))
         result = copy.deepcopy(record["result"])
+        endpoints, initiator = _report_endpoints(record, redact)
         row = {"id": record["id"], "kind": "diagnostic-check", "check_type": record["check_type"],
                "display_index": index, "color": run_color(record), "label": "Check " + str(index) if redact else record.get("label") or settings.get("label") or "Check " + str(index),
                "created_at": record["created_at"], "finished_at": record["finished_at"], "status": record["status"],
                "settings": _private_check(settings) if redact else settings,
                "result": _private_check(result) if redact else drop_raw(result), "metrics": {}, "series": [],
+               "endpoints": endpoints, "initiator_context": initiator,
                "project": "[redacted]" if redact and project else copy.deepcopy(project),
                "tags": {} if redact else copy.deepcopy(settings.get("tags", {})),
                "notes": "[redacted]" if redact and settings.get("notes") else settings.get("notes", ""),
@@ -255,6 +293,11 @@ def prepare_report(manager, data):
             if "lineage" in record:
                 from .reruns import validate_lineage
                 validate_lineage(record["lineage"])
+            from .endpoints import validate_endpoints, validate_context
+            if "endpoints" in record:
+                validate_endpoints(record["endpoints"], record)
+            if "initiator_context" in record:
+                validate_context(record["initiator_context"])
             if record.get("children") or record.get("kind") in {"protocol-job", "matrix-job"}:
                 raise ValueError("Choose individual tests within a protocol or matrix batch.")
             if record.get("kind") == "diagnostic-check":
@@ -334,6 +377,7 @@ def prepare_report(manager, data):
             metric_names[key] = "external_metric_" + str(len(metric_names) + 1) + suffix
     for index, record in enumerate(records, 1):
         settings = effective_settings(record)
+        endpoints, initiator = _report_endpoints(record, redact)
         project = projects.get(settings.get("project_id"))
         diagnostics, route = copy.deepcopy(record.get("diagnostics")), copy.deepcopy(record.get("route"))
         preflight = copy.deepcopy(record.get("preflight"))
@@ -355,6 +399,7 @@ def prepare_report(manager, data):
                "diagnostics": _private_diagnostics(diagnostics) if redact else diagnostics,
                "route": _private_route(route) if redact else route,
                "preflight": _private_preflight(preflight) if redact else preflight,
+               "endpoints": endpoints, "initiator_context": initiator,
                "provenance": {"engine": record.get("engine", "iperf3"), "engine_version": record.get("iperf_version"),
                               "output_format": record.get("output_format"), "imported": bool(record.get("imported")),
                               "lineage": copy.deepcopy(record.get("lineage")),
@@ -564,10 +609,48 @@ def _check_sections(run):
     return sections
 
 
+def _endpoint_sections(run):
+    evidence = run.get("endpoints") or {}
+    def point(value):
+        value = value or {}
+        address = value.get("address")
+        if not address:
+            return "Unavailable"
+        address = "[" + address + "]" if ":" in address else address
+        return address + (":" + str(value["port"]) if value.get("port") is not None else " (port unavailable)")
+    rows = [("Capture status / provenance", display(evidence.get("status")) + " / " + display(evidence.get("provenance"))),
+            ("Interpretation", "Local and remote remain in each reporter's perspective, including reverse and bidirectional tests. Process/container namespace addresses do not establish a physical host, NAT egress or public IP.")]
+    if evidence.get("identifiers_redacted"):
+        rows.extend([("Endpoint identifiers", "Removed by redaction, including hostnames, socket IDs and ports"),
+                     ("Data sockets / control peers / destinations", f"{evidence.get('socket_count', 0)} / {evidence.get('control_peer_count', 0)} / {evidence.get('destination_count', 0)}"),
+                     ("Observed families / protocols", _summary(evidence.get("families", [])) + " / " + _summary(evidence.get("protocols", [])))])
+    else:
+        rows.append(("Execution hostname", evidence.get("execution_hostname") or "Not recorded; no current-host substitution"))
+        for index, item in enumerate(evidence.get("sockets", []), 1):
+            label = f"Data socket {index}: {item['reporter']} / {item['observer']} / {item.get('protocol') or 'protocol unavailable'}"
+            rows.append((label, "Local " + point(item.get("local")) + "\nRemote " + point(item.get("remote")) + "\nSource: " + item["source"]))
+        if not evidence.get("sockets"):
+            rows.append(("Measured data sockets", "Not captured or unavailable; requested settings are not observed sockets"))
+        for index, item in enumerate(evidence.get("control_peers", []), 1):
+            rows.append((f"Control peer {index}: {item['reporter']}", point(item.get("peer")) + "; control connection, not a data-stream port"))
+        for index, item in enumerate(evidence.get("destinations", []), 1):
+            rows.append((f"Destination {index}: {item['purpose']}", point(item.get("endpoint")) + "\nReported host: " + display(item.get("reported_host")) + "\nSource: " + item["source"] + "; " + display(item.get("transport"))))
+    context = run.get("initiator_context")
+    if isinstance(context, dict) and context.get("identifiers_redacted"):
+        request = "Identifiers removed by redaction" if context["status"] == "recorded" else "Not recorded"
+    elif context:
+        request = point(context.get("peer")) + " | Observed UTC " + context["observed_at"] + " | WSGI request peer"
+    else:
+        request = "Not recorded; no current-viewer substitution"
+    rows.append(("Initiating HTTP peer (not traffic source)", request + ". Request context can identify a proxy peer; it does not identify the traffic generator or public client IP."))
+    return [("Captured test endpoints", ["Evidence", "Recorded value"], rows)]
+
+
 def _sections(run):
     """One shared narrative/table definition prevents PDF and Word drift."""
     if run.get("kind") == "diagnostic-check":
-        return _check_sections(run)
+        sections = _check_sections(run)
+        return sections[:1] + _endpoint_sections(run) + sections[1:]
     s = run["settings"]
     settings = [("Role and endpoint", f"{s.get('role')} | {display(s.get('target'))}:{display(s.get('port'))}\nBind: {s.get('bind') or 'Automatic'}"),
                 ("Protocol and direction", f"{s.get('protocol')} | {s.get('mode')}"),
@@ -585,6 +668,7 @@ def _sections(run):
         settings.append(("Workload", run["workload"]))
     sections = [("Test settings and provenance", ["Setting", "Recorded value"], settings),
                 ("Measured results", ["Metric", "Value"], [(metric_label(k), metric_value(k, v)) for k, v in sorted(run["metrics"].items())])]
+    sections[1:1] = _endpoint_sections(run)
     preflight = run.get("preflight") or {}
     quality = preflight.get("time_quality") or {}
     if preflight:
@@ -1138,6 +1222,12 @@ def render_docx(model):
             para("Raw fields are limited to 20000 characters each. Any truncation is explicitly recorded below.")
             para(display(run["raw_evidence"]))
     output = BytesIO()
+    # Table spacing is useful between sections, but a final empty paragraph can
+    # overflow onto an otherwise blank page in native LibreOffice conversion.
+    # Body-level tables do not require the trailing paragraph that cells do.
+    body = document._element.body
+    while len(body) > 1 and body[-2].tag == qn("w:p") and len(body[-2]) == 0:
+        body.remove(body[-2])
     for border in document._element.xpath(".//w:pBdr"):
         border.getparent().remove(border)
     content_bytes = len(document._element.xml.encode("utf-8")) + sum(len(part.blob) for part in document.part.package.image_parts)

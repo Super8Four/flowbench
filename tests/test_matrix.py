@@ -1,9 +1,11 @@
 import copy
+import json
 import os
 from pathlib import Path
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
@@ -18,6 +20,109 @@ from test_protocols import process_for
 def request(**changes):
     return {"settings": {"target": "127.0.0.1", "duration": 1, "bandwidth": "2M"},
             "protocols": ["tcp", "udp"], "modes": ["upload", "download"], "streams": [1, 2], **changes}
+
+
+def wait_for_matrix_capture(manager, *, idle_timeout=10, total_timeout=40, clock=None, wait=None):
+    """Wait for mocked children to persist, bounding stalls and total runtime.
+
+    Eight children commit 48 events plus their lifecycle writes. A controlled
+    .22-second delay per durable event left the worker alive after ten seconds
+    (41 committed events), then all children completed at 11.625 seconds. This
+    demonstrates a fixed-join failure, not the cause of a particular CI failure.
+    Sample under the capture lock so in-flight writes do not count as progress;
+    acquiring that lock is itself bounded and cannot hide a stalled worker.
+    """
+    worker = manager.worker
+    clock, wait = clock or time.monotonic, wait or worker.join
+    began = last_progress_at = clock()
+    previous, state = None, {"capture_lock_observed": False}
+    while True:
+        observed = clock()
+        remaining = min(total_timeout - (observed - began), idle_timeout - (observed - last_progress_at))
+        if remaining > 0 and manager.lock.acquire(timeout=min(.05, remaining)):
+            try:
+                record, job = manager.record or {}, manager.job or {}
+                progress = (job.get("status"), record.get("id"), record.get("status"),
+                            record.get("event_count", 0), record.get("finished_at"))
+                state = {"capture_lock_observed": True, "job_id": job.get("id"), "job_status": job.get("status"),
+                         "current": {key: record.get(key) for key in ("id", "status", "event_count", "finished_at", "error")},
+                         "interval_count": len(record.get("intervals", [])),
+                         "summary_keys": sorted(record.get("summary", {})),
+                         "capture_errors": list(manager.capture_errors), "storage_error": manager.storage_error}
+            finally:
+                manager.lock.release()
+            observed = clock()
+            if progress != previous:
+                previous, last_progress_at = progress, observed
+        else:
+            observed = clock()
+            state["capture_lock_observed"] = False
+        alive = worker.is_alive()
+        if observed - began >= total_timeout:
+            reason = "overall_deadline"
+        elif not alive:
+            return
+        elif observed - last_progress_at >= idle_timeout:
+            reason = "no_capture_progress"
+        else:
+            wait(min(.05, total_timeout - (observed - began), idle_timeout - (observed - last_progress_at)))
+            continue
+        state.update(reason=reason, worker_alive=alive, elapsed_seconds=round(observed - began, 3),
+                     idle_seconds=round(observed - last_progress_at, 3), idle_timeout=idle_timeout, total_timeout=total_timeout)
+        raise AssertionError("Matrix evidence did not finish: " + json.dumps(state, sort_keys=True))
+
+
+class MatrixCaptureWaitTests(unittest.TestCase):
+    def fixture(self, evolve, complete_at=float("inf")):
+        class Clock:
+            value = 0.0
+            def now(self):
+                return self.value
+            def wait(self, seconds):
+                self.value += max(seconds, .000001)
+                evolve(self.value, manager)
+        clock = Clock()
+        manager = Mock(lock=threading.RLock(), record={"id": "child", "status": "running", "event_count": 1},
+                       job={"id": "matrix", "status": "running"}, capture_errors=[], storage_error=None)
+        manager.worker.is_alive.side_effect = lambda: clock.value < complete_at
+        return manager, clock
+
+    def test_durable_capture_progress_allows_completion_after_ten_seconds(self):
+        manager, clock = self.fixture(lambda seconds, manager: manager.record.update(event_count=1 + int(seconds / 3)), complete_at=12)
+        wait_for_matrix_capture(manager, clock=clock.now, wait=clock.wait)
+        self.assertGreaterEqual(clock.value, 12)
+        self.assertLess(clock.value, 13)
+
+    def test_metadata_changes_do_not_hide_a_ten_second_capture_stall(self):
+        manager, clock = self.fixture(lambda seconds, manager: manager.job.update(updated_at=seconds))
+        with self.assertRaisesRegex(AssertionError, '"reason": "no_capture_progress"') as raised:
+            wait_for_matrix_capture(manager, clock=clock.now, wait=clock.wait)
+        self.assertGreaterEqual(clock.value, 10)
+        self.assertLess(clock.value, 11)
+        self.assertIn('"event_count": 1', str(raised.exception))
+
+    def test_continuing_events_cannot_extend_the_overall_deadline(self):
+        manager, clock = self.fixture(lambda seconds, manager: manager.record.update(event_count=1 + int(seconds)))
+        with self.assertRaisesRegex(AssertionError, '"reason": "overall_deadline"'):
+            wait_for_matrix_capture(manager, clock=clock.now, wait=clock.wait)
+        self.assertGreaterEqual(clock.value, 40)
+        self.assertLess(clock.value, 41)
+
+    def test_busy_capture_lock_cannot_hide_a_stall_or_block_the_wait(self):
+        manager, clock = self.fixture(lambda seconds, manager: None)
+        timeouts = []
+        def unavailable(timeout):
+            timeouts.append(timeout)
+            clock.value += timeout
+            return False
+        manager.lock = Mock()
+        manager.lock.acquire.side_effect = unavailable
+        with self.assertRaisesRegex(AssertionError, '"reason": "no_capture_progress"'):
+            wait_for_matrix_capture(manager, clock=clock.now, wait=clock.wait)
+        self.assertGreaterEqual(clock.value, 10)
+        self.assertLess(clock.value, 11)
+        self.assertLessEqual(max(timeouts), .05)
+        manager.lock.release.assert_not_called()
 
 
 class MatrixTests(unittest.TestCase):
@@ -37,7 +142,7 @@ class MatrixTests(unittest.TestCase):
         with patch.object(self.manager, "preflight", return_value=True), patch("app.runner.subprocess.Popen", side_effect=[process_for(row["protocol"], code)
                                                               for row, code in zip(combinations, codes)]) as launch:
             record = self.manager.start_matrix(data)
-            self.manager.worker.join(10)
+            wait_for_matrix_capture(self.manager)
         self.assertFalse(self.manager.worker.is_alive())
         return self.manager.export(record["id"]), launch
 

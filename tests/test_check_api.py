@@ -152,6 +152,91 @@ class CheckControlAPITests(unittest.TestCase):
         self.assertEqual(len(self.manager.list_runs()), 1)
         self.assertEqual(plan['kind'], 'diagnostic-check')
 
+    def test_terminal_adapter_checkpoint_stays_active_until_cleanup_then_is_stable(self):
+        from app.checks import CheckCapture, check_run_status, validate_check_record
+        from app.imports import prepare_run
+        original_run = CheckCapture.run
+        for cancel in (False, True):
+            with self.subTest(cancel_during_cleanup=cancel):
+                reached, release = threading.Event(), threading.Event()
+                def gated(capture, checkpoint):
+                    def publish(result):
+                        checkpoint(result)
+                        if check_run_status(result) in {'completed', 'failed', 'partial', 'cancelled'}:
+                            reached.set()
+                            if not release.wait(15):
+                                raise AssertionError('Terminal checkpoint cleanup barrier was not released')
+                    return original_run(capture, publish)
+                token = uuid4().hex
+                with patch.object(CheckCapture, 'run', gated):
+                    run_id = self.start(request_id=token)
+                    try:
+                        self.assertTrue(reached.wait(10), self.manager.read(run_id))
+                        active = self.manager.export(run_id)
+                        validate_check_record(active)
+                        self.assertEqual(active['status'], 'running')
+                        self.assertIsNone(active['finished_at'])
+                        self.assertEqual(active['result']['status'], 'running')
+                        self.assertIsNone(active['result']['finished_at'])
+                        self.assertEqual(len(active['result']['attempts']), 1)
+                        self.assertEqual(self.manager.storage.read(run_id)['result'], active['result'])
+                        imported, _ = prepare_run(active, 'active-check.json')
+                        self.assertEqual(imported['status'], 'interrupted')
+                        self.assertEqual(imported['result']['attempts'], active['result']['attempts'])
+                        retry = self.client.post('/api/checks', json=self.config(request_id=token))
+                        self.assertEqual(retry.get_json()['id'], run_id)
+                        self.assertEqual(self.client.post('/api/checks', json=self.config()).status_code, 409)
+                        self.assertEqual(self.client.get(f'/api/runs/{run_id}/rerun-plan').status_code, 409)
+                        if cancel:
+                            self.manager.stop(run_id)
+                    finally:
+                        release.set()
+                        self.manager.worker.join(10)
+                    self.assertFalse(self.manager.worker.is_alive())
+                terminal = self.manager.export(run_id)
+                validate_check_record(terminal)
+                self.assertEqual(terminal['status'], 'cancelled' if cancel else 'completed')
+                self.assertIsNotNone(terminal['finished_at'])
+                self.assertIsNone(self.manager.active_id)
+                # Repeated reads and a later actual capture must not revise the
+                # source's terminal timestamps, observations or native output.
+                next_id = self.start()
+                self.finish(next_id)
+                self.manager.worker.join(10)
+                self.assertEqual(self.manager.export(run_id), terminal)
+
+    def test_failed_terminal_commit_keeps_durable_active_evidence_and_retry_identity(self):
+        from app.checks import validate_check_record
+        from app.runner import RunManager
+        token = uuid4().hex
+        save = self.manager.save
+        def reject_terminal(record):
+            if record.get('kind') == 'diagnostic-check' and record.get('finished_at') is not None:
+                raise OSError('Fixture final transaction failed')
+            save(record)
+        with patch.object(self.manager, 'save', side_effect=reject_terminal):
+            run_id = self.start(request_id=token)
+            self.manager.worker.join(10)
+            self.assertFalse(self.manager.worker.is_alive())
+        retained = self.manager.export(run_id)
+        validate_check_record(retained)
+        self.assertEqual(retained['status'], 'running')
+        self.assertIsNone(retained['finished_at'])
+        self.assertEqual(len(retained['result']['attempts']), 1)
+        self.assertEqual(self.manager.storage.read(run_id)['result'], retained['result'])
+        self.assertEqual(self.manager.active_id, run_id)
+        self.assertIn('final transaction failed', self.manager.storage_error)
+        self.assertEqual(self.client.post('/api/checks', json=self.config()).status_code, 503)
+        requests = len(self.requests)
+        self.manager.shutdown()
+        self.manager = RunManager(self.temp.name, 'missing-iperf')
+        recovered = self.manager.read(run_id)
+        validate_check_record(recovered)
+        self.assertEqual(recovered['status'], 'interrupted')
+        self.assertEqual(recovered['result']['attempts'], retained['result']['attempts'])
+        self.assertEqual(self.manager.start_check(self.config(request_id=token))['id'], run_id)
+        self.assertEqual(len(self.requests), requests)
+
     def test_negative_dns_outcome_remains_comparable_without_performance_ranking(self):
         missing = self.start(target='missing.example.test')
         record = self.finish(missing)

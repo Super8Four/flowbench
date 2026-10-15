@@ -88,6 +88,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; f
 .connection-map-empty { fill: var(--workspace-muted); font-size: 16px; }
 .connection-map-selection { background: var(--workspace-raised); padding: 12px; margin-top: 12px; border-radius: 5px; overflow-wrap: anywhere; }
 .connection-map-attribution { font-size: .75rem; }
+.endpoint-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.endpoint-card { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 16px; border: 1px solid var(--workspace-border); border-radius: 6px; background: var(--workspace-raised); }
+.endpoint-card .btn { margin-top: auto; min-height: 44px; }
+.endpoint-values { display: grid; gap: 4px; width: 100%; margin-bottom: 16px; }
+.endpoint-values dt { font-size: .75rem; color: var(--workspace-muted); font-weight: 400; }
+.endpoint-values dd { margin: 0 0 8px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.endpoint-values code { color: var(--workspace-text); white-space: pre-wrap; font-size: .875rem; }
+.endpoint-scope { margin-bottom: 16px; overflow-wrap: anywhere; }
+.endpoint-state { font-size: .75rem; color: var(--workspace-muted); }
+.endpoint-disclosure { border-top: 1px solid var(--workspace-border); margin-top: 8px; }
+.endpoint-disclosure > summary { min-height: 44px; padding-block: 12px; color: var(--workspace-text); cursor: pointer; }
+.endpoint-panel .table td { overflow-wrap: anywhere; min-width: 110px; }
+.endpoint-panel .table caption { color: var(--workspace-muted); caption-side: top; }
+.endpoint-copy-feedback:not(:empty) { margin-top: 12px; }
+#endpoint-copy-value { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+@media (max-width: 639px) { .endpoint-cards { grid-template-columns: 1fr; } }
 .measurement-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .check-summary { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 2fr); gap: 8px 16px; }
 .check-summary dd { margin: 0; overflow-wrap: anywhere; }

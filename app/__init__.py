@@ -18,6 +18,7 @@ from .version import __version__
 from .projects import ProjectStore
 from .diagnostics import diagnostic_capabilities
 from .units import RATE_CONTRACT
+from .endpoints import endpoint_view, request_context, runtime_hostname
 
 
 def create_app(test_config=None):
@@ -215,6 +216,13 @@ def create_app(test_config=None):
                        diagnostics=diagnostic_capabilities(), flent=manager.flent_capabilities,
                        checks=check_capabilities())
 
+    @app.get("/api/context")
+    def current_context():
+        response = jsonify(schema_version=1, execution_hostname=runtime_hostname(),
+                           web_request=request_context(request.remote_addr))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.get("/api/runs")
     def list_runs():
         return jsonify(runs=manager.list_runs(), active_run=manager.active_id, rate_units=RATE_CONTRACT)
@@ -231,7 +239,7 @@ def create_app(test_config=None):
     @app.post("/api/runs")
     def start_run():
         try:
-            record = manager.start(request.get_json())
+            record = manager.start(request.get_json(), initiator_context=request_context(request.remote_addr))
         except RuntimeError as exc:
             data = request.get_json()
             conflict = manager.active or (listener.running and isinstance(data, dict) and data.get("role") == "server")
@@ -241,7 +249,7 @@ def create_app(test_config=None):
     @app.post("/api/matrices")
     def start_matrix():
         try:
-            return jsonify(manager.start_matrix(request.get_json())), 201
+            return jsonify(manager.start_matrix(request.get_json(), initiator_context=request_context(request.remote_addr))), 201
         except RuntimeError as exc:
             return execution_failure(exc, bool(manager.active))
 
@@ -252,7 +260,7 @@ def create_app(test_config=None):
     @app.post("/api/flent")
     def start_flent():
         try:
-            return jsonify(manager.start_flent(request.get_json())), 201
+            return jsonify(manager.start_flent(request.get_json(), initiator_context=request_context(request.remote_addr))), 201
         except RuntimeError as exc:
             return execution_failure(exc, bool(manager.active))
 
@@ -264,7 +272,7 @@ def create_app(test_config=None):
     @app.post("/api/checks")
     def start_check():
         try:
-            return jsonify(manager.start_check(request.get_json())), 201
+            return jsonify(manager.start_check(request.get_json(), initiator_context=request_context(request.remote_addr))), 201
         except RuntimeError as exc:
             return execution_failure(exc, bool(manager.active))
 
@@ -281,7 +289,7 @@ def create_app(test_config=None):
     @app.post("/api/runs/<run_id>/rerun")
     def rerun(run_id):
         try:
-            result = manager.rerun(run_id, request.get_json())
+            result = manager.rerun(run_id, request.get_json(), initiator_context=request_context(request.remote_addr))
             return jsonify(result), 200 if result["replayed"] else 201
         except RuntimeError as exc:
             return execution_failure(exc, bool(manager.active))
@@ -298,6 +306,7 @@ def create_app(test_config=None):
         record["overview"] = overview(record)
         record["effective_settings"] = effective_settings(record)
         record["peer"] = peer_results(record)
+        record["endpoint_view"] = endpoint_view(record)
         record["events"] = manager.read_events(run_id, int(after))
         if record.get("kind") == "protocol-job":
             record["protocol_runs"] = manager.protocol_runs(record)

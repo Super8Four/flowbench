@@ -45,6 +45,7 @@
     <div class="app-content"><div class="container-fluid">
       <div id="message" class="alert d-none" role="status"></div>
 {% if page == 'test' %}
+{{ workflow.endpoints() }}
 <div id="result-cards" class="row g-3 mb-4 d-none" aria-label="Final results">
   <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">Upload · <span id="result-upload-unit">bit/s</span></div><h2 id="result-upload" class="metric-value">—</h2><p class="metric-foot mb-0" id="result-upload-foot">Final receiver report</p></div></div>
   <div class="col-6 col-xl-3"><div class="metric-card"><div class="metric-caption">Download · <span id="result-download-unit">bit/s</span></div><h2 id="result-download" class="metric-value">—</h2><p class="metric-foot mb-0" id="result-download-foot">Final receiver report</p></div></div>

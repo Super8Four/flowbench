@@ -21,6 +21,8 @@ SQLite commits streamed measured state with each event. The merged listener stdo
 
 One outgoing client/job can run concurrently in its own process. Both protocol children remain sequential. Overlapping incoming/outbound records retain mutual run IDs and a measurement-interference note. Rates are never combined. FlowBench does not promise unaffected measurements or unlimited concurrent clients. A legacy one-test server cannot share the managed listener port.
 
+**Run again** on a saved incoming test prepares a fresh one-test server execution; it does not re-enable or replay the persistent managed listener. Review the bind/port and confirmation before starting, and keep it separate from the managed listener's occupied port. Its initial client wait is bounded to 60 seconds; an accepted session retains the normal server hard limit. See [Run again](network-checks.md#run-again) for source lineage and retry behavior.
+
 Stopping during a session preserves a `cancelled` partial run. Unexpected listener death preserves `interrupted` evidence; storage capture failures surface as `failed` and disable readiness. Startup recovery marks unfinished records interrupted and never replays completed sessions. Graceful app shutdown stops active incoming/outgoing traffic and retains saved enable state for later resume. Abrupt power loss and hardware durability remain separate operational concerns.
 
 ## API and maintenance
@@ -36,3 +38,9 @@ Cross-origin browser writes and non-JSON control requests are rejected. This is 
 Set `FLOWBENCH_RESUME_LISTENER=0` before maintenance CLI operations/exports to prevent saved listener startup. This suppresses startup for that process without altering configuration. Full backups include the listener metadata; legacy rollback exports do not provide automatic listener resume in the old application.
 
 This feature does **not** implement R17 authenticated FlowBench-to-FlowBench coordination, peer authorization, instance pairing or cross-instance correlation. Those remain pending.
+
+## Endpoint perspective
+
+Current main retains numeric socket/control-peer context when the tool supplies it. Incoming pairs use the accepting reporter's local/remote perspective; accepted control-port evidence is not relabelled as a data-stream port. The execution hostname can identify a container namespace rather than the physical host.
+
+A managed incoming session has no inferred initiating browser request: an external iPerf client started its traffic. An explicit web-requested incoming Run again receives fresh initiating context for its new bounded wait. That web peer can be a proxy, is separate from traffic endpoints and does not prove the remote client's public identity. Current viewer context never fills missing historical values. See [Test endpoints](test-endpoints.md); existing rc.2 downloads do not contain this addition.

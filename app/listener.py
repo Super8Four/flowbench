@@ -11,6 +11,7 @@ import time
 from uuid import uuid4
 
 from .runner import CREATE_FLAGS, RunManager, now, settings_from
+from .endpoints import derive_endpoints, initial_endpoints, observe_iperf_start, runtime_hostname
 
 
 class ListenerConflict(RuntimeError):
@@ -148,6 +149,8 @@ class IncomingListener:
         from .preflight import initial_preflight, route_placeholder
         self.record["route"] = route_placeholder(settings, "not_applicable", "observed_after_start")
         self.record["preflight"] = initial_preflight("observed_after_start", "not_applicable")
+        self.record["endpoints"] = initial_endpoints(self.record, runtime_hostname())
+        self.record["endpoints"] = observe_iperf_start(self.record, start)
         self.events, self.full_lines, self.end_seen = [], [], False
         self.manager.save(self.record)
         self.start_time_quality(self.record["id"])
@@ -318,6 +321,7 @@ class IncomingListener:
                            intervals=full.get("intervals") or self.record["intervals"],
                            test_parameters=start.get("test_start") or self.record["test_parameters"],
                            error=full.get("error") or self.record["error"])
+        self.record["endpoints"] = derive_endpoints(self.record)
         self.finish(error=None if self.record["test_parameters"] and self.record["summary"] else
                     self.record["error"] or "Incoming session ended without a complete measurement report.")
 

@@ -1,6 +1,15 @@
-# DNS checks ICMP observations and run again
+# DNS checks, ICMP observations and Run again
 
-The `feature/network-checks-reruns` branch adds standalone DNS and ICMP checks and a way to start a new execution from saved configuration. These are development features; the published rc.1 and rc.2 downloads are unchanged. See [planned diagnostics](roadmap.md) for work that remains outside this implementation.
+Current main (`0.2.0-dev`) includes standalone DNS and ICMP checks and new executions from saved configuration. Build current source to use these features; the published rc.1 and rc.2 downloads are unchanged. See [planned diagnostics](roadmap.md) for work that remains outside this implementation.
+
+## Start and inspect a check
+
+1. Open **Test & export** and choose **DNS lookup** or **ICMP echo check** under **Measurement type**. Changing the selection does not start traffic.
+2. Enter the selected target and check settings. Review the local capability message, then choose **Start check**. Use **Stop** to cancel owned work; captured attempts remain saved.
+3. Read the capture status and individual attempts as well as the summary. Unavailable measurements remain unavailable. **Export session** saves the complete JSON or XML evidence.
+4. Find the record later in **History & import**. Filter by DNS or ICMP echo to keep different measurement types separate.
+
+The desktop [DNS example](assets/network-dns-desktop.jpg), [ICMP example](assets/network-icmp-desktop.jpg) and [mobile DNS example](assets/network-dns-mobile.jpg) use sanitized disposable evidence. They illustrate controls and recorded outcomes, not external network performance.
 
 ## DNS query
 
@@ -28,7 +37,11 @@ Standalone records use `kind: diagnostic-check`, `check_type: dns` or `loss`, ty
 
 One local clock-quality observation accompanies the check. System UTC is not independently NTP verified; a provider's synchronization status and root dispersion proxy do not guarantee timestamp accuracy. Standalone checks do not automatically capture a route.
 
+**Display time** switches between **Browser timezone** and **UTC**. Displayed local times include timezone/offset context, including daylight-saving changes. The selection changes presentation only: stored timestamps, JSON/XML exports and report UTC evidence retain the original instant. A timezone choice does not improve clock accuracy.
+
 Compare terminal checks of the same type. Completed, failed, partial, cancelled and interrupted observations retain their status and missing evidence; active snapshots cannot be compared or reported. DNS, ICMP and throughput comparisons remain separate because their measurements have different meanings. Matching settings do not establish equal network conditions or prove causation, and changed outcomes are not ranked as improvements.
+
+In **Compare tests**, select a DNS or ICMP baseline and add saved checks of that same type with **Add test to comparison**. Read capture status and settings differences before interpreting the table. DNS compares final query outcomes and available answer sets; ICMP compares known counts, nullable nonresponse percentages and numeric RTT. The [comparison example](assets/network-comparison-desktop.jpg) shows the separate diagnostic view. Use **Export comparison** for the typed JSON/XML bundle, or the report preview and PDF/Word controls for a readable report.
 
 JSON/XML exports retain complete typed evidence. Imports create new local identities and preserve lineage provenance without launching a resolver, ping or other test. PDF/Word reports use the same normalized preview, fingerprints and resource budgets as [measurement reports](reports.md). Default redaction removes names, answer data, resolver and endpoint addresses, labels, notes, free-form errors, time-source context and raw output. Safe outcomes, response codes, flags, TTL, counts, nullable RTT and timing remain. Raw report output is separately opt-in and cannot bypass redaction. Unredacted reports and archive exports can contain sensitive network information.
 
@@ -38,7 +51,9 @@ SQLite remains in the persistent writable data volume. Back up the complete arch
 
 Run again reads a saved configuration and creates a new execution with a new identity and immutable source lineage. It does not overwrite the source or copy captured measurements, native output, event history or timeline observations into a new result. Saved configuration notes and metadata remain configuration context.
 
-Review the prepared settings before launching. Load settings lets you edit configuration before starting a separate execution; that path does not promise source lineage. Run again uses the validated saved-source plan and records its immutable source link. Current availability and admission rules are checked again. Incoming Run again executions wait initially for a client for at most 60 seconds; an accepted session remains subject to the existing server hard limit. Flent still requires its explicit Netserver confirmation. A saved result or prior confirmation does not establish that a peer remains reachable or compatible.
+For ordinary outgoing iPerf, Both/matrix and DNS/ICMP records, clicking **Run again** starts the new execution immediately after validation. To review or edit configuration first, choose **Load settings**, make any changes and start normally; that path does not promise source lineage. Run again uses the validated saved-source plan and records its immutable source link. Current availability and admission rules are checked again.
+
+Flent and incoming records instead open a review panel and require a fresh explicit confirmation before launch. Flent requires Netserver confirmation. Incoming executions wait initially for a client for at most 60 seconds; an accepted session remains subject to the existing server hard limit. The [confirmation example](assets/network-rerun-desktop.jpg) uses sanitized settings. A saved result or prior confirmation does not establish that a peer remains reachable or compatible. Both and matrix sources create fresh children; choose an individual child when only that one configuration is wanted.
 
 The browser supplies a request identity to prevent a double click or replayed response from starting duplicate work. Reusing an identity with changed intent conflicts. This local execution identity is not imported as reusable launch authorization. Cancellation and restart preserve the source and the newly committed capture; neither automatically retries traffic.
 
@@ -51,3 +66,7 @@ The browser supplies a request identity to prevent a double click or replayed re
 - `POST /api/runs/<id>/rerun` submits the reviewed plan's `source_fingerprint`, a fresh `request_id` and any required confirmations.
 
 Check records use the existing history, run status, cancellation and report endpoints. The API has no login protection; keep it on loopback or behind the intended authenticated access boundary.
+
+## Destination context
+
+Current main retains endpoint context alongside diagnostic evidence. For DNS, the destination is the numeric resolver and port recorded by each UDP/TCP attempt; the question and returned answer are not that network destination. For ICMP, the destination is the retained pinned address and family, with no invented TCP/UDP port. A separately captured initiating web peer is not the probe source address, and current viewing context does not replace historical evidence. Opening/importing results sends no extra lookup. Full exports retain sensitive context; default-redacted reports remove it, including raw copies. See [endpoint interpretation](test-endpoints.md); existing rc.2 downloads do not include this addition.

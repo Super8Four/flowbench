@@ -42,6 +42,8 @@ jobs:
         run: node tests/listener-ui-behavior.mjs
       - name: Exercise typed checks, immutable retries and timezone display with the controlled DOM/API fixture
         run: node tests/network-checks-ui-behavior.mjs
+      - name: Exercise endpoint provenance, copying and polling focus with the controlled DOM/API fixture
+        run: node tests/endpoints-ui-behavior.mjs
       - name: Record source check summary
         if: always()
         run: |
