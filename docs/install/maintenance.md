@@ -9,7 +9,7 @@
 3. Install the new source or matching architecture's image. Keep the existing archive and Compose project/volume.
 4. Start, check `/api/ready`, then verify saved IDs, notes, logs, measurements, projects/baselines, typed checks, source lineage, presets and listener settings.
 
-Current main keeps SQLite schema 1 and adds versioned evidence in run documents plus local execution-request metadata. Reinstall the selected source version's requirements when upgrading a native environment. Published rc.2 remains unchanged. Upgrading older JSON/JSONL archives creates SQLite and imports records/presets once in a transaction. Source files remain untouched. Malformed/unsupported data stops migration without a partial import; retain the originals and repair a copy. Custom external PostgreSQL tables have no importer here.
+Version 0.2.0-rc.1 keeps SQLite schema 1 and stores versioned evidence in run documents plus local execution-request metadata. Reinstall the selected source version's requirements when upgrading a native environment. Historical release tags and downloads remain unchanged. Upgrading older JSON/JSONL archives creates SQLite and imports records/presets once in a transaction. Source files remain untouched. Malformed/unsupported data stops migration without a partial import; retain the originals and repair a copy. Custom external PostgreSQL tables have no importer here.
 
 ## Back up
 

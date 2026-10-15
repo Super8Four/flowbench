@@ -21,7 +21,7 @@ Client tests need a reachable iPerf3 peer and do not require an inbound iPerf ma
 
 One incoming session is accepted at a time. An outgoing job can overlap, with interference recorded. Use a peer that stays listening for two connections when selecting Both. Windows UDP bidirectional is unsupported. Keep the API local or behind authenticated access; same-origin guards are not login protection.
 
-## Current-main checks and maps
+## Checks and maps
 
 DNS checks use the configured system resolver addresses or a numeric custom resolver chosen in the form. No public fallback resolver is selected. ICMP hostname resolution pins a selected address before probes; numeric targets need no hostname lookup. These checks have their own availability information at `/api/checks` and do not require iPerf to be installed. `/api/ready` still includes iPerf availability, so a missing engine can return 503 while a supported standalone check remains usable. Native ping permissions and output parsing can leave evidence unavailable.
 
