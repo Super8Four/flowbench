@@ -158,8 +158,16 @@ def _has_address(point):
     return point["address"] is not None and not ipaddress.ip_address(point["address"].split("%", 1)[0]).is_unspecified
 
 
-def _finish_status(value, record, incomplete=False):
-    incomplete |= value["status"] == "partial" and (len(value["sockets"]) == 256 or len(value["control_peers"]) == 8 or len(value["destinations"]) == 256)
+def _finish_status(value, record, incomplete=False, observed=()):
+    # A complete retained row cannot account for a previously skipped malformed
+    # row. Only fresh matching socket evidence can reconcile that warning;
+    # end-only output, an empty start or another reporter cannot do so.
+    previous_sockets = (record.get("endpoints") or {}).get("sockets", [])
+    reconciled = bool(previous_sockets) and all(any(
+        row["reporter"] == fresh["reporter"] and row["socket_id"] == fresh["socket_id"]
+        and row["local"] == fresh["local"] and row["remote"] == fresh["remote"]
+        for fresh in observed) for row in value["sockets"])
+    incomplete |= value["status"] == "partial" and (not reconciled or len(value["sockets"]) == 256 or len(value["control_peers"]) == 8 or len(value["destinations"]) == 256)
     if record.get("kind") in ("protocol-job", "matrix-job"):
         value.update(status="not_applicable", sockets=[], control_peers=[], destinations=[])
     elif value["sockets"]:
@@ -174,7 +182,7 @@ def _finish_status(value, record, incomplete=False):
     return value
 
 
-def _observe(value, record, start, reporter):
+def _observe(value, record, start, reporter, observed=None):
     if not isinstance(start, dict):
         return True
     params = start.get("test_start")
@@ -196,6 +204,8 @@ def _observe(value, record, start, reporter):
                    "protocol": protocol, "local": _point(raw.get("local_host"), raw.get("local_port")),
                    "remote": _point(raw.get("remote_host"), raw.get("remote_port")), "source": "iperf_start_connected"}
             malformed |= not _append_unique(value["sockets"], row, 256)
+            if observed is not None:
+                observed.append(copy.deepcopy(row))
         malformed |= len(connected) > 256
     accepted = start.get("accepted_connection")
     if isinstance(accepted, dict) and accepted:
@@ -208,8 +218,9 @@ def observe_iperf_start(record, start, reporter="local"):
     if reporter not in ("local", "peer"):
         raise ValueError("Invalid endpoint reporter.")
     value = _previous(record)
-    incomplete = _observe(value, record, start, reporter)
-    return _finish_status(value, record, incomplete)
+    observed = []
+    incomplete = _observe(value, record, start, reporter, observed)
+    return _finish_status(value, record, incomplete, observed)
 
 
 def _structured_starts(record):
@@ -233,8 +244,9 @@ def _structured_starts(record):
 def derive_endpoints(record):
     value = _previous(record)
     incomplete = False
+    observed = []
     for start, reporter in _structured_starts(record):
-        incomplete |= _observe(value, record, start, reporter)
+        incomplete |= _observe(value, record, start, reporter, observed)
     if record.get("kind") == "diagnostic-check":
         result = record.get("result")
         result = result if isinstance(result, dict) else {}
@@ -265,7 +277,7 @@ def derive_endpoints(record):
                 "reported_host": host, "transport": None, "source": "tool_metadata"}, 256)
         except ValueError:
             pass
-    return _finish_status(value, record, incomplete)
+    return _finish_status(value, record, incomplete, observed)
 
 
 def validate_endpoints(value, record=None):

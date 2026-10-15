@@ -34,6 +34,8 @@ Tool absence, text-only output, malformed native fields, failed starts and incom
 
 Endpoint availability is separate from the test's capture outcome. A completed test can have partial or unavailable endpoint details; that does not turn missing addresses into a failed measurement or a guessed socket.
 
+The follow-up `fix/endpoint-partial-evidence` branch is under review. The merged PR24 version can incorrectly upgrade partial availability when valid sockets coexist with malformed entries and a later update has no reconciling socket evidence. The proposed correction preserves the warning through end-only output and finalization. Fresh matching observations can still fill unknown socket fields; empty starts and another reporter's observations cannot erase the warning. It requires no schema migration and does not rewrite or repair older archived labels.
+
 ## History, copies and provenance
 
 New captures retain optional versioned endpoint metadata alongside the existing run document. Streaming iPerf start evidence commits with its event before it is shown. A later end-only result must not erase earlier saved socket observations. Local and peer observations are merged without moving either into the other's namespace.

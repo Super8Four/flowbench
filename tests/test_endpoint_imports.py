@@ -72,10 +72,15 @@ class EndpointImportTests(unittest.TestCase):
         self.assertNotIn("initiator_context", saved)
 
     def test_end_only_snapshot_keeps_previously_captured_streaming_pairs(self):
-        record = endpoint_fixture()
-        record["native_result"] = {"event": "end", "data": copy.deepcopy(record["summary"])}
-        identity = self.load(record)["imported"][0]
-        self.assertEqual(self.manager.export(identity)["endpoints"], record["endpoints"])
+        for status in ("captured", "partial"):
+            for xml in (False, True):
+                with self.subTest(status=status, xml=xml):
+                    record = endpoint_fixture()
+                    record["id"] = ("c" if status == "partial" else "e") * 31 + ("d" if xml else "f")
+                    record["endpoints"]["status"] = status
+                    record["native_result"] = {"event": "end", "data": copy.deepcopy(record["summary"])}
+                    identity = self.load(record, xml)["imported"][0]
+                    self.assertEqual(self.manager.export(identity)["endpoints"], record["endpoints"])
 
     def test_invalid_second_batch_member_rolls_back_json_and_xml(self):
         from app.imports import prepare_run
