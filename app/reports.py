@@ -439,7 +439,7 @@ def prepare_report(manager, data):
     model["display"] = {"rate_axis": rate_scale([p["mbps"] * 1_000_000 for run in model["runs"] for p in run["series"] if _finite(p.get("mbps"))]
                                                + [p["value"] * 1_000_000 for run in model["runs"] for item in run.get("flent_series", []) if item["unit"] == "Mbits/s" for p in item["points"] if _finite(p.get("value"))])}
     model["limitations"].append("Summary metrics cover each complete captured run. A common elapsed window does not recompute these whole-run averages. Shorter traces stop at their actual last measurement; they are not extended to match longer tests.")
-    model["limitations"].append("iPerf session colors identify upload and download; comparisons assign separate series colors. Native Flent plots retain saved run colors. Chart panels and legends paginate; labels and line patterns identify traces. Resource limits are 32 MiB of normalized report data, 500000 measured chart points, 500 PDF pages and 32 MiB of Word document content.")
+    model["limitations"].append("iPerf colors match the UI selection; Flent uses saved colors. Legends paginate. Labels and patterns identify series. Resource limits are 32 MiB of normalized report data, 500000 measured chart points, 500 PDF pages and 32 MiB of Word document content.")
     for after in records[1:]:
         report = comparison(records[0], after)
         if "common_window" in report:
