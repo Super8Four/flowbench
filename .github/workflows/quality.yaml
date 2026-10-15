@@ -44,6 +44,8 @@ jobs:
         run: node tests/network-checks-ui-behavior.mjs
       - name: Exercise endpoint provenance, copying and polling focus with the controlled DOM/API fixture
         run: node tests/endpoints-ui-behavior.mjs
+      - name: Exercise chart direction colors, comparison stability, gaps and legends
+        run: node tests/chart-colors-behavior.mjs
       - name: Record source check summary
         if: always()
         run: |

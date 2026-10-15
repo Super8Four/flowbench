@@ -317,3 +317,8 @@ body { font-size: 1rem; line-height: 1.5; background: var(--workspace-bg); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+.series-key { display: inline-flex; align-items: center; gap: 6px; color: var(--workspace-text); font-size: .75rem; }
+.series-key svg { flex-shrink: 0; }
+.comparison-series-keys { display: flex; flex-wrap: wrap; gap: 8px 18px; flex-basis: 100%; }
+#throughput-legend { flex-wrap: wrap; gap: 8px 18px; }

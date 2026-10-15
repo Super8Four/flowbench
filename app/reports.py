@@ -12,6 +12,7 @@ import threading
 from xml.sax.saxutils import escape
 import xml.etree.ElementTree as ET
 
+from .chart_styles import comparison_styles, series_style
 from .annotations import identifier
 from .flent import normalize as normalize_flent, validate_flent
 from .metrics import comparison, effective_settings, measurements, series
@@ -438,7 +439,7 @@ def prepare_report(manager, data):
     model["display"] = {"rate_axis": rate_scale([p["mbps"] * 1_000_000 for run in model["runs"] for p in run["series"] if _finite(p.get("mbps"))]
                                                + [p["value"] * 1_000_000 for run in model["runs"] for item in run.get("flent_series", []) if item["unit"] == "Mbits/s" for p in item["points"] if _finite(p.get("value"))])}
     model["limitations"].append("Summary metrics cover each complete captured run. A common elapsed window does not recompute these whole-run averages. Shorter traces stop at their actual last measurement; they are not extended to match longer tests.")
-    model["limitations"].append("Saved colors are used consistently. Chart panels and legends paginate; colors can repeat and labels identify traces. Resource limits are 32 MiB of normalized report data, 500000 measured chart points, 500 PDF pages and 32 MiB of Word document content.")
+    model["limitations"].append("iPerf session colors identify upload and download; comparisons assign separate series colors. Native Flent plots retain saved run colors. Chart panels and legends paginate; labels and line patterns identify traces. Resource limits are 32 MiB of normalized report data, 500000 measured chart points, 500 PDF pages and 32 MiB of Word document content.")
     for after in records[1:]:
         report = comparison(records[0], after)
         if "common_window" in report:
@@ -517,7 +518,7 @@ def _bounds(runs, native_unit=None):
             "scale": scale, "multiplier": multiplier}
 
 
-def _chart(runs, bounds=None):
+def _chart(runs, bounds=None, styles=None):
     """Raster chart of individual measured spans, with no bridging of missing data."""
     from PIL import Image, ImageDraw, ImageFont
     import reportlab
@@ -542,7 +543,9 @@ def _chart(runs, bounds=None):
         draw.text((590, 520), "Elapsed seconds", fill="#1b1f22", font=font)
         draw.line((x0, y0, x0, y1, x1, y1), fill="#41494d", width=2)
         for index, point in all_points:
-            color = runs[index]["color"]
+            direction = point.get("direction")
+            style = (styles or {}).get((runs[index]["id"], "local", direction), series_style("local", direction))
+            color = style["color"]
             x = x0 + point["seconds"] / xmax * (x1 - x0)
             y = y1 - (point["mbps"] * 1_000_000 / scale["divisor"]) / ymax * (y1 - y0)
             start = point.get("start")
@@ -550,11 +553,14 @@ def _chart(runs, bounds=None):
                 sx = x0 + start / xmax * (x1 - x0)
                 if point.get("direction") == "download":
                     for pos in range(int(sx), int(x), 15):
+                        draw.line((pos, y, min(pos + 8, x), y), fill="#212629", width=7)
                         draw.line((pos, y, min(pos + 8, x), y), fill=color, width=3)
                 elif point.get("direction") in {"upload", "bidir"}:
+                    draw.line((sx, y, x, y), fill="#212629", width=7)
                     draw.line((sx, y, x, y), fill=color, width=3)
+            draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill="#212629")
             draw.ellipse((x - 3, y - 3, x + 3, y + 3), fill=color)
-        draw.text((130, 575), "Trace labels and saved colors are listed below", fill="#41494d", font=font)
+        draw.text((130, 575), "Series labels, colors and patterns are listed below", fill="#41494d", font=font)
     output = BytesIO()
     image.save(output, "PNG")
     return output.getvalue()
@@ -659,6 +665,7 @@ def _sections(run):
                 ("Recorded timestamps", "Started " + run["created_at"] + "\nFinished " + run["finished_at"]),
                 ("Clock verification", "Host system UTC; not independently NTP verified. Provider synchronization is local status only."),
                 ("Saved test ID", run["id"]),
+                ("Saved history marker color", run["color"]),
                 ("Engine and evidence", f"{display(run['provenance'].get('engine'))} | {display(run['provenance'].get('engine_version'))}\nOutput {display(run['provenance'].get('output_format'))} | Imported {display(run['provenance'].get('imported'))}")]
     if run["provenance"].get("concurrency"):
         settings.append(("Overlapping traffic", _summary(run["provenance"]["concurrency"])))
@@ -871,7 +878,7 @@ def _native_chart(runs, unit, bounds=None):
     return output.getvalue()
 
 
-def _charts(runs):
+def _charts(runs, styles=None):
     if any(run.get("kind") == "diagnostic-check" for run in runs):
         return []
     native = [run for run in runs if run.get("flent_series")]
@@ -888,14 +895,17 @@ def _charts(runs):
                                    "Named native Flent series are individual samples; missing samples stay blank. SI throughput units and RTT remain separate. Panels share axes. Markers alternate circles and outlined squares; colors can repeat.", legend))
     elif not native:
         bounds = _bounds(runs)
+        styles = styles if styles is not None else comparison_styles(runs) if len(runs) > 1 else {}
         for offset in range(0, len(runs), 10):
             panel = runs[offset:offset + 10]
-            legend = [("Test " + str(run["display_index"]), run["color"], run["label"]) for run in panel]
-            custom_direction = any(point.get("direction") not in KNOWN_DIRECTIONS for run in panel for point in run["series"])
-            caption = ("Known upload intervals are solid; download dashed; other directions are points. Only captured data are drawn, with shared axes across panels. Short traces stop at their last measurement. Saved colors can repeat."
-                       if custom_direction else "Upload solid; download dashed. Only captured spans and points are drawn, with shared axes across panels. Short traces stop at their last measurement. Trace labels identify saved colors, which can repeat.")
-            charts.append(("Measured throughput intervals", _chart(panel, bounds),
-                           caption, legend))
+            legend = []
+            for run in panel:
+                directions = sorted({point.get("direction", "unknown") for point in run["series"]})
+                for direction in directions:
+                    style = styles.get((run["id"], "local", direction), series_style("local", direction))
+                    legend.append(("Test " + str(run["display_index"]), style["color"], run["label"] + " / " + style["label"] + " / " + style["pattern"]))
+            caption = "Local reports, client perspective. Upload solid; download dashed; other directions are points (bidirectional aggregates solid). Dark outlines keep bright colors visible on paper. Only captured spans and points are drawn; shared axes preserve elapsed time and gaps. Series colors match the same UI selection."
+            charts.append(("Measured throughput intervals", _chart(panel, bounds, styles), caption, legend))
     return charts
 
 
@@ -933,6 +943,7 @@ def _window_rows(model):
 
 
 def render_pdf(model):
+    chart_policy = comparison_styles(model["runs"]) if len(model["runs"]) > 1 else {}
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -995,10 +1006,10 @@ def render_pdf(model):
     flow.extend(p(text) for text in model["limitations"])
     if len(model["runs"]) > 1 and model.get("report_type") != "diagnostic-check":
         flow.append(PageBreak())
-        charts = _charts(model["runs"])
+        charts = _charts(model["runs"], chart_policy)
         for title, chart, caption, legend in charts:
             flow.append(KeepTogether([p(title, "FBHeading"), chart_image(chart), p(caption)]))
-            flow.append(table(["Trace", "Saved color", "Label or native series"], legend, (65, 95, 335)))
+            flow.append(table(["Trace", "Color", "Label or native series"], legend, (65, 95, 335)))
         if not charts:
             flow.append(p("These workloads have different measurement series; inspect their individual charts and comparison caveats below."))
     for index, run in enumerate(model["runs"], 1):
@@ -1014,9 +1025,9 @@ def render_pdf(model):
                     flow.append(KeepTogether([p("Approximate public-IP world map", "FBHeading"), chart_image(world, height=280),
                                               p("Approximate network locations only. Missing and internal hops stay unlocated; markers do not prove router positions or the physical route. Coincident markers can overlap; the table retains every reply.")]))
             if heading == "Measured results":
-                for title, chart, caption, legend in _charts([run]):
+                for title, chart, caption, legend in _charts([run], chart_policy):
                     flow.append(KeepTogether([p(title, "FBHeading"), chart_image(chart), p(caption)]))
-                    flow.append(table(["Trace", "Saved color", "Label or native series"], legend, (65, 95, 335)))
+                    flow.append(table(["Trace", "Color", "Label or native series"], legend, (65, 95, 335)))
         context = _context(run)
         if context:
             flow.append(p("Project labels and timeline notes", "FBHeading"))
@@ -1048,6 +1059,7 @@ def render_pdf(model):
 
 
 def render_docx(model):
+    chart_policy = comparison_styles(model["runs"]) if len(model["runs"]) > 1 else {}
     from docx import Document
     from docx.shared import Inches, Pt, RGBColor
     from docx.oxml import OxmlElement
@@ -1175,12 +1187,12 @@ def render_docx(model):
         para(text)
     if len(model["runs"]) > 1 and model.get("report_type") != "diagnostic-check":
         document.add_page_break()
-        charts = _charts(model["runs"])
+        charts = _charts(model["runs"], chart_policy)
         for title, chart, caption, legend in charts:
             document.add_heading(title, 1)
             add_chart(chart)
             para(caption)
-            table(["Trace", "Saved color", "Label or native series"], legend)
+            table(["Trace", "Color", "Label or native series"], legend)
         if not charts:
             para("These workloads have different measurement series; inspect their individual charts and comparison caveats below.")
     for index, run in enumerate(model["runs"], 1):
@@ -1204,11 +1216,11 @@ def render_docx(model):
                     add_chart(world, height=3.85)
                     para("Approximate network locations only. Missing and internal hops stay unlocated; markers do not prove router positions or the physical route. Coincident markers can overlap; the table retains every reply.")
             if heading == "Measured results":
-                for title, chart, caption, legend in _charts([run]):
+                for title, chart, caption, legend in _charts([run], chart_policy):
                     document.add_heading(title, 2)
                     add_chart(chart)
                     para(caption)
-                    table(["Trace", "Saved color", "Label or native series"], legend)
+                    table(["Trace", "Color", "Label or native series"], legend)
         if _context(run):
             document.add_heading("Project labels and timeline notes", 2)
             for text in _context(run):
