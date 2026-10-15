@@ -54,6 +54,9 @@ class ChartColorsTests(unittest.TestCase):
             self.assertIn(color,pixels)
             self.assertTrue(all(image.getpixel((782,y)) != color for y in range(80,460)))
         self.assertEqual(runs[0]['color'],'#123456')
+        unknown = dict(runs[0], series=[{'seconds':1,'mbps':20,'direction':'custom'}])
+        self.assertTrue(_charts([unknown])[0][3][0][2].endswith('/ points'))
+        self.assertEqual(_charts([runs[0]], styles)[0][3][0][1], styles[(runs[0]['id'],'local','download')]['color'])
 
     @unittest.skipUnless(shutil.which('node'), 'Node absent; source CI runs the isolated JavaScript fixture.')
     def test_browser_renderer_and_cross_language_palette_parity(self):

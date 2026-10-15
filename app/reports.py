@@ -903,7 +903,7 @@ def _charts(runs, styles=None):
                 directions = sorted({point.get("direction", "unknown") for point in run["series"]})
                 for direction in directions:
                     style = styles.get((run["id"], "local", direction), series_style("local", direction))
-                    legend.append(("Test " + str(run["display_index"]), style["color"], run["label"] + " / " + style["label"] + " / " + style["pattern"]))
+                    legend.append(("Test " + str(run["display_index"]), style["color"], run["label"] + " / " + style["label"] + " / " + (style["pattern"] if direction in KNOWN_DIRECTIONS else "points")))
             caption = "Local reports, client perspective. Upload solid; download dashed; other directions are points (bidirectional aggregates solid). Dark outlines keep bright colors visible on paper. Only captured spans and points are drawn; shared axes preserve elapsed time and gaps. Series colors match the same UI selection."
             charts.append(("Measured throughput intervals", _chart(panel, bounds, styles), caption, legend))
     return charts
