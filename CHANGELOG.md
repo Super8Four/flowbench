@@ -2,6 +2,10 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Published prerelease](docs/assets/badges/version.svg)](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1) [![Native images](docs/assets/badges/platform.svg)](docs/setup-and-testing.md) [![Storage](docs/assets/badges/storage.svg)](docs/sqlite-storage.md)
 
+## Unreleased
+
+- Distinguish iPerf session upload/download with green/yellow local and remote shades. Add explicit source/direction legends and consistent line patterns. Assign separate comparison-series colors beyond the saved eight-color run palette; match PDF/Word colors and retain saved history colors, elapsed gaps and SI units.
+
 ## 0.2.0-rc.1 - 2026-10-15
 
 This prerelease brings the merged measurement, diagnostic and reporting workflows into the release downloads. It retains SQLite schema 1 and the existing persistent data volume. See [release notes](docs/release-0.2.0-rc.1.md) for install, upgrade and verification links.

@@ -1,3 +1,4 @@
+import {seriesStyle, comparisonStyles, seriesKey} from './chart-styles.js';
 import {createWorkflows, preflightSummary} from './workflows.js';
 import {rateScale, formatRate, formatMbps, runColor, palette} from './units.js';
 import {displayTimestamp, initTimestamps} from './timestamps.js';
@@ -290,17 +291,17 @@ function chart(localPoints, remotePoints = []) {
   for (const [source, input] of [['local', localPoints], ['remote', remotePoints]]) {
     if (perspective !== 'compare' && source !== perspective) continue;
     for (const direction of ['upload', 'download']) {
-      const color = runColor(selected || {});
+      const style = seriesStyle(source, direction), color = style.color;
       const valid = (input || []).filter((p) => p.direction === direction && Number.isFinite(p.seconds) && Number.isFinite(p.mbps));
       const data = Array.from(new Map(valid.map((p) => [p.seconds, p])).values()).sort((a, b) => a.seconds - b.seconds);
-      if (data.length) lines.push({source, direction, color, data});
+      if (data.length) lines.push({source, direction, color, data, style});
     }
   }
   const points = lines.flatMap((line) => line.data);
   const scale = rateScale(points.map((point) => point.mbps * 1e6));
   $('throughput-unit').textContent = scale.unit;
   $('throughput-chart').setAttribute('aria-label', `Throughput by elapsed seconds in ${scale.unit}`);
-  $('peer-legend').classList.toggle('d-none', perspective !== 'compare');
+  $('throughput-legend').innerHTML = lines.map((line) => seriesKey(line.style)).join('');
   if (!points.length) {
     $('throughput-chart').innerHTML = `<text x="${width / 2}" y="110" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'No remote interval measurements' : 'Interval measurements'}</text><text x="${width / 2}" y="130" text-anchor="middle" fill="#aab6bf" font-size="12">${perspective === 'remote' ? 'are available for this session' : 'will appear here'}</text>`;
     return;
@@ -322,14 +323,15 @@ function chart(localPoints, remotePoints = []) {
     svg += `<text x="${x(seconds)}" y="222" text-anchor="${i === 0 ? 'start' : i === ticks ? 'end' : 'middle'}" fill="#aab3bb" font-size="12">${number(seconds, 1)}s</text>`;
   }
   for (const line of lines) {
-    const path = smoothPath(line.data, x, y), remote = line.source === 'remote' && perspective === 'compare';
-    const pattern = remote ? line.direction === 'download' ? '8 3 2 3' : '2 4' : line.direction === 'download' ? '7 5' : '';
+    const path = smoothPath(line.data, x, y), remote = line.source === 'remote';
+    const pattern = line.style.dash;
     svg += `<path d="${path}" stroke="${line.color}" stroke-width="${remote ? '1.6' : '1.9'}" ${pattern ? `stroke-dasharray="${pattern}"` : ''} fill="none"/>`;
-    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="${line.data.length === 1 ? 3 : 5}" fill="${line.color}" fill-opacity="${line.data.length === 1 ? 1 : 0}"><title>${line.source} ${line.direction}: ${formatMbps(p.mbps,2,scale)} at ${number(p.seconds, 2)}s</title></circle>`;
+    for (const p of line.data) svg += `<circle cx="${x(p.seconds)}" cy="${y(p.mbps)}" r="${line.data.length === 1 ? 3 : 5}" fill="${line.color}" fill-opacity="${line.data.length === 1 ? 1 : 0}"><title>${line.style.label}: ${formatMbps(p.mbps,2,scale)} at ${number(p.seconds, 2)}s</title></circle>`;
   }
   $('throughput-chart').innerHTML = svg;
 }
 function renderPeer() {
+  $('throughput-legend').innerHTML = '';
   if (isCheck(selected)) { $('throughput-chart').innerHTML = ''; $('peer-summary').classList.add('d-none'); return; }
   if (selected?.kind === 'flent-run') {
     $('throughput-chart').innerHTML = '';
@@ -348,7 +350,7 @@ function renderPeer() {
   const peer = selected?.peer;
   $('peer-output').textContent = peer?.raw_output || peer?.note || 'Remote output will appear after the server supplies it.';
   const perspective = $('chart-perspective').value;
-  $('chart-source-note').textContent = perspective === 'local' ? 'Local iPerf measurements · solid: upload · dashed: download. Saved run color identifies this session; measured point tooltips include SI units.' : (peer?.note || 'Choose a session to view the remote server output.');
+  $('chart-source-note').textContent = perspective === 'local' ? 'Client perspective: green upload, yellow download. Local and remote shades, labels and line patterns identify each measured series; tooltips include SI units.' : (peer?.note || 'Choose a session to view the remote server output.');
   const visible = perspective !== 'local';
   $('peer-summary').classList.toggle('d-none', !visible);
   if (visible) {
@@ -557,6 +559,7 @@ async function overlay(renderLegend = true) {
   const width = chartWidth('comparison-chart'), right = width - 15, ticks = width < 600 ? 3 : 5;
   const remote = $('comparison-perspective').value === 'remote';
   const records = comparisonData?.runs || [];
+  const styles = comparisonStyles(records), source = remote ? 'remote' : 'local';
   records.forEach((run, index) => { if (!knownComparisonRuns.has(run.id)) { if (index >= 8) hiddenComparisonRuns.add(run.id); knownComparisonRuns.add(run.id); } });
   const lines = [];
   records.forEach((run, index) => {
@@ -564,10 +567,10 @@ async function overlay(renderLegend = true) {
       const input = (remote ? run.peer?.series : run.series) || [];
       const valid = input.filter((p) => p.direction === direction && Number.isFinite(p.seconds) && Number.isFinite(p.mbps));
       const data = [...new Map(valid.map((p) => [p.seconds, p])).values()].sort((a,b) => a.seconds-b.seconds);
-      if (data.length) lines.push({data, direction, color: runColor(run), name: `${index + 1}. ${title(run)}`, id: run.id, index});
+      if (data.length) lines.push({data, direction, style: styles.get(`${run.id}/${source}/${direction}`), color: styles.get(`${run.id}/${source}/${direction}`).color, name: `${index + 1}. ${title(run)}`, id: run.id, index});
     }
   });
-  if (renderLegend) renderComparisonLegend(records, remote);
+  if (renderLegend) renderComparisonLegend(records, remote, styles);
   const points = lines.flatMap((l) => l.data);
   if (!points.length) { $('comparison-unit').textContent = 'bps'; $('comparison-visible-count').textContent = 'No iPerf intervals are available for this selection. All selected evidence remains in tables and exports.'; $('comparison-chart').innerHTML = `<text x="${width / 2}" y="115" text-anchor="middle" fill="#aab3bb">No iPerf interval data for this selection</text>`; return; }
   const maxTime = points.reduce((max, point) => Math.max(max, point.seconds), 1), maxRate = points.reduce((max, point) => Math.max(max, point.mbps), 0) * 1.1 || 1e-6;
@@ -586,18 +589,18 @@ async function overlay(renderLegend = true) {
       if (index && index % 2500 === 0) { await new Promise((resolve) => requestAnimationFrame(resolve)); if (plotGeneration !== comparisonPlotVersion) return; }
       const point = line.data[index], previous = line.data[index - 1];
       path += `${index && Number.isFinite(point.start) && point.start <= previous.seconds + 0.000001 ? 'L' : 'M'} ${x(point.seconds)},${y(point.mbps)} `;
-      if (index % markerStride === 0 || index === line.data.length - 1) markers += `<circle cx="${x(point.seconds)}" cy="${y(point.mbps)}" r="3" fill="${line.color}"><title>${escape(line.name)} · ${line.direction}: ${formatMbps(point.mbps, 2, scale)} at ${number(point.seconds)}s</title></circle>`;
+      if (index % markerStride === 0 || index === line.data.length - 1) markers += `<circle cx="${x(point.seconds)}" cy="${y(point.mbps)}" r="3" fill="${line.color}"><title>${escape(line.name)} · ${line.style.label}: ${formatMbps(point.mbps, 2, scale)} at ${number(point.seconds)}s</title></circle>`;
     }
-    svg += `<path d="${path}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.direction === 'download' ? 'stroke-dasharray="7 5"' : ''}><title>${escape(line.name)} ${line.direction} measured curve; point tooltips are sampled for display only.</title></path>` + markers;
+    svg += `<path d="${path}" fill="none" stroke="${line.color}" stroke-width="2.4" ${line.style.dash ? `stroke-dasharray="${line.style.dash}"` : ''}><title>${escape(line.name)} ${line.style.label} measured curve; point tooltips are sampled for display only.</title></path>` + markers;
     const last = line.data.at(-1);
-    svg += `<text x="${x(last.seconds)}" y="${Math.max(15, y(last.mbps) + (line.direction === 'upload' ? -8 : 13))}" text-anchor="end" fill="${line.color}" font-size="11">${line.index + 1} ${line.direction === 'upload' ? 'U' : 'D'}<title>${escape(line.name)} ends at ${number(last.seconds)} elapsed seconds; ${line.direction}</title></text>`;
+    svg += `<text x="${x(last.seconds)}" y="${Math.max(15, y(last.mbps) + (line.direction === 'upload' ? -8 : 13))}" text-anchor="end" fill="${line.color}" font-size="11">${line.index + 1} ${remote ? 'R' : 'L'}${line.direction === 'upload' ? 'U' : 'D'}<title>${escape(line.name)} ends at ${number(last.seconds)} elapsed seconds; ${line.style.label}</title></text>`;
   }
   if (plotGeneration !== comparisonPlotVersion) return;
   $('comparison-chart').innerHTML = svg;
   const shown = records.filter((run) => !hiddenComparisonRuns.has(run.id)).length;
   $('comparison-visible-count').textContent = `${shown} of ${records.length} traces shown. All selected runs remain in tables, exports and reports. Point markers are sampled on dense curves; measured paths and saved values are retained.`;
 }
-function renderComparisonLegend(records, remote) {
+function renderComparisonLegend(records, remote, styles) {
   const generation = ++comparisonRenderVersion; $('comparison-legend').replaceChildren();
   let index = 0;
   const batch = () => {
@@ -605,7 +608,11 @@ function renderComparisonLegend(records, remote) {
     const fragment = document.createDocumentFragment(), end = Math.min(index + 20, records.length);
     for (; index < end; index++) {
       const run = records[index], item = document.createElement('div'); item.className = 'comparison-legend-row';
-      item.innerHTML = `<label class="comparison-trace"><input type="checkbox" data-visible-run="${escape(run.id)}" ${hiddenComparisonRuns.has(run.id) ? '' : 'checked'}><span class="comparison-color-swatch" style="background:${runColor(run)}"></span><span>${index + 1}. ${escape(title(run))}${index === 0 ? ' · baseline' : ''}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span></label><label class="comparison-color-label">Saved color<input type="color" class="comparison-color" data-run-color="${escape(run.id)}" value="${runColor(run)}" aria-label="Saved trace color for ${escape(title(run))}"></label>`;
+      item.innerHTML = `<label class="comparison-trace"><input type="checkbox" data-visible-run="${escape(run.id)}" ${hiddenComparisonRuns.has(run.id) ? '' : 'checked'}><span class="comparison-color-swatch" style="background:${runColor(run)}"></span><span>${index + 1}. ${escape(title(run))}${index === 0 ? ' · baseline' : ''}${remote && !run.peer?.series?.length ? ' · remote intervals unavailable' : ''}</span></label><label class="comparison-color-label">Saved run color<input type="color" class="comparison-color" data-run-color="${escape(run.id)}" value="${runColor(run)}" aria-label="Saved history marker color for ${escape(title(run))}"></label>`;
+      const input = (remote ? run.peer?.series : run.series) || [];
+      const keys = document.createElement('div'); keys.className = 'comparison-series-keys';
+      keys.innerHTML = ['upload', 'download'].filter((direction) => input.some((point) => point.direction === direction && Number.isFinite(point.seconds) && Number.isFinite(point.mbps))).map((direction) => seriesKey(styles.get(`${run.id}/${remote ? 'remote' : 'local'}/${direction}`))).join('');
+      item.append(keys);
       fragment.append(item);
     }
     $('comparison-legend').append(fragment);
