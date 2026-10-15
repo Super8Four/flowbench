@@ -1,6 +1,6 @@
 # DNS checks, ICMP observations and Run again
 
-Current main (`0.2.0-dev`) includes standalone DNS and ICMP checks and new executions from saved configuration. Build current source to use these features; the published rc.1 and rc.2 downloads are unchanged. See [planned diagnostics](roadmap.md) for work that remains outside this implementation.
+Current main (`0.2.0-rc.1`) includes standalone DNS and ICMP checks and new executions from saved configuration. Use the 0.2.0-rc.1 tag for a reproducible install; older 0.1.0-rc.1/rc.2 downloads are unchanged. See [planned diagnostics](roadmap.md) for work that remains outside this implementation.
 
 ## Start and inspect a check
 

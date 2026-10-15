@@ -2,9 +2,23 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](assets/badges/container.svg)](setup-and-testing.md) [![Architecture](assets/badges/platform.svg)](setup-and-testing.md) [![Python](assets/badges/python.svg)](setup-and-testing.md) [![SQLite](assets/badges/storage.svg)](sqlite-storage.md) [![iPerf3](assets/badges/engine.svg)](protocol-tests.md)
 
-## Current source and repeatable checks
+## Release verification
 
-Current main is unreleased `0.2.0-dev`, including route and read-only clock evidence, offline connection maps, DNS and ICMP checks, Run again, measurement workflows, actual optional Linux Flent and PDF/Word reports. PRs [10](https://github.com/Super8Four/flowbench/pull/10) and [21](https://github.com/Super8Four/flowbench/pull/21) were merged in order. Their combined code is commit `22f15addf6b0e232bbe6dcf44d57705ce9b546b3`; its file tree matches the tested feature commit `010177c5b85802dd89779e3d530965a5867efeba`. The latest published downloads remain rc.2. Use the exact source SHA and terminal CI run, rather than a changing badge, to identify tested code. [Testing](testing.md) maps meaningful checks and platform limits; [lifecycle](lifecycle.md) describes review and release evidence.
+The [0.2.0-rc.1 release page](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1) identifies its immutable source commit, terminal CI runs and six native image/metadata/checksum assets. Follow the [release notes](release-0.2.0-rc.1.md) for installation, upgrade and remaining limits. Current-main badges can change after publication.
+
+The release includes the endpoint warning correction from [PR25](https://github.com/Super8Four/flowbench/pull/25). Its model regression reproduced 20 incorrect promotions on the old main, and a parser/SQLite regression reproduced the warning loss in the first streamed start transaction. The correction passed 406 local tests with zero skips and exact-source Windows/native CI. Historical labels already saved as captured are not rewritten.
+
+ReportLab 5.0.1 and the dependency minimum updates are reviewed through [PR9](https://github.com/Super8Four/flowbench/pull/9). Fresh native rendering is checked independently of the older renderer's pages. Release CI and the release-page evidence distinguish generated/layout-checked output from manual visual review.
+
+## Release UI and screenshot provenance
+
+The README retains the actual desktop and mobile endpoint captures documented below. They were captured at `2d2c882`; the release uses the same static assets and templates. The version label and backend dependency/status corrections are checked separately. They are not new release-source screenshots.
+
+Fresh browser capture was attempted during release preparation, but no browser surface was connected and both Edge and the in-app browser reported unavailable after retries. Earlier actual desktop/mobile/keyboard checks and the release's controller/API regressions remain identified by source; fresh interactive browser acceptance is unrun. No screenshot was reconstructed, relabelled as a newer capture or taken from a private archive. The supplied SVG/PNG geometry and transparent dark variant are unchanged.
+
+## Historical integration evidence (22f15ad)
+
+The earlier main integration included route and read-only clock evidence, offline connection maps, DNS and ICMP checks, Run again, measurement workflows, actual optional Linux Flent and PDF/Word reports. PRs [10](https://github.com/Super8Four/flowbench/pull/10) and [21](https://github.com/Super8Four/flowbench/pull/21) were merged in order. Their combined code is commit `22f15addf6b0e232bbe6dcf44d57705ce9b546b3`; its file tree matches the tested feature commit `010177c5b85802dd89779e3d530965a5867efeba`. Those results describe that earlier integration, not the new release commit. Use the exact source SHA and terminal CI run, rather than a changing badge, to identify tested code. [Testing](testing.md) maps meaningful checks and platform limits; [lifecycle](lifecycle.md) describes review and release evidence.
 
 Run `python -m unittest discover -s tests -v` with the verified engine and dependencies. Source/Windows and native AMD64/ARM64 workflows exercise archive transaction/concurrency/error/restart, JSON/XML import/export, protocol/listener behavior, measurement workflows, report privacy, native Flent and report rendering. Node-dependent wrappers can skip in the Node-free image; actual controller behavior is exercised separately in the source job. Read the test summary, including skips, for the exact commit.
 

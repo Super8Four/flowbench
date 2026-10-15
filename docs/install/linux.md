@@ -4,14 +4,13 @@
 
 These commands target **Ubuntu 24.04** with Python 3.12. The container build exercises the same iPerf source/checksum and packages on AMD64/ARM64; a standalone native-host install has not been separately verified. Use the [container method](containers.md) for the fully checked package.
 
-The commands use current main. For an immutable older prerelease, use the alternative in [version selection](README.md#choose-a-source-version). Install prerequisites:
+The commands use the immutable 0.2.0-rc.1 tag. [Version selection](README.md#choose-a-source-version) also explains development main and historical releases. Install prerequisites:
 
 ```sh
 sudo apt-get update
 sudo apt-get install -y git python3-venv build-essential ca-certificates curl libssl-dev iputils-tracepath iputils-ping
-git clone https://github.com/Super8Four/flowbench.git
+git clone --branch v0.2.0-rc.1 --depth 1 https://github.com/Super8Four/flowbench.git
 cd flowbench
-git switch main
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```

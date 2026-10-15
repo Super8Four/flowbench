@@ -1,6 +1,6 @@
 # Test endpoints and execution context
 
-This guide describes Test endpoints in current main (`0.2.0-dev`), delivered through [PR24](https://github.com/Super8Four/flowbench/pull/24). Published rc.2 downloads remain unchanged and do not contain this addition. The [verification record](verification.md) identifies exact-source CI, browser checks, screenshot provenance and rendered-report evidence; the PR records integration and post-merge checks.
+This guide describes Test endpoints in 0.2.0-rc.1, delivered through [PR24](https://github.com/Super8Four/flowbench/pull/24) with the partial-evidence correction in [PR25](https://github.com/Super8Four/flowbench/pull/25). Published rc.2 downloads remain unchanged and do not contain this addition. The [verification record](verification.md) identifies exact-source CI, browser checks, screenshot provenance and rendered-report evidence; the PR records integration and post-merge checks.
 
 ## Read the selected test's evidence
 
@@ -34,7 +34,7 @@ Tool absence, text-only output, malformed native fields, failed starts and incom
 
 Endpoint availability is separate from the test's capture outcome. A completed test can have partial or unavailable endpoint details; that does not turn missing addresses into a failed measurement or a guessed socket.
 
-The follow-up `fix/endpoint-partial-evidence` branch is under review. The merged PR24 version can incorrectly upgrade partial availability when valid sockets coexist with malformed entries and a later update has no reconciling socket evidence. The proposed correction preserves the warning through end-only output and finalization. Fresh matching observations can still fill unknown socket fields; empty starts and another reporter's observations cannot erase the warning. It requires no schema migration and does not rewrite or repair older archived labels.
+The partial-evidence correction in 0.2.0-rc.1 preserves the warning when valid sockets coexist with malformed entries and a later update has no reconciling socket evidence. End-only output and finalization do not clear it. Fresh matching observations can still fill unknown socket fields; empty starts and another reporter's observations cannot erase the warning. It requires no schema migration and does not rewrite or repair older archived labels.
 
 ## History, copies and provenance
 

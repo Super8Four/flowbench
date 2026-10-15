@@ -2,22 +2,22 @@
 
 [![Main CI](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml/badge.svg?branch=main)](https://github.com/Super8Four/flowbench/actions/workflows/container.yaml?query=branch%3Amain) [![Prerelease](https://img.shields.io/github/v/release/Super8Four/flowbench?include_prereleases&sort=semver&label=prerelease&color=183b50&cacheSeconds=300)](https://github.com/Super8Four/flowbench/releases) [![Container](assets/badges/container.svg)](setup-and-testing.md) [![Architecture](assets/badges/platform.svg)](setup-and-testing.md) [![Python](assets/badges/python.svg)](setup-and-testing.md) [![SQLite](assets/badges/storage.svg)](sqlite-storage.md) [![iPerf3](assets/badges/engine.svg)](protocol-tests.md)
 
-These instructions cover **current main (`0.2.0-dev`)**, including [standalone checks and Run again](network-checks.md), [route/clock evidence](preflight.md) and the merged measurement/report workflows. Published rc.1 and rc.2 downloads remain unchanged. Choose the intended source/version before installing; the [installation wiki](install/README.md) has separate platform guides.
+These instructions cover **0.2.0-rc.1**, including standalone checks, reruns, endpoints, route/clock evidence and measurement reports. The [installation index](install/README.md) has platform-specific steps. Older rc.1/rc.2 downloads retain their original contents.
 
 ## Ubuntu container
 
-Install Docker Engine and Compose v2 using [Docker's Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/) on the approved host. Build current main using the README commands and record its exact Git revision. To reproduce rc.2 instead, use that immutable tag and matching image metadata; its source/image does not contain current-main additions. Use native `linux/amd64` or `linux/arm64`; choose ARM64 only on a compatible 64-bit host. The runtime is non-root UID/GID `10001:10001`, with a read-only root, `/tmp` tmpfs, dropped capabilities and a writable `/data` volume.
+Use Docker Engine and Compose v2 on a compatible Linux host. Build the tagged source using the [README](../README.md#start-with-docker), or download the matching native AMD64/ARM64 archive, metadata and checksum list from the [release](https://github.com/Super8Four/flowbench/releases/tag/v0.2.0-rc.1).
 
-To reproduce the older rc.2 prerelease image instead of building main, download its architecture-specific `.tar.gz`, `.image.json` and `.SHA256SUMS` files into a clean directory. Verify the checksum list **before** loading. Example for ARM64:
+Verify checksums before loading. Example for ARM64:
 
 ```sh
-sha256sum -c flowbench-0.1.0-rc.2-linux-arm64.SHA256SUMS
-gzip -dc flowbench-0.1.0-rc.2-linux-arm64.tar.gz | docker load
-docker image inspect iperf-workspace:local --format '{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+sha256sum -c flowbench-0.2.0-rc.1-linux-arm64.SHA256SUMS
+gzip -dc flowbench-0.2.0-rc.1-linux-arm64.tar.gz | docker load
+docker image inspect iperf-workspace:local --format '{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.version"}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
 docker compose up -d --no-build --wait
 ```
 
-The compatibility image tag remains `iperf-workspace:local`. Metadata records its source revision, version, architecture and image ID. Release source archives are GitHub-generated source downloads; they contain no local `.env`, archives or Windows engine. A container archive does **not** include your data volume.
+Use the release's Compose file and compare architecture, version and source revision with its metadata. The compatibility tag remains `iperf-workspace:local`; no registry image is published. Images use non-root UID/GID `10001:10001`, a read-only root, `/tmp` tmpfs, dropped capabilities and a writable `/data` volume. Image archives do not include user volumes or local credentials. Physical Pi operation remains untested.
 
 ## Configuration and reachability
 
@@ -77,7 +77,7 @@ A complete stopped SQLite backup retains local request mappings, which prevent d
 
 ## Local development
 
-Use a fresh source checkout of main for these development features, or select a published tag before installing its requirements. Windows PowerShell:
+Use the tagged release checkout before installing its requirements. Select main explicitly only for development. Windows PowerShell:
 
 ```powershell
 py -3.12 -m venv .venv
